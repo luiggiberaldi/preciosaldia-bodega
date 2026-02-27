@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* DEFAULT REVENDEDOR THEME (Luege se cambian vía JS) */
+    --color-brand: 16 185 129; /* Emerald 500 equivalent */
+    --color-brand-dark: 4 120 87; /* Emerald 700 equivalent */
+    --color-bg-light: 248 250 252;
+    --color-bg-dark: 15 23 42; 
+  }
+}
+
+body {
+  background-color: rgb(var(--color-bg-light));
+  color: #1e293b;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.dark body {
+  background-color: rgb(var(--color-bg-dark));
+  color: #f8fafc;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}

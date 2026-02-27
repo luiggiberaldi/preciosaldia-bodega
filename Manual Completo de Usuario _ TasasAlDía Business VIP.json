@@ -1,0 +1,134 @@
+{
+    "manual_info": {
+        "title": "Manual Completo de Usuario | TasasAlDía Business VIP",
+        "version": "3.0 Fénix",
+        "last_update": "Febrero 2026",
+        "compliance": "PDA Compliance Checked"
+    },
+    "welcome_message": "Bienvenido al futuro de la gestión financiera inteligente. Este manual es tu mapa para dominar TasasAlDía y blindar tu negocio contra la volatilidad.",
+    "sections": [
+        {
+            "id": "activation",
+            "title": "🎯 Primeros Pasos: Activación",
+            "steps": [
+                "Acepta los Términos y Condiciones deslizando hasta el final.",
+                "IMPORTANTE: El Modo Demo es de uso único (24h). No reactivable.",
+                "Copia tu ID de Instalación (Formato: TASAS-XXXX).",
+                "Solicita tu Código de Activación al soporte VIP.",
+                "Ingresa el código (Formato: ACTIV-XXXX-XXXX) y valida."
+            ]
+        },
+        {
+            "id": "section_1",
+            "title": "📊 Sección 1: Monitor de Mercado",
+            "description": "Tu torre de control con el pulso económico en tiempo real.",
+            "features": [
+                {
+                    "name": "Indicadores Principales",
+                    "details": "Tasa BCV (Oficial), Tasa USDT (Paralelo P2P) y Euro BCV."
+                },
+                {
+                    "name": "La Brecha (%)",
+                    "details": "Diferencia porcentual entre BCV y Paralelo. Si sube, protege tus precios."
+                },
+                {
+                    "name": "Indicadores de Tendencia",
+                    "details": "Flechas y colores (Verde/Rojo) que indican variaciones recientes en las tasas."
+                },
+                {
+                    "name": "Modo Kiosco",
+                    "details": "Botón de 'Pantalla Completa' para exhibir la tasa en grande en tu local."
+                },
+                {
+                    "name": "Captura de Pantalla",
+                    "details": "Icono de cámara en Modo Kiosco para guardar una imagen compartible de la tasa del día."
+                }
+            ]
+        },
+        {
+            "id": "section_2",
+            "title": "🧮 Sección 2: Calculadora y Chat IA",
+            "description": "Calculadora híbrida con modos Manual y Chat Inteligente.",
+            "features": [
+                {
+                    "name": "Modo Manual",
+                    "details": "Calculadora tradicional. Selecciona USD o VES, ingresa monto y elige la tasa (BCV, Paralelo, Promedio)."
+                },
+                {
+                    "name": "Mister Cambio (Asistente IA)",
+                    "details": "Habla o escribe en lenguaje natural. Ej: '50 dólares a bolos' o 'Precio de 2 harinas'."
+                },
+                {
+                    "name": "Control de Voz",
+                    "details": "Activa/Desactiva la respuesta de voz tocando el ícono de micrófono/altavoz en la cabecera de la calculadora."
+                },
+                {
+                    "name": "Tarjetas de Respuesta",
+                    "details": "Resultados visuales grandes con botón de copiar rápido."
+                }
+            ]
+        },
+        {
+            "id": "section_3",
+            "title": "🏪 Sección 3: Catálogo 'Blindado'",
+            "description": "Inventario que ajusta precios en Bolívares automáticamente.",
+            "features": [
+                {
+                    "name": "Precios en Dólares Fijos",
+                    "details": "Fijas el precio en USD una vez. La app calcula los Bs diarios según la tasa."
+                },
+                {
+                    "name": "Calibración de Efectivo",
+                    "details": "Herramienta 'Calibrar Tasa Efectivo' para ajustar la paridad del dólar físico vs USDT."
+                },
+                {
+                    "name": "Cotizaciones Flash",
+                    "details": "Selecciona productos -> Ver Pedido -> Cotizar por WhatsApp. Genera un mensaje listo para enviar."
+                }
+            ]
+        },
+        {
+            "id": "section_4",
+            "title": "💳 Sección 4: Billetera (Mis Cuentas)",
+            "description": "Gestiona tus datos de pago para compartir rápido.",
+            "features": [
+                {
+                    "name": "Gestión de Cuentas",
+                    "details": "Guarda Pago Móvil, Transferencias, Zelle y Binance."
+                },
+                {
+                    "name": "Compartir Datos",
+                    "details": "Envía tus datos bancarios por WhatsApp o muestra un código QR generado al instante."
+                },
+                {
+                    "name": "Calculadora de Cobro",
+                    "details": "Al compartir, puedes agregar un monto en Bs y la app calcula el equivalente en divisas (si aplica)."
+                }
+            ]
+        },
+        {
+            "id": "section_5",
+            "title": "🔧 Sección 5: Configuración y Datos",
+            "features": [
+                {
+                    "name": "Tema",
+                    "details": "Alterna entre Modo Claro y Oscuro con el ícono de sol/luna."
+                },
+                {
+                    "name": "Respaldo (Backup)",
+                    "details": "En el ícono de engranaje (Catálogo), puedes Exportar e Importar todos tus productos y cuentas."
+                },
+                {
+                    "name": "Modo Offline",
+                    "details": "Funciona sin internet mostrando la última tasa guardada (alerta visual de datos antiguos)."
+                }
+            ]
+        }
+    ],
+    "tips": [
+        "Usa el micrófono en horas pico para conversiones rápidas.",
+        "Comparte tu lista de precios actualizada cada mañana desde el Catálogo.",
+        "Realiza un respaldo semanal de tus datos desde configuración.",
+        "Usa la Calibración de Efectivo para no perder dinero aceptando dólares físicos."
+    ]
+}

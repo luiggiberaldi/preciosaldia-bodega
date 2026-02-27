@@ -1,0 +1,700 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { storageService } from '../utils/storageService';
+import { showToast } from '../components/Toast';
+import { Search, X, Package, RefreshCw, Mic, Box, ShoppingCart } from 'lucide-react';
+import { formatBs } from '../utils/calculatorUtils';
+import { DEFAULT_PAYMENT_METHODS } from '../config/paymentMethods';
+import ReceiptModal from '../components/Sales/ReceiptModal';
+import CheckoutModal from '../components/Sales/CheckoutModal';
+import CartPanel from '../components/Sales/CartPanel';
+import { useVoiceSearch } from '../hooks/useVoiceSearch';
+
+const SALES_KEY = 'bodega_sales_v1';
+
+export default function SalesView({ rates, triggerHaptic }) {
+    const [products, setProducts] = useState([]);
+    const [customers, setCustomers] = useState([]);
+    const [selectedCustomerId, setSelectedCustomerId] = useState('');
+    const [cart, setCart] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showCheckout, setShowCheckout] = useState(false);
+    const [showReceipt, setShowReceipt] = useState(null);
+    const [payments, setPayments] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [showRateConfig, setShowRateConfig] = useState(false);
+    const [hierarchyPending, setHierarchyPending] = useState(null); // Producto pendiente de selección paquete/unidad
+    const [weightPending, setWeightPending] = useState(null); // Producto pendiente de pesaje (kg/litro)
+
+    // Búsqueda y Navegación
+    const searchInputRef = useRef(null);
+    const [selectedIndex, setSelectedIndex] = useState(0);
+
+    // Audio / Voice Search (Groq Whisper)
+    const { isRecording, isProcessingAudio, toggleRecording } = useVoiceSearch({
+        onResult: (text) => { setSearchTerm(text); searchInputRef.current?.focus(); },
+        triggerHaptic,
+    });
+
+    // Calculadora de pago
+    const [amountGiven, setAmountGiven] = useState('');
+    const [amountGivenCurrency, setAmountGivenCurrency] = useState('USD');
+
+    // ── Tasa BCV (automática o manual) ──
+    const [useAutoRate, setUseAutoRate] = useState(() => {
+        const saved = localStorage.getItem('bodega_use_auto_rate');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
+    const [customRate, setCustomRate] = useState(() => {
+        const saved = localStorage.getItem('bodega_custom_rate');
+        return saved && parseFloat(saved) > 0 ? saved : '';
+    });
+
+    const bcvRate = rates.bcv?.price || 0;
+    const effectiveRate = useAutoRate ? bcvRate : (parseFloat(customRate) > 0 ? parseFloat(customRate) : bcvRate);
+
+    // Persist rate config
+    useEffect(() => {
+        localStorage.setItem('bodega_use_auto_rate', JSON.stringify(useAutoRate));
+        localStorage.setItem('bodega_custom_rate', customRate.toString());
+    }, [useAutoRate, customRate]);
+
+    // Load products and customers from IndexedDB
+    useEffect(() => {
+        let mounted = true;
+        const load = async () => {
+            const [saved, savedCustomers] = await Promise.all([
+                storageService.getItem('my_products_v1', []),
+                storageService.getItem('my_customers_v1', [])
+            ]);
+            if (mounted) {
+                setProducts(saved);
+                setCustomers(savedCustomers);
+                setIsLoading(false);
+            }
+        };
+        load();
+        return () => { mounted = false; };
+    }, []);
+
+    // Regresar el foco al input
+    useEffect(() => {
+        if (!isLoading && searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [isLoading]);
+
+    // Refresh products (when coming back from catalog)
+    useEffect(() => {
+        const handleFocus = async () => {
+            const saved = await storageService.getItem('my_products_v1', []);
+            setProducts(saved);
+        };
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }, []);
+
+    // Reseteamos index cuando cambia la busqueda
+    useEffect(() => {
+        setSelectedIndex(0);
+    }, [searchTerm]);
+
+    // Search results (permite buscar por código de barra también)
+    const searchResults = searchTerm.length >= 1
+        ? products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.barcode?.includes(searchTerm)).slice(0, 6)
+        : [];
+
+    // Cart calculations — Todo en $ BCV y Bs
+    const cartTotalUsd = cart.reduce((sum, item) => sum + (item.priceUsd * item.qty), 0);
+    const cartTotalBs = cartTotalUsd * effectiveRate;
+    const cartItemCount = cart.reduce((sum, item) => sum + item.qty, 0);
+
+    // Add to cart — Convierte priceUsdt a $ BCV para uniformidad
+    const addToCart = useCallback((product, qtyOverride = null, forceMode = null) => {
+        triggerHaptic && triggerHaptic();
+
+        // Si el producto tiene jerarquía y no se ha elegido modo, mostrar popup
+        if (product.sellByUnit && product.unitPriceUsd && !forceMode && !qtyOverride) {
+            setHierarchyPending(product);
+            return;
+        }
+
+        // Si el producto es por peso/volumen y no tiene cantidad, mostrar popup de pesaje
+        if ((product.unit === 'kg' || product.unit === 'litro') && !qtyOverride) {
+            setWeightPending(product);
+            return;
+        }
+
+        const usdtRate = rates.usdt?.price || effectiveRate;
+        let priceToUse = product.priceUsdt;
+        let cartId = product.id;
+        let cartName = product.name;
+        let qtyToAdd = qtyOverride || 1;
+
+        // Si se elige unidad suelta, usar precio unitario
+        if (forceMode === 'unit') {
+            priceToUse = product.unitPriceUsd;
+            cartId = product.id + '_unit';
+            cartName = product.name + ' (Ud.)';
+        }
+
+        const priceInBcvUsd = (priceToUse * usdtRate) / effectiveRate;
+
+        setCart(prev => {
+            const existing = prev.find(i => i.id === cartId);
+            if (existing && !qtyOverride) {
+                return prev.map(i => i.id === cartId ? { ...i, qty: i.qty + 1 } : i);
+            }
+            if (existing && qtyOverride) {
+                return prev.map(i => i.id === cartId ? { ...i, qty: i.qty + qtyOverride } : i);
+            }
+            return [...prev, {
+                ...product,
+                id: cartId,
+                name: cartName,
+                priceUsd: priceInBcvUsd,
+                qty: qtyToAdd,
+                isWeight: !!qtyOverride,
+                _originalId: product.id, // Para descontar stock correctamente
+                _mode: forceMode || 'package',
+                _unitsPerPackage: product.unitsPerPackage || 1,
+            }];
+        });
+        setSearchTerm('');
+        setHierarchyPending(null);
+        searchInputRef.current?.focus();
+    }, [triggerHaptic, rates, effectiveRate]);
+
+    // Eventos del Input para teclado interactivo y Escáner
+    const handleSearchKeyDown = (e) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex(prev => Math.min(prev + 1, searchResults.length - 1));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex(prev => Math.max(prev - 1, 0));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+
+            // Lógica de Balanza y Escáner Continuo (Prefijo 21)
+            // Ejemplo peso: 2100012003504 (PLU 12, PESA 0.350kg)
+            if (searchTerm.startsWith('21') && searchTerm.length >= 13) {
+                const pluCode = parseInt(searchTerm.substring(2, 7), 10).toString(); // Quitar ceros a la izquierda
+                const weightRaw = searchTerm.substring(7, 12); // 5 dígitos de peso en gramos
+                const weightKg = parseInt(weightRaw, 10) / 1000;
+                // Busca por ID simulando el PLU o por Barcode
+                const p = products.find(p => p.id === pluCode || p.barcode?.includes(pluCode) || p.barcode?.includes(searchTerm.substring(0, 7)));
+                if (p) {
+                    addToCart({ ...p, isWeight: true }, weightKg);
+                    setSearchTerm('');
+                    return;
+                }
+            }
+
+            // Seleccion normal por lista
+            if (searchResults[selectedIndex]) {
+                addToCart(searchResults[selectedIndex]);
+            } else if (searchResults.length === 1) {
+                addToCart(searchResults[0]);
+            } else if (searchTerm.length >= 3 && searchResults.length === 0) {
+                // Si fue escáner pero no encontró con '21', buscar coincidencia exacta
+                const exactMatch = products.find(p => p.barcode === searchTerm);
+                if (exactMatch) {
+                    addToCart(exactMatch);
+                }
+            }
+        }
+    };
+
+    const updateQty = (id, delta) => {
+        triggerHaptic && triggerHaptic();
+        setCart(prev => prev.map(i => {
+            if (i.id !== id) return i;
+            // Permitir decimales en el cambio de cantidad si isWeight es true? 
+            let newQty = i.qty + delta;
+            if (newQty < 0) newQty = 0;
+            // Redondear a 3 decimales para evitar problemas
+            newQty = Math.round(newQty * 1000) / 1000;
+            return newQty === 0 ? null : { ...i, qty: newQty };
+        }).filter(Boolean));
+        searchInputRef.current?.focus();
+    };
+
+    const removeFromCart = (id) => {
+        triggerHaptic && triggerHaptic();
+        setCart(prev => prev.filter(i => i.id !== id));
+        searchInputRef.current?.focus();
+    };
+
+    // Global Keybinds
+    useEffect(() => {
+        const handleGlobalKeyMap = (e) => {
+            if (e.key === 'F9') {
+                e.preventDefault();
+                if (cart.length > 0 && !showCheckout && !showReceipt) setShowCheckout(true);
+            }
+            if (e.key === 'Escape') {
+                if (showCheckout) setShowCheckout(false);
+                if (showReceipt) setShowReceipt(null);
+            }
+        };
+        window.addEventListener('keydown', handleGlobalKeyMap);
+        return () => window.removeEventListener('keydown', handleGlobalKeyMap);
+    }, [cart, showCheckout, showReceipt]);
+
+    // Calculadora de Vuelto y Pagos Mixtos
+    const totalPaidUsd = payments.reduce((acc, p) => acc + p.amountUsd, 0);
+    const remainingUsd = Math.max(0, cartTotalUsd - totalPaidUsd);
+    const remainingBs = remainingUsd * effectiveRate;
+    const changeUsd = Math.max(0, totalPaidUsd - cartTotalUsd);
+    const changeBs = changeUsd * effectiveRate;
+
+    // Al abrir checkout si el total es algo, lo pre-fill (opcional)
+    useEffect(() => {
+        if (showCheckout) {
+            setAmountGiven('');
+            setPayments([]);
+        }
+        if (!showCheckout && !showReceipt && searchInputRef.current) {
+            searchInputRef.current.focus();
+            setSelectedCustomerId(''); // Limpiar el cliente al cerrar/completar checkout
+        }
+    }, [showCheckout, showReceipt]);
+
+    // Función para procesar o añadir un pago parcial
+    const handlePaymentMethodClick = (methodId) => {
+        triggerHaptic && triggerHaptic();
+        const m = DEFAULT_PAYMENT_METHODS.find(x => x.id === methodId);
+        if (!m) return;
+
+        let inputAmount = parseFloat(amountGiven);
+        let inputCurrency = amountGivenCurrency;
+
+        // Si no ingresó monto, asumimos el total restante en la moneda del método de pago
+        if (isNaN(inputAmount) || inputAmount <= 0) {
+            inputCurrency = m.currency;
+            inputAmount = m.currency === 'USD' ? remainingUsd : remainingBs;
+            // Redondear a max 2 decimales para UI limpia
+            inputAmount = Number(inputAmount.toFixed(2));
+        }
+
+        if (inputAmount <= 0) return; // Si no hay nada que pagar, evitamos agregar pago 0
+
+        const amountUsd = inputCurrency === 'USD' ? inputAmount : inputAmount / effectiveRate;
+        const amountBs = inputCurrency === 'BS' ? inputAmount : inputAmount * effectiveRate;
+
+        setPayments(prev => [...prev, {
+            id: crypto.randomUUID(),
+            methodId: m.id,
+            methodLabel: m.label,
+            currency: m.currency,
+            amountInput: inputAmount,
+            amountInputCurrency: inputCurrency,
+            amountUsd,
+            amountBs
+        }]);
+
+        setAmountGiven('');
+    };
+
+    const removePayment = (pid) => {
+        triggerHaptic && triggerHaptic();
+        setPayments(prev => prev.filter(p => p.id !== pid));
+    };
+
+    // Saldo a Favor handler
+    const handleUseSaldoFavor = () => {
+        const c = customers.find(x => x.id === selectedCustomerId);
+        if (!c) return;
+        const expectedSaldo = Math.abs(c.deuda);
+        const amountToUse = Math.min(expectedSaldo, remainingUsd);
+        setPayments(prev => [...prev, {
+            id: crypto.randomUUID(),
+            methodId: 'saldo_favor',
+            methodLabel: 'Saldo a Favor',
+            currency: 'USD',
+            amountInput: Number(amountToUse.toFixed(2)),
+            amountInputCurrency: 'USD',
+            amountUsd: amountToUse,
+            amountBs: amountToUse * effectiveRate
+        }]);
+    };
+
+    // Checkout Final
+    const handleCheckout = async () => {
+        triggerHaptic && triggerHaptic();
+
+        const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+
+        if (cart.length === 0) return;
+        if (!selectedCustomer && remainingUsd > 0.01) return; // Si no hay cliente, no puede fiar
+
+        // --- 🛡️ AUDITORÍA DE DATOS DE VENTA (Golden Rule) ---
+        if (
+            isNaN(cartTotalUsd) || cartTotalUsd < 0 ||
+            isNaN(changeBs) || changeBs < 0 ||
+            isNaN(totalPaidUsd) || totalPaidUsd < 0
+        ) {
+            console.error("❌ BLOODHOUND: Abortando venta. Integridad matemática comprometida (NaN o Negativo).");
+            showToast('Error de integridad de datos. Revisa los montos.', 'error');
+            return;
+        }
+        // ---------------------------------------------------
+
+        // Calcular el vuelto principal (asumiremos que todo sobrante se da en la moneda del primer pago excedido o USD por defecto)
+        const fiadoAmountUsd = remainingUsd > 0.01 ? remainingUsd : 0;
+
+        const sale = {
+            id: crypto.randomUUID(),
+            tipo: fiadoAmountUsd > 0 ? "VENTA_FIADA" : "VENTA",
+            status: "COMPLETADA",
+            items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, isWeight: i.isWeight })),
+            totalUsd: cartTotalUsd,
+            totalBs: cartTotalBs,
+            payments,
+            rate: effectiveRate,
+            rateSource: useAutoRate ? 'BCV Auto' : 'Manual',
+            timestamp: new Date().toISOString(),
+            changeUsd: fiadoAmountUsd > 0 ? 0 : changeUsd,
+            changeBs: fiadoAmountUsd > 0 ? 0 : changeBs,
+            customerId: selectedCustomerId || null,
+            customerName: selectedCustomer ? selectedCustomer.name : 'Consumidor Final',
+            fiadoUsd: fiadoAmountUsd
+        };
+
+        // Save sale
+        const existingSales = await storageService.getItem(SALES_KEY, []);
+        await storageService.setItem(SALES_KEY, [sale, ...existingSales]);
+
+        // Deduct stock
+        const updatedProducts = products.map(p => {
+            const cartItem = cart.find(i => i.id === p.id);
+            if (cartItem) return { ...p, stock: Math.max(0, (p.stock ?? 0) - cartItem.qty) };
+            return p;
+        });
+        setProducts(updatedProducts);
+        await storageService.setItem('my_products_v1', updatedProducts);
+
+        // Update Customer Balance if needed
+        const amount_favor_used = payments.filter(p => p.methodId === 'saldo_favor').reduce((sum, p) => sum + p.amountUsd, 0);
+        const debtIncurred = fiadoAmountUsd + amount_favor_used;
+
+        if (selectedCustomer && debtIncurred > 0) {
+            const updatedCustomers = customers.map(c => {
+                if (c.id === selectedCustomer.id) {
+                    return { ...c, deuda: c.deuda + debtIncurred };
+                }
+                return c;
+            });
+            setCustomers(updatedCustomers);
+            await storageService.setItem('my_customers_v1', updatedCustomers);
+        }
+
+        setShowReceipt(sale);
+        setCart([]);
+        setShowCheckout(false);
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex-1 flex flex-col items-center justify-center">
+                <div className="w-8 h-8 rounded-full border-4 border-slate-200 dark:border-slate-800 border-t-emerald-500 animate-spin" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-2 sm:p-4 overflow-hidden relative">
+
+            {/* Header Rediseñado - Mobile First */}
+            <div className="shrink-0 mb-3 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-sm border border-slate-100 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
+                            <div className="bg-emerald-500 text-white p-1.5 sm:p-2 rounded-xl shadow-lg shadow-emerald-500/30">
+                                <ShoppingCart size={20} className="sm:w-[22px] sm:h-[22px]" />
+                            </div>
+                            Punto de Venta
+                        </h2>
+                        {/* Tasa Móvil (visible solo en sm) */}
+                        <div className="sm:hidden">
+                            <button onClick={() => setShowRateConfig(!showRateConfig)} className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <RefreshCw size={12} className={showRateConfig ? "animate-spin text-emerald-500" : "text-slate-400"} />
+                                <strong className="text-xs text-emerald-600 dark:text-emerald-400">{formatBs(effectiveRate)}</strong>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Tasa Desktop (oculto en sm) */}
+                    <div className="hidden sm:flex items-center gap-2">
+                        <button onClick={() => setShowRateConfig(!showRateConfig)} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 transition-colors group">
+                            <span className="text-xs text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1">
+                                <RefreshCw size={12} className={showRateConfig ? "animate-spin text-emerald-500" : "group-hover:text-emerald-500"} />
+                                BCV:
+                            </span>
+                            <strong className="text-sm text-emerald-600 dark:text-emerald-400">{formatBs(effectiveRate)} Bs</strong>
+                            {!useAutoRate && <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1 rounded-md font-bold">MAN</span>}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Rate Config Panel */}
+                {showRateConfig && (
+                    <div className="bg-slate-50 dark:bg-slate-950 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 p-3 mb-3 animate-in fade-in slide-in-from-top-2">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-slate-500">Tasa de Cambio</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold text-slate-400">
+                                    {useAutoRate ? <span className="text-emerald-500">Auto Dólar BCV</span> : <span>Manual</span>}
+                                </span>
+                                <button onClick={() => { triggerHaptic && triggerHaptic(); setUseAutoRate(!useAutoRate); }}
+                                    className={`relative w-10 h-6 rounded-full transition-colors ${useAutoRate ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                                    <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${useAutoRate ? 'translate-x-4' : 'translate-x-0'}`} />
+                                </button>
+                            </div>
+                        </div>
+                        {!useAutoRate && (
+                            <input type="number" value={customRate} onChange={e => setCustomRate(e.target.value)}
+                                className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-bold text-indigo-600 dark:text-indigo-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                                placeholder="Ingresa Tasa Manual (Bs por $)" autoFocus />
+                        )}
+                    </div>
+                )}
+
+                {/* Search Input Mejorado */}
+                <div className="relative">
+                    <Search size={20} className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        onKeyDown={handleSearchKeyDown}
+                        placeholder="Buscar producto..."
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl sm:rounded-2xl py-3 pl-10 sm:pl-12 pr-14 sm:pr-20 text-slate-800 dark:text-white font-medium outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-inner text-sm sm:text-base transition-all" />
+
+                    {/* Botones al lado derecho del input */}
+                    <div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 flex items-center pr-1 gap-0.5">
+                        {searchTerm && (
+                            <button onClick={() => { setSearchTerm(''); searchInputRef.current?.focus(); }} className="text-slate-400 hover:text-slate-600 p-1.5 transition-colors">
+                                <X size={18} />
+                            </button>
+                        )}
+
+                        <button
+                            onClick={(e) => { e.preventDefault(); toggleRecording(); }}
+                            className={`p-1.5 rounded-full transition-all flex items-center justify-center ${isRecording
+                                ? 'bg-red-100 text-red-500 shadow-inner animate-pulse'
+                                : isProcessingAudio
+                                    ? 'bg-amber-100 text-amber-500'
+                                    : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'
+                                }`}
+                            title={isRecording ? "Detener grabación" : "Búsqueda por voz"}
+                        >
+                            {isProcessingAudio ? (
+                                <div className="w-[18px] h-[18px] border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <Mic size={18} className={isRecording ? 'animate-bounce' : ''} />
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Search Dropdown Mejorado con Indexado Visual */}
+                    {searchResults.length > 0 && (
+                        <div className="absolute top-full mt-2 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-20 overflow-hidden">
+                            {searchResults.map((p, index) => {
+                                const usdtRate = rates.usdt?.price || effectiveRate;
+                                const valBs = p.priceUsdt * usdtRate;
+                                const valUsd = valBs / effectiveRate;
+                                const inCart = cart.find(i => i.id === p.id);
+                                const isSelected = index === selectedIndex;
+                                return (
+                                    <button key={p.id} onClick={() => addToCart(p)}
+                                        onMouseEnter={() => setSelectedIndex(index)}
+                                        className={`w-full flex items-center gap-3 p-3 text-left border-b border-slate-50 dark:border-slate-800/50 last:border-0 transition-colors
+                                            ${isSelected ? 'bg-emerald-50 dark:bg-emerald-900/20 border-l-4 border-l-emerald-500' : 'bg-transparent border-l-4 border-l-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
+                                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden text-slate-400">
+                                            {p.image ? <img src={p.image} className="w-full h-full object-contain" /> : <Package size={16} />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-sm font-bold truncate ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                {p.name}
+                                            </p>
+                                            <p className="text-[11px] text-slate-400">Stock: {p.stock ?? 0} · Barcode: {p.barcode || 'N/A'}</p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <p className="text-sm font-black text-slate-800 dark:text-white">${valUsd.toFixed(2)}</p>
+                                            <p className="text-[11px] font-bold text-slate-400">{formatBs(valBs)} Bs</p>
+                                        </div>
+                                        {inCart && (
+                                            <div className="shrink-0 ml-2 w-6 h-6 bg-emerald-100 dark:bg-emerald-900/50 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-xs font-black">
+                                                {inCart.qty}
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                            <div className="bg-slate-50 dark:bg-slate-950 p-2 text-center border-t border-slate-100 dark:border-slate-800">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2">
+                                    Navega con flechas <span className="px-1 bg-slate-200 dark:bg-slate-800 rounded">↓</span><span className="px-1 bg-slate-200 dark:bg-slate-800 rounded">↑</span> y presiona <span className="px-1 bg-slate-200 dark:bg-slate-800 rounded">ENTER ↵</span>
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ─── POPUP JERARQUÍA LITE: Paquete o Unidad ─── */}
+                    {hierarchyPending && (
+                        <div className="absolute top-full mt-2 left-0 right-0 z-30 bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-800 rounded-2xl shadow-2xl shadow-indigo-500/10 overflow-hidden">
+                            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">¿Cómo lo vendes?</p>
+                                        <p className="text-[11px] text-indigo-500/70 dark:text-indigo-400/50 font-medium mt-0.5">{hierarchyPending.name}</p>
+                                    </div>
+                                    <button onClick={() => setHierarchyPending(null)} className="p-1 text-indigo-400 hover:text-indigo-600"><X size={16} /></button>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 p-3">
+                                <button onClick={() => addToCart(hierarchyPending, null, 'package')}
+                                    className="flex flex-col items-center gap-2 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all active:scale-95">
+                                    <Package size={24} className="text-indigo-600 dark:text-indigo-400" />
+                                    <span className="text-xs font-black text-indigo-700 dark:text-indigo-300 uppercase">Paquete</span>
+                                    <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">${hierarchyPending.priceUsdt?.toFixed(2)}</span>
+                                    <span className="text-[9px] text-slate-400 font-bold">{hierarchyPending.unitsPerPackage} uds</span>
+                                </button>
+                                <button onClick={() => addToCart(hierarchyPending, null, 'unit')}
+                                    className="flex flex-col items-center gap-2 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all active:scale-95">
+                                    <Box size={24} className="text-emerald-600 dark:text-emerald-400" />
+                                    <span className="text-xs font-black text-emerald-700 dark:text-emerald-300 uppercase">Unidad</span>
+                                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">${hierarchyPending.unitPriceUsd?.toFixed(2)}</span>
+                                    <span className="text-[9px] text-slate-400 font-bold">1 ud</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ─── POPUP PESAJE: Kg / Litro ─── */}
+                    {weightPending && (
+                        <div className="absolute top-full mt-2 left-0 right-0 z-30 bg-white dark:bg-slate-900 border-2 border-amber-200 dark:border-amber-800 rounded-2xl shadow-2xl shadow-amber-500/10 overflow-hidden">
+                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-800">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-black text-amber-700 dark:text-amber-300 uppercase tracking-wider">
+                                            ¿Cuántos {weightPending.unit === 'kg' ? 'kilos' : 'litros'}?
+                                        </p>
+                                        <p className="text-[11px] text-amber-500/70 dark:text-amber-400/50 font-medium mt-0.5">{weightPending.name} · ${weightPending.priceUsdt?.toFixed(2)}/{weightPending.unit === 'kg' ? 'kg' : 'lt'}</p>
+                                    </div>
+                                    <button onClick={() => setWeightPending(null)} className="p-1 text-amber-400 hover:text-amber-600"><X size={16} /></button>
+                                </div>
+                            </div>
+                            <div className="p-3 space-y-3">
+                                {/* Botones rápidos */}
+                                <div className="grid grid-cols-4 gap-2">
+                                    {[0.25, 0.5, 1, 2].map(q => (
+                                        <button key={q} onClick={() => { addToCart(weightPending, q); setWeightPending(null); }}
+                                            className="py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm font-black text-amber-700 dark:text-amber-300 hover:bg-amber-100 active:scale-95 transition-all">
+                                            {q} {weightPending.unit === 'kg' ? 'kg' : 'lt'}
+                                        </button>
+                                    ))}
+                                </div>
+                                {/* Input manual */}
+                                <div className="flex gap-2">
+                                    <input type="number" step="0.01" min="0.01" placeholder="Cantidad exacta..."
+                                        id="weight-input"
+                                        className="flex-1 bg-amber-50 dark:bg-slate-800 border border-amber-200 dark:border-amber-700 p-3 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-amber-500/50 text-sm"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                const val = parseFloat(e.target.value);
+                                                if (val > 0) { addToCart(weightPending, val); setWeightPending(null); }
+                                            }
+                                        }} />
+                                    <button onClick={() => {
+                                        const input = document.getElementById('weight-input');
+                                        const val = parseFloat(input?.value);
+                                        if (val > 0) { addToCart(weightPending, val); setWeightPending(null); }
+                                    }} className="px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-sm active:scale-95 transition-all">
+                                        Agregar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Cart Container */}
+            <CartPanel
+                cart={cart}
+                effectiveRate={effectiveRate}
+                cartTotalUsd={cartTotalUsd}
+                cartTotalBs={cartTotalBs}
+                cartItemCount={cartItemCount}
+                updateQty={updateQty}
+                removeFromCart={removeFromCart}
+                onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); }}
+                onClearCart={() => {
+                    triggerHaptic && triggerHaptic();
+                    if (window.confirm('¿Estás seguro de vaciar toda la cesta? Esta acción no se puede deshacer.')) {
+                        setCart([]);
+                    }
+                }}
+                triggerHaptic={triggerHaptic}
+            />
+
+            {/* ZONA DE COBRO */}
+            {showCheckout && (
+                <CheckoutModal
+                    onClose={() => setShowCheckout(false)}
+                    cartTotalUsd={cartTotalUsd}
+                    cartTotalBs={cartTotalBs}
+                    amountGiven={amountGiven}
+                    setAmountGiven={setAmountGiven}
+                    amountGivenCurrency={amountGivenCurrency}
+                    setAmountGivenCurrency={setAmountGivenCurrency}
+                    payments={payments}
+                    totalPaidUsd={totalPaidUsd}
+                    remainingUsd={remainingUsd}
+                    remainingBs={remainingBs}
+                    changeUsd={changeUsd}
+                    changeBs={changeBs}
+                    effectiveRate={effectiveRate}
+                    customers={customers}
+                    selectedCustomerId={selectedCustomerId}
+                    setSelectedCustomerId={setSelectedCustomerId}
+                    handlePaymentMethodClick={handlePaymentMethodClick}
+                    removePayment={removePayment}
+                    handleCheckout={handleCheckout}
+                    onUseSaldoFavor={handleUseSaldoFavor}
+                    triggerHaptic={triggerHaptic}
+                />
+            )}
+
+            {/* ZONA DE TICKETS */}
+            <ReceiptModal
+                receipt={showReceipt}
+                onClose={() => { setShowReceipt(null); setSelectedCustomerId(''); }}
+                onShareWhatsApp={(r) => {
+                    let text = `*COMPROBANTE DE VENTA | PRECIOS AL DÍA*\n`;
+                    text += `--------------------------------\n`;
+                    text += `🛍️ *Orden:* #${(r.id.substring(0, 6)).toUpperCase()}\n`;
+                    text += `Cliente: ${r.customerName || 'Consumidor Final'}\n`;
+                    text += `Fecha: ${new Date(r.timestamp).toLocaleString('es-VE')}\n`;
+                    text += `===================================\n\n`;
+                    text += `*DETALLE DE PRODUCTOS:*\n`;
+                    r.items.forEach(item => {
+                        const qty = item.isWeight ? `${item.qty.toFixed(3)}Kg` : `${item.qty} Und`;
+                        text += `- ${item.name}\n  ${qty} x $${item.priceUsd.toFixed(2)} = *$${(item.priceUsd * item.qty).toFixed(2)}*\n`;
+                    });
+                    text += `\n===================================\n`;
+                    text += `*TOTAL A PAGAR: $${r.totalUsd.toFixed(2)}*\n`;
+                    text += ` Ref: ${formatBs(r.totalBs)} Bs a ${formatBs(r.rate)} Bs/$\n`;
+                    if (r.fiadoUsd > 0) {
+                        text += `\n*SALDO PENDIENTE (FIADO): $${r.fiadoUsd.toFixed(2)}*\n`;
+                    }
+                    text += `\n===================================\n`;
+                    text += `*¡Gracias por su compra!*`;
+                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+            />
+        </div>
+    );
+}
