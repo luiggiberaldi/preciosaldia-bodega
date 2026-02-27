@@ -1,57 +1,58 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Calculator, Wallet, Store, ChevronRight, ChevronLeft, X } from 'lucide-react';
+import { Home, ShoppingCart, Store, Users, ChevronRight, ChevronLeft, X } from 'lucide-react';
 
 const STEPS = [
     {
-        // Welcome slide
         type: 'welcome',
     },
     {
-        icon: LayoutDashboard,
-        color: 'text-amber-500',
-        bg: 'bg-amber-100 dark:bg-amber-900/30',
-        title: 'Inicio',
-        headline: 'Ve las tasas del día al instante',
-        description: 'Aquí ves la tasa Dólar USD, Dólar BCV y Euro actualizadas automáticamente cada 30 segundos.',
-        tip: '💡 Toca ⛶ para ver en pantalla completa y guardar una foto de las tasas.',
-    },
-    {
-        icon: Calculator,
-        color: 'text-blue-500',
-        bg: 'bg-blue-100 dark:bg-blue-900/30',
-        title: 'Calculadora',
-        headline: 'Convierte entre monedas al toque',
-        description: 'Escribe el monto arriba, elige la moneda y la conversión aparece abajo. Funciona con Dólar USD, Dólar BCV, Euro y Bolívares.',
-        tip: '💡 Toca ⇅ para invertir la conversión.',
-    },
-    {
-        icon: Wallet,
+        icon: Home,
         color: 'text-emerald-500',
         bg: 'bg-emerald-100 dark:bg-emerald-900/30',
-        title: 'Cuentas',
-        headline: 'Guarda tus datos de pago',
-        description: 'Agrega tus cuentas de Pago Móvil, Transferencia o Binance. Al enviar un monto por WhatsApp, tus datos de pago se incluyen automáticamente.',
-        tip: '💡 Puedes tener varias cuentas y elegir cuál usar al enviar.',
+        title: 'Inicio',
+        headline: 'Tu bodega de un vistazo',
+        description: 'Dashboard con resumen de ventas del día, productos con stock bajo y accesos rápidos a todas las funciones.',
+        tip: '💡 Las tasas de cambio se actualizan automáticamente para calcular precios en Bolívares.',
+    },
+    {
+        icon: ShoppingCart,
+        color: 'text-blue-500',
+        bg: 'bg-blue-100 dark:bg-blue-900/30',
+        title: 'Vender',
+        headline: 'Punto de venta rápido',
+        description: 'Agrega productos al carrito, aplica descuentos y cobra en efectivo, pago móvil o transferencia. El sistema calcula automáticamente el precio en Bs.',
+        tip: '💡 Toca + en un producto para agregarlo al carrito directamente.',
     },
     {
         icon: Store,
         color: 'text-indigo-500',
         bg: 'bg-indigo-100 dark:bg-indigo-900/30',
-        title: 'Tienda',
+        title: 'Inventario',
         headline: 'Tu catálogo de productos',
-        descriptionPremium: 'Agrega tus productos con foto y precio en dólares. La app calcula automáticamente el precio en Bolívares, efectivo y todas las tasas.',
-        descriptionFree: 'Con TasasAlDía Business puedes gestionar tu inventario, calcular precios en todas las monedas y compartir tu catálogo por código.',
+        descriptionPremium: 'Agrega tus productos con foto, precio en dólares y categoría. La app calcula precio en Bolívares y controla el stock automáticamente.',
+        descriptionFree: 'Con PreciosAlDía Premium puedes gestionar un inventario ilimitado, cobrar con POS y compartir tu catálogo.',
         tipPremium: '💡 Comparte tu catálogo con otros usando un código de 6 dígitos.',
-        tipFree: '👑 Activa tu licencia para desbloquear esta función.',
+        tipFree: '👑 Activa tu licencia para desbloquear todas las funciones.',
+    },
+    {
+        icon: Users,
+        color: 'text-amber-500',
+        bg: 'bg-amber-100 dark:bg-amber-900/30',
+        title: 'Clientes',
+        headline: 'Gestiona tus clientes',
+        descriptionPremium: 'Registra a tus clientes frecuentes, lleva control de fiados y pagos parciales. Todo offline y seguro.',
+        descriptionFree: 'Con PreciosAlDía Premium puedes gestionar tu cartera de clientes y control de deudas.',
+        tipPremium: '💡 Toca un cliente para ver su historial completo de fiados.',
+        tipFree: '👑 Activa tu licencia para gestionar clientes.',
     },
 ];
 
 export default function OnboardingOverlay({ isPremium = false }) {
     const [done, setDone] = useState(
-        () => localStorage.getItem('onboarding_done') === 'true'
+        () => localStorage.getItem('pda_onboarding_done') === 'true'
     );
     const [step, setStep] = useState(0);
-    const [direction, setDirection] = useState(1); // 1 = forward, -1 = back
+    const [direction, setDirection] = useState(1);
 
     if (done) return null;
 
@@ -59,9 +60,10 @@ export default function OnboardingOverlay({ isPremium = false }) {
     const isFirst = step === 0;
     const isLast = step === STEPS.length - 1;
     const isWelcome = current.type === 'welcome';
+    const hasVariants = current.descriptionPremium !== undefined;
 
     const finish = () => {
-        localStorage.setItem('onboarding_done', 'true');
+        localStorage.setItem('pda_onboarding_done', 'true');
         setDone(true);
     };
 
@@ -81,7 +83,7 @@ export default function OnboardingOverlay({ isPremium = false }) {
         <div className="fixed inset-0 z-[9998] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-5 animate-in fade-in duration-300 overflow-hidden">
 
             {/* Decorative background orbs */}
-            <div className="absolute top-1/4 -left-20 w-64 h-64 bg-brand/10 rounded-full blur-[100px] pointer-events-none animate-pulse" />
+            <div className="absolute top-1/4 -left-20 w-64 h-64 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none animate-pulse" />
             <div className="absolute bottom-1/4 -right-20 w-64 h-64 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none animate-pulse" style={{ animationDelay: '1s' }} />
 
             {/* Skip button */}
@@ -106,29 +108,28 @@ export default function OnboardingOverlay({ isPremium = false }) {
                         /* ─── WELCOME SLIDE ─── */
                         <div className="p-8 text-center relative overflow-hidden">
                             {/* Gradient header accent */}
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand via-amber-400 to-brand" />
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-400" />
 
                             {/* Logo */}
                             <div className="relative mx-auto mb-5">
                                 <img
                                     src="/logoprincipal.png"
-                                    alt="TasasAlDía"
+                                    alt="PreciosAlDía"
                                     className="w-44 h-auto mx-auto drop-shadow-lg"
                                 />
-                                {/* Glow effect */}
-                                <div className="absolute inset-0 bg-brand/15 rounded-full blur-2xl -z-10 scale-150" />
+                                <div className="absolute inset-0 bg-emerald-500/15 rounded-full blur-2xl -z-10 scale-150" />
                             </div>
-                            <p className="text-xs font-bold text-brand uppercase tracking-[0.2em] mb-5">
-                                Tu aliado financiero
+                            <p className="text-xs font-bold text-emerald-500 uppercase tracking-[0.2em] mb-5">
+                                Tu bodega inteligente
                             </p>
 
                             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-6 max-w-[260px] mx-auto">
-                                Tasas en tiempo real, conversiones y herramientas diseñadas para el comerciante venezolano.
+                                Inventario, ventas y gestión de clientes en una sola app, diseñada para el bodeguero venezolano.
                             </p>
 
                             {/* Feature pills */}
                             <div className="flex flex-wrap justify-center gap-2 mb-2">
-                                {['Tasas al instante', 'Calculadora', 'Cuentas', 'Catálogo'].map(label => (
+                                {['Inventario', 'Punto de Venta', 'Clientes', 'Reportes'].map(label => (
                                     <span key={label} className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-3 py-1.5 rounded-full">
                                         {label}
                                     </span>
@@ -155,7 +156,7 @@ export default function OnboardingOverlay({ isPremium = false }) {
 
                             {/* Description */}
                             <p className="text-sm text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-4">
-                                {isLast
+                                {hasVariants
                                     ? (isPremium ? current.descriptionPremium : current.descriptionFree)
                                     : current.description}
                             </p>
@@ -163,7 +164,7 @@ export default function OnboardingOverlay({ isPremium = false }) {
                             {/* Tip */}
                             <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-100 dark:border-slate-700/50">
                                 <p className="text-xs text-slate-600 dark:text-slate-300 font-medium text-center">
-                                    {isLast
+                                    {hasVariants
                                         ? (isPremium ? current.tipPremium : current.tipFree)
                                         : current.tip}
                                 </p>
@@ -174,7 +175,6 @@ export default function OnboardingOverlay({ isPremium = false }) {
 
                 {/* Navigation */}
                 <div className="flex items-center justify-between mt-6 px-2">
-                    {/* Left: Back button or spacer */}
                     {!isFirst ? (
                         <button
                             onClick={goBack}
@@ -193,9 +193,9 @@ export default function OnboardingOverlay({ isPremium = false }) {
                             <div
                                 key={i}
                                 className={`h-2 rounded-full transition-all duration-300 ${i === step
-                                    ? 'w-6 bg-brand'
+                                    ? 'w-6 bg-emerald-500'
                                     : i < step
-                                        ? 'w-2 bg-brand/40'
+                                        ? 'w-2 bg-emerald-500/40'
                                         : 'w-2 bg-slate-600'
                                     }`}
                             />
@@ -205,7 +205,7 @@ export default function OnboardingOverlay({ isPremium = false }) {
                     {/* Button */}
                     <button
                         onClick={goNext}
-                        className="flex items-center gap-2 bg-brand text-slate-900 px-5 py-3 rounded-full font-bold text-sm shadow-lg shadow-brand/20 active:scale-95 transition-transform"
+                        className="flex items-center gap-2 bg-emerald-500 text-white px-5 py-3 rounded-full font-bold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform"
                     >
                         <span>{isLast ? '¡Empezar!' : isWelcome ? 'Inicio' : 'Siguiente'}</span>
                         {!isLast && <ChevronRight size={16} strokeWidth={3} />}

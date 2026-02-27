@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
-// CLAVE MAESTRA SECRETA (En un entorno real estaría ofuscada o validada en servidor, 
-// pero siguiendo la directiva "Offline First" y "Sin Backend", vive aquí).
-const MASTER_SECRET_KEY = "VENEZUELA_PRO_2026_GLOBAL";
+// CLAVE MAESTRA SECRETA — Licencia exclusiva PreciosAlDía Bodega
+// (Separada del revendedor para que los códigos no sean intercambiables)
+const MASTER_SECRET_KEY = "PRECIOS_ALDIA_BODEGA_2026";
 const DEMO_DURATION_MS = 72 * 60 * 60 * 1000; // 72 horas (3 días)
 
 export function useSecurity() {
@@ -31,11 +31,11 @@ export function useSecurity() {
 
     useEffect(() => {
         // 1. Obtener o Generar Device ID
-        let storedId = localStorage.getItem('device_id');
+        let storedId = localStorage.getItem('pda_device_id');
         if (!storedId) {
             const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-            storedId = `TASAS-${randomPart}`;
-            localStorage.setItem('device_id', storedId);
+            storedId = `PDA-${randomPart}`;
+            localStorage.setItem('pda_device_id', storedId);
         }
         setDeviceId(storedId);
 
@@ -52,7 +52,7 @@ export function useSecurity() {
             if (diff <= 0) {
                 // Demo expiró en tiempo real
                 clearInterval(interval);
-                localStorage.removeItem('premium_token');
+                localStorage.removeItem('pda_premium_token');
                 setIsPremium(false);
                 setIsDemo(false);
                 setDemoTimeLeft('');
@@ -85,7 +85,7 @@ export function useSecurity() {
     };
 
     const checkLicense = async (currentDeviceId) => {
-        let storedToken = localStorage.getItem('premium_token');
+        let storedToken = localStorage.getItem('pda_premium_token');
 
         if (!storedToken) {
             setIsPremium(false);
@@ -105,7 +105,7 @@ export function useSecurity() {
                         setDemoExpires(tokenObj.expires);
                     } else {
                         console.warn("Demo Expirada");
-                        localStorage.removeItem('premium_token');
+                        localStorage.removeItem('pda_premium_token');
                         setIsPremium(false);
                         setIsDemo(false);
                         setDemoExpiredMsg("Tu prueba gratuita de 3 días ha finalizado. Esperamos que hayas disfrutado la experiencia completa.");
@@ -134,7 +134,7 @@ export function useSecurity() {
      */
     const activateDemo = async () => {
         // Verificar si ya se usó
-        if (localStorage.getItem('demo_used_history')) {
+        if (localStorage.getItem('pda_demo_used')) {
             return { success: false, status: 'DEMO_USED' };
         }
 
@@ -146,8 +146,8 @@ export function useSecurity() {
             isDemo: true
         };
 
-        localStorage.setItem('premium_token', JSON.stringify(demoToken));
-        localStorage.setItem('demo_used_history', 'true');
+        localStorage.setItem('pda_premium_token', JSON.stringify(demoToken));
+        localStorage.setItem('pda_demo_used', 'true');
 
         setIsPremium(true);
         setIsDemo(true);
@@ -162,7 +162,7 @@ export function useSecurity() {
     const unlockApp = async (inputCode) => {
         const validCode = await generateActivationCode(deviceId);
         if (inputCode.trim().toUpperCase() === validCode) {
-            localStorage.setItem('premium_token', validCode);
+            localStorage.setItem('pda_premium_token', validCode);
             setIsPremium(true);
             setIsDemo(false);
             return { success: true, status: 'PREMIUM_ACTIVATED' };
@@ -189,6 +189,6 @@ export function useSecurity() {
         demoTimeLeft,
         demoExpiredMsg,
         dismissExpiredMsg: () => setDemoExpiredMsg(''),
-        demoUsed: typeof window !== 'undefined' && localStorage.getItem('demo_used_history') === 'true'
+        demoUsed: typeof window !== 'undefined' && localStorage.getItem('pda_demo_used') === 'true'
     };
 }

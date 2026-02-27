@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, ShoppingCart, Store, Users, Download, FlaskConical } from 'lucide-react';
+import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Key } from 'lucide-react';
 
 import SalesView from './views/SalesView';
 import DashboardView from './views/DashboardView';
@@ -8,13 +8,25 @@ import CustomersView from './views/CustomersView';
 import { TesterView } from './views/TesterView';
 
 import { useRates } from './hooks/useRates';
+import { useSecurity } from './hooks/useSecurity';
+import PremiumGuard from './components/security/PremiumGuard';
+import TermsOverlay from './components/TermsOverlay';
+import OnboardingOverlay from './components/OnboardingOverlay';
 import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
   const [installPrompt, setInstallPrompt] = useState(null);
 
+  // Admin Panel States
+  const [adminClicks, setAdminClicks] = useState(0);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showTester, setShowTester] = useState(false);
+  const [clientDeviceId, setClientDeviceId] = useState('');
+  const [generatedCode, setGeneratedCode] = useState('');
+
   const { rates, loading, isOffline, updateData } = useRates();
+  const { generateCodeForClient, isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg } = useSecurity();
 
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
@@ -55,6 +67,30 @@ export default function App() {
     }
   };
 
+  // Admin Panel Logic (Hidden — 10 clicks on top-left corner)
+  const handleLogoClick = () => {
+    const now = Date.now();
+    if (window.lastClickTime && (now - window.lastClickTime > 1000)) {
+      setAdminClicks(1);
+    } else {
+      setAdminClicks(prev => prev + 1);
+    }
+    window.lastClickTime = now;
+
+    if (adminClicks + 1 >= 10) {
+      setShowAdminPanel(true);
+      setAdminClicks(0);
+      triggerHaptic();
+    }
+  };
+
+  const handleGenerateCode = async (e) => {
+    e.preventDefault();
+    if (!clientDeviceId) return;
+    const code = await generateCodeForClient(clientDeviceId);
+    setGeneratedCode(code);
+  };
+
   // Keyboard detection
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const baseHeight = useRef(0);
@@ -91,11 +127,74 @@ export default function App() {
   return (
     <div className="font-sans antialiased bg-slate-50 dark:bg-black h-[100dvh] flex flex-col overflow-hidden transition-colors duration-300">
 
+      {/* Terms and Conditions Overlay (First Use) */}
+      <TermsOverlay />
+
+      {/* Tutorial Onboarding (First Use, after Terms) */}
+      <OnboardingOverlay isPremium={isPremium} />
+
+      {/* Demo Banner (discreto — top-right) */}
+      {isDemo && demoTimeLeft && (
+        <div className="fixed top-1 right-2 z-[100]">
+          <div className="px-2 py-0.5 bg-amber-500/80 backdrop-blur-sm rounded-full">
+            <p className="text-[9px] font-bold text-slate-900">
+              ⏱ {demoTimeLeft}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Demo Expired Modal */}
+      {demoExpiredMsg && (
+        <div className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-5 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-sm shadow-2xl border border-slate-100 dark:border-slate-800 text-center animate-in zoom-in-95 duration-300">
+            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">⏳</span>
+            </div>
+            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">Prueba finalizada</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
+              {demoExpiredMsg}
+            </p>
+            <button
+              onClick={() => {
+                const msg = `Hola! Quiero adquirir la licencia Premium de PreciosAlDía. Acabo de terminar mi prueba gratuita.`;
+                window.open(`https://wa.me/584124051793?text=${encodeURIComponent(msg)}`, '_blank');
+              }}
+              className="w-full py-3 bg-[#10B981] text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform text-sm mb-2"
+            >
+              Solicitar Licencia
+            </button>
+            <button
+              onClick={dismissExpiredMsg}
+              className="w-full py-2.5 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              Continuar con versión gratuita
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Golden Tester View Overlay */}
+      {showTester && (
+        <div className="fixed inset-0 z-[150] bg-slate-50 dark:bg-slate-950">
+          <TesterView onBack={() => setShowTester(false)} />
+        </div>
+      )}
+
       <main className={`flex-1 w-full max-w-md md:max-w-3xl lg:max-w-7xl mx-auto relative pb-24 flex flex-col ${activeTab === 'ventas' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+
+        {/* Hidden Admin Trigger Area */}
+        <div
+          className="absolute top-0 left-0 w-20 h-20 z-50 cursor-pointer opacity-0"
+          onClick={handleLogoClick}
+          title="Ssshh..."
+        ></div>
 
         {activeTab === 'ventas' && (
           <ErrorBoundary>
-            <SalesView rates={rates} triggerHaptic={triggerHaptic} />
+            <PremiumGuard featureName="Punto de Venta" isShop={true}>
+              <SalesView rates={rates} triggerHaptic={triggerHaptic} />
+            </PremiumGuard>
           </ErrorBoundary>
         )}
 
@@ -111,15 +210,11 @@ export default function App() {
           </ErrorBoundary>
         )}
 
-        {/* HIDDEN: Tester v2.0 — descomentar para reactivar
-        {activeTab === 'tester' && (
-          <TesterView onBack={() => setActiveTab('inicio')} />
-        )}
-        */}
-
         {activeTab === 'clientes' && (
           <ErrorBoundary>
-            <CustomersView triggerHaptic={triggerHaptic} />
+            <PremiumGuard featureName="Gestión de Clientes">
+              <CustomersView triggerHaptic={triggerHaptic} />
+            </PremiumGuard>
           </ErrorBoundary>
         )}
       </main>
@@ -138,14 +233,6 @@ export default function App() {
               />
             ))}
 
-            {/* HIDDEN: Botón Tester — descomentar para reactivar
-            {activeTab === 'inicio' && (
-              <button onClick={() => { triggerHaptic(); setActiveTab('tester'); }} className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl transition-all duration-300 text-slate-600 hover:text-indigo-400 hover:bg-white/5">
-                <FlaskConical size={18} strokeWidth={2} />
-              </button>
-            )}
-            */}
-
             {installPrompt && activeTab === 'inicio' && (
               <button onClick={() => { triggerHaptic(); handleInstall(); }} className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl transition-all duration-300 bg-emerald-500 text-white shadow-md animate-pulse">
                 <Download size={20} strokeWidth={3} />
@@ -154,6 +241,51 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Admin Panel Modal */}
+      {showAdminPanel && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Key className="text-amber-500" /> Admin Gen
+              </h2>
+              <button onClick={() => setShowAdminPanel(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <form onSubmit={handleGenerateCode}>
+              <label className="block text-xs uppercase text-slate-500 font-bold mb-2">ID del Cliente</label>
+              <input
+                type="text"
+                value={clientDeviceId}
+                onChange={e => setClientDeviceId(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white mb-4 font-mono uppercase"
+                placeholder="PDA-XXXX"
+              />
+              <button className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold py-3 rounded-lg mb-4">
+                Generar Código
+              </button>
+            </form>
+
+            <button
+              onClick={() => { triggerHaptic(); setShowTester(true); setShowAdminPanel(false); }}
+              className="w-full bg-indigo-600/20 border border-indigo-500/50 text-indigo-400 font-bold py-2 rounded-lg text-xs uppercase tracking-tighter hover:bg-indigo-600/30 transition-colors"
+            >
+              🚀 Abrir Tester
+            </button>
+
+            {generatedCode && (
+              <div className="mt-4 bg-green-900/30 border border-green-500/50 p-4 rounded-lg text-center">
+                <p className="text-xs text-green-400 mb-1">Código Generado:</p>
+                <p className="text-xl font-mono font-bold text-white tracking-widest selectable select-all">
+                  {generatedCode}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

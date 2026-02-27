@@ -3,7 +3,7 @@ import { Lock, Copy, Check, Star, Sparkles, Send, Bot, Store, MessageCircle, Dat
 import { useSecurity } from '../../hooks/useSecurity';
 import { Modal } from '../Modal';
 
-export default function PremiumGuard({ children, featureName = "Esta función", isAI = false, isShop = false }) {
+export default function PremiumGuard({ children, featureName = "Esta función", isShop = false }) {
     const { deviceId, isPremium, loading, unlockApp, activateDemo, demoUsed } = useSecurity();
     const [inputCode, setInputCode] = useState('');
     const [error, setError] = useState(false);
@@ -60,7 +60,7 @@ export default function PremiumGuard({ children, featureName = "Esta función", 
     };
 
     const openWhatsApp = () => {
-        const message = `Hola! Quiero adquirir una licencia Premium para TasasAlDía. Mi ID de instalación es: ${deviceId}`;
+        const message = `Hola! Quiero adquirir una licencia Premium para PreciosAlDía Bodega. Mi ID de instalación es: ${deviceId}`;
         const url = `https://wa.me/584124051793?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
     };
@@ -69,39 +69,27 @@ export default function PremiumGuard({ children, featureName = "Esta función", 
     let title, message, Icon, iconColor, benefits;
 
     if (isShop) {
-        title = <span>TasasAlDía <span className="text-amber-500">Business</span> 👑</span>;
-        message = "Desbloquea el potencial completo para tu negocio.";
+        title = <span>PreciosAlDía <span className="text-amber-500">Business</span> 👑</span>;
+        message = "Desbloquea el potencial completo para tu bodega.";
         Icon = Store;
         iconColor = "text-indigo-600 dark:text-indigo-400 animate-pulse";
         benefits = (
             <>
-                <BenefitItem icon={<MessageCircle size={15} className="text-green-500" />} text="Envío de cotizaciones por WhatsApp." />
-                <BenefitItem icon={<CreditCard size={15} className="text-blue-500" />} text="Cuentas de pago ilimitadas." />
-                <BenefitItem icon={<Store size={15} className="text-indigo-500" />} text="Catálogo de productos con precios." />
+                <BenefitItem icon={<Store size={15} className="text-indigo-500" />} text="Inventario ilimitado de productos." />
+                <BenefitItem icon={<CreditCard size={15} className="text-blue-500" />} text="Sistema de Ventas y POS completo." />
+                <BenefitItem icon={<MessageCircle size={15} className="text-green-500" />} text="Dashboard con reportes de ventas." />
                 <BenefitItem icon={<Database size={15} className="text-amber-500" />} text="Compartir catálogo con código." />
             </>
         );
-    } else if (isAI) {
-        title = "Asesoría VIP Agotada ⚡";
-        message = "Para continuar con análisis precisos y visión ilimitada, activa tu licencia.";
-        Icon = Bot;
-        iconColor = "text-violet-600 dark:text-violet-400 animate-pulse";
-        benefits = (
-            <>
-                <BenefitItem icon={<Sparkles size={15} className="text-violet-600 dark:text-violet-400" />} text="Análisis de brecha real" />
-                <BenefitItem icon={<Star size={15} className="text-amber-500" />} text="Acceso a Catálogo VIP" />
-                <BenefitItem icon={<Check size={15} className="text-green-600 dark:text-green-500" />} text="Soporte Prioritario 24/7" />
-            </>
-        );
     } else {
-        title = <span>TasasAlDía <span className="text-amber-500">Premium</span> 👑</span>;
+        title = <span>PreciosAlDía <span className="text-amber-500">Premium</span> 👑</span>;
         message = <span>Acceso exclusivo a <strong>{featureName}</strong> para miembros.</span>;
         Icon = Lock;
         iconColor = "text-amber-500";
         benefits = (
             <>
-                <BenefitItem icon={<Sparkles size={15} className="text-purple-600 dark:text-purple-400" />} text="Envío de cotizaciones por WhatsApp" />
-                <BenefitItem icon={<Star size={15} className="text-amber-500" />} text="Catálogo de Productos" />
+                <BenefitItem icon={<Sparkles size={15} className="text-purple-600 dark:text-purple-400" />} text="Gestión completa de inventario" />
+                <BenefitItem icon={<Star size={15} className="text-amber-500" />} text="Punto de Venta integrado" />
                 <BenefitItem icon={<Check size={15} className="text-green-600 dark:text-green-500" />} text="Soporte Prioritario" />
             </>
         );
