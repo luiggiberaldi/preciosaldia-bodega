@@ -6,146 +6,201 @@ import { formatBs } from './calculatorUtils';
  * y lo descarga o comparte via Web Share API
  */
 export function generateTicketPDF(sale, bcvRate) {
-    // Dimensiones ticket 80mm (ancho) x alto dinámico
     const WIDTH = 80; // mm
-    const MARGIN = 5;
-    const CONTENT_W = WIDTH - MARGIN * 2;
+    const MARGIN = 6;
 
-    // Calcular alto dinámico basado en contenido
+    // Calcular altura dinámica
     const itemCount = sale.items?.length || 0;
-    const estimatedHeight = 100 + (itemCount * 10) + (sale.payments?.length > 1 ? 20 : 0);
+    const paymentCount = sale.payments?.length || 0;
+    const estimatedHeight = 110 + (itemCount * 12) + (paymentCount * 6);
 
     const doc = new jsPDF({
         unit: 'mm',
-        format: [WIDTH, Math.max(estimatedHeight, 120)],
+        format: [WIDTH, Math.max(estimatedHeight, 130)],
     });
 
-    let y = 8;
+    const rate = sale.rate || bcvRate || 1;
+    let y = 0;
     const centerX = WIDTH / 2;
 
-    // ── ENCABEZADO ──
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(12);
-    doc.text('PRECIOS AL DIA', centerX, y, { align: 'center' });
-    y += 5;
+    // ── COLORS ──
+    const BRAND_BG = [15, 23, 42]; // slate-900
+    const BRAND_ACCENT = [16, 185, 129]; // emerald-500
+    const TEXT_MAIN = [30, 41, 59]; // slate-800
+    const TEXT_MUTED = [100, 116, 139]; // slate-500
+    const LIGHT_BG = [248, 250, 252]; // slate-50
 
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(7);
+    // ── HEADER (Colored Block) ──
+    doc.setFillColor(...BRAND_BG);
+    doc.rect(0, 0, WIDTH, 28, 'F');
+
+    y = 12;
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('PRECIOS AL DÍA', centerX, y, { align: 'center' });
+
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184); // slate-400
     doc.text('Tu Bodega Inteligente', centerX, y, { align: 'center' });
+
     y += 4;
     doc.text('preciosaldia.vercel.app', centerX, y, { align: 'center' });
+
+    // ── ORDER INFO ──
+    y = 36;
+    doc.setTextColor(...TEXT_MAIN);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(`TICKET #${(sale.id.substring(0, 6)).toUpperCase()}`, MARGIN, y);
+
     y += 5;
-
-    // Línea separadora
-    doc.setLineWidth(0.3);
-    doc.line(MARGIN, y, WIDTH - MARGIN, y);
-    y += 4;
-
-    // ── DATOS DE LA VENTA ──
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.setFont('courier', 'bold');
-    doc.text(`Orden: #${(sale.id.substring(0, 6)).toUpperCase()}`, MARGIN, y);
-    y += 4;
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text(`Cliente:`, MARGIN, y);
+    doc.setTextColor(...TEXT_MAIN);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${sale.customerName || 'Consumidor Final'}`, MARGIN + 12, y);
 
-    doc.setFont('courier', 'normal');
-    doc.text(`Cliente: ${sale.customerName || 'Consumidor Final'}`, MARGIN, y);
     y += 4;
-
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...TEXT_MUTED);
     const fecha = new Date(sale.timestamp);
-    doc.text(`Fecha: ${fecha.toLocaleDateString('es-VE')}`, MARGIN, y);
-    doc.text(`${fecha.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}`, WIDTH - MARGIN, y, { align: 'right' });
-    y += 5;
+    doc.text(`Fecha:`, MARGIN, y);
+    doc.setTextColor(...TEXT_MAIN);
+    doc.text(`${fecha.toLocaleDateString('es-VE')} - ${fecha.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}`, MARGIN + 12, y);
 
-    // Línea doble
+    y += 6;
+    // Separator
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.setLineWidth(0.5);
     doc.line(MARGIN, y, WIDTH - MARGIN, y);
-    y += 1;
-    doc.line(MARGIN, y, WIDTH - MARGIN, y);
-    y += 4;
+    y += 6;
 
-    // ── DETALLE DE PRODUCTOS ──
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(8);
-    doc.text('DETALLE', MARGIN, y);
-    y += 4;
-
-    doc.setFont('courier', 'normal');
+    // ── ITEMS LIST ──
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text('CANTIDAD / PRODUCTO', MARGIN, y);
+    doc.text('TOTAL', WIDTH - MARGIN, y, { align: 'right' });
+    y += 4;
 
     if (sale.items && sale.items.length > 0) {
-        sale.items.forEach(item => {
+        sale.items.forEach((item, index) => {
+            // Alternate background
+            if (index % 2 === 0) {
+                doc.setFillColor(...LIGHT_BG);
+                doc.rect(MARGIN - 2, y - 3, WIDTH - (MARGIN * 2) + 4, 11, 'F');
+            }
+
             const qty = item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`;
-            const subtotal = (item.priceUsd * item.qty).toFixed(2);
+            const subtotalUsd = item.priceUsd * item.qty;
+            const subtotalBs = subtotalUsd * rate;
 
-            // Nombre del producto (truncar si es muy largo)
-            const name = item.name.length > 28 ? item.name.substring(0, 25) + '...' : item.name;
-            doc.text(name, MARGIN, y);
-            y += 3.5;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            doc.setTextColor(...TEXT_MAIN);
 
-            // Cantidad x precio = subtotal
-            doc.text(`  ${qty} x $${item.priceUsd.toFixed(2)}`, MARGIN, y);
-            doc.text(`$${subtotal}`, WIDTH - MARGIN, y, { align: 'right' });
-            y += 4.5;
+            // Nombre del producto (truncar)
+            const name = item.name.length > 25 ? item.name.substring(0, 22) + '...' : item.name;
+            doc.text(`${qty} × ${name}`, MARGIN, y + 1);
+
+            // Subtotal $
+            doc.text(`$${subtotalUsd.toFixed(2)}`, WIDTH - MARGIN, y + 1, { align: 'right' });
+
+            // Subtotal Bs / Precio unitario
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(...TEXT_MUTED);
+            doc.text(`(Bs ${formatBs(subtotalBs)})`, WIDTH - MARGIN, y + 5, { align: 'right' });
+            doc.text(`$${item.priceUsd.toFixed(2)} c/u`, MARGIN, y + 5);
+
+            y += 11;
         });
     }
 
-    // Línea separadora
-    y += 1;
-    doc.line(MARGIN, y, WIDTH - MARGIN, y);
-    y += 5;
-
-    // ── TOTAL ──
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(11);
-    doc.text('TOTAL:', MARGIN, y);
-    doc.text(`$${(sale.totalUsd || 0).toFixed(2)}`, WIDTH - MARGIN, y, { align: 'right' });
-    y += 5;
-
-    // Referencia en Bs
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(7);
-    const rate = sale.rate || bcvRate;
-    doc.text(`Ref: ${formatBs(sale.totalBs || 0)} Bs @ ${formatBs(rate)} Bs/$`, MARGIN, y);
-    y += 4;
-
-    // Fiado
-    if (sale.fiadoUsd > 0) {
-        doc.setFont('courier', 'bold');
-        doc.setFontSize(8);
-        doc.text(`PENDIENTE (FIADO): $${sale.fiadoUsd.toFixed(2)}`, MARGIN, y);
-        y += 5;
-    }
-
-    // Método de pago
-    if (sale.payments && sale.payments.length > 0) {
-        doc.setFont('courier', 'normal');
-        doc.setFontSize(7);
-        y += 1;
-        doc.line(MARGIN, y, WIDTH - MARGIN, y);
-        y += 4;
-        doc.text('PAGO:', MARGIN, y);
-        y += 3.5;
-        sale.payments.forEach(p => {
-            doc.text(`  ${p.methodLabel}: $${(p.amountUsd || 0).toFixed(2)}`, MARGIN, y);
-            y += 3.5;
-        });
-        y += 1;
-    }
-
-    // Línea doble final
     y += 2;
     doc.line(MARGIN, y, WIDTH - MARGIN, y);
-    y += 1;
-    doc.line(MARGIN, y, WIDTH - MARGIN, y);
-    y += 5;
+    y += 6;
 
-    // ── PIE ──
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(8);
-    doc.text('Gracias por su compra!', centerX, y, { align: 'center' });
-    y += 4;
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(6);
-    doc.text('Precios al Dia - POS & Inventario', centerX, y, { align: 'center' });
+    // ── TOTALS HIGHLIGHT BLOCK ──
+    doc.setFillColor(...LIGHT_BG);
+    doc.roundedRect(MARGIN, y, WIDTH - (MARGIN * 2), 22, 2, 2, 'F');
+
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(...BRAND_ACCENT);
+    doc.text(`TOTAL:`, MARGIN + 4, y + 2);
+    doc.text(`$${(sale.totalUsd || 0).toFixed(2)}`, WIDTH - MARGIN - 4, y + 2, { align: 'right' });
+
+    y += 8;
+    doc.setFontSize(11);
+    doc.setTextColor(...TEXT_MAIN);
+    doc.text(`En Bs:`, MARGIN + 4, y);
+    doc.text(`Bs ${formatBs(sale.totalBs || 0)}`, WIDTH - MARGIN - 4, y, { align: 'right' });
+
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text(`Tasa BCV: ${formatBs(rate)} Bs/$`, centerX, y, { align: 'center' });
+
+    y += 8;
+
+    // ── PAYMENTS & DEBT ──
+    if (sale.payments && sale.payments.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...TEXT_MAIN);
+        doc.text('MÉTODOS DE PAGO', MARGIN, y);
+        y += 4;
+
+        doc.setFont('helvetica', 'normal');
+        sale.payments.forEach(p => {
+            const isBs = p.methodId.includes('_bs') || p.methodId === 'pago_movil';
+            const amountToShow = isBs ? `Bs ${formatBs(p.amountUsd * rate)}` : `$${(p.amountUsd || 0).toFixed(2)}`;
+
+            doc.setTextColor(...TEXT_MUTED);
+            doc.text(p.methodLabel, MARGIN, y);
+            doc.setTextColor(...TEXT_MAIN);
+            doc.text(amountToShow, WIDTH - MARGIN, y, { align: 'right' });
+            y += 4;
+        });
+    }
+
+    // Fiado / Deuda
+    if (sale.fiadoUsd > 0) {
+        y += 2;
+        doc.setFillColor(254, 226, 226); // red-100
+        doc.roundedRect(MARGIN, y - 3, WIDTH - (MARGIN * 2), 8, 1, 1, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(220, 38, 38); // red-600
+        doc.text(`PENDIENTE DE PAGO (FIADO)`, MARGIN + 2, y + 2);
+        doc.text(`$${sale.fiadoUsd.toFixed(2)}`, WIDTH - MARGIN - 2, y + 2, { align: 'right' });
+        y += 8;
+    }
+
+    // ── FOOTER ──
+    const finalY = Math.max(y + 10, doc.internal.pageSize.getHeight() - 15);
+
+    doc.setDrawColor(...BRAND_ACCENT);
+    doc.setLineWidth(1);
+    doc.line(MARGIN, finalY - 4, WIDTH - MARGIN, finalY - 4);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...TEXT_MAIN);
+    doc.text('¡Gracias por su compra!', centerX, finalY + 2, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text('Comprobante Digital sin valor fiscal', centerX, finalY + 6, { align: 'center' });
 
     // ── DESCARGAR / COMPARTIR ──
     const filename = `ticket_${(sale.id.substring(0, 6)).toUpperCase()}.pdf`;
