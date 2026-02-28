@@ -5,6 +5,7 @@ import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag,
 import { formatBs } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
+import ConfirmModal from '../components/ConfirmModal';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -14,6 +15,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate }) {
     const [isLoading, setIsLoading] = useState(true);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [voidSaleTarget, setVoidSaleTarget] = useState(null);
 
     const bcvRate = rates.bcv?.price || 0;
 
@@ -38,7 +40,13 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate }) {
 
     // ── Funciones de Historial Avanzado ──
     const handleVoidSale = async (sale) => {
-        if (!window.confirm(`¿Estás seguro de anular la venta #${sale.id.substring(0, 6).toUpperCase()}?\n\nEsta acción:\n- Marcará la venta como ANULADA\n- Devolverá el stock de todos los productos vendidos a la bodega\n- Revertirá deudas o saldos a favor al cliente asociado\n\nEsta acción no se puede deshacer.`)) return;
+        setVoidSaleTarget(sale);
+    };
+
+    const confirmVoidSale = async () => {
+        const sale = voidSaleTarget;
+        if (!sale) return;
+        setVoidSaleTarget(null);
 
         try {
             // 1. Marcar venta como ANULADA
@@ -413,6 +421,16 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate }) {
                     </div>
                 </div>
             )}
+            {/* Modal Confirmación: Anular Venta */}
+            <ConfirmModal
+                isOpen={!!voidSaleTarget}
+                onClose={() => setVoidSaleTarget(null)}
+                onConfirm={confirmVoidSale}
+                title={`Anular venta #${voidSaleTarget?.id?.substring(0, 6).toUpperCase() || ''}`}
+                message={`Esta acción:\n• Marcará la venta como ANULADA\n• Devolverá el stock a la bodega\n• Revertirá deudas o saldos a favor\n\nEsta acción no se puede deshacer.`}
+                confirmText="Sí, anular"
+                variant="danger"
+            />
         </div>
     );
 }

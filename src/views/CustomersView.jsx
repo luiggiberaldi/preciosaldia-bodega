@@ -5,6 +5,7 @@ import { Users, Search, Plus, CreditCard, ArrowDownRight, ArrowUpRight, User, Ph
 import { formatBs, formatUsd } from '../utils/calculatorUtils';
 import { procesarImpactoCliente } from '../utils/financialLogic';
 import { DEFAULT_PAYMENT_METHODS } from '../config/paymentMethods';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function CustomersView({ triggerHaptic }) {
     const [customers, setCustomers] = useState([]);
@@ -15,6 +16,7 @@ export default function CustomersView({ triggerHaptic }) {
     const [transactionModal, setTransactionModal] = useState({ isOpen: false, type: null, customer: null }); // type: 'ABONO' | 'CREDITO'
     const [amountBs, setAmountBs] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('efectivo_bs');
+    const [resetBalanceCustomer, setResetBalanceCustomer] = useState(null);
 
     useEffect(() => {
         loadCustomers();
@@ -37,14 +39,18 @@ export default function CustomersView({ triggerHaptic }) {
 
     const handleResetBalance = async (customer) => {
         triggerHaptic();
-        if (!window.confirm(`¿Estás seguro de REINICIAR LA DEUDA/SALDO A FAVOR a 0 para el cliente ${customer.name}?\n\nEsta acción no se puede deshacer y borrará permanentemente cualquier monto pendiente que tenga registrado.`)) {
-            return;
-        }
+        setResetBalanceCustomer(customer);
+    };
+
+    const confirmResetBalance = async () => {
+        const customer = resetBalanceCustomer;
+        if (!customer) return;
 
         const updatedCustomer = { ...customer, deuda: 0, favor: 0 };
         const newCustomers = customers.map(c => c.id === customer.id ? updatedCustomer : c);
         await saveCustomers(newCustomers);
         showToast(`Saldo reiniciado a cero para ${customer.name}`, 'success');
+        setResetBalanceCustomer(null);
     };
 
     const handleTransaction = async () => {
@@ -278,6 +284,17 @@ export default function CustomersView({ triggerHaptic }) {
                     </div>
                 </div>
             )}
+
+            {/* Modal Confirmación: Reiniciar Saldo */}
+            <ConfirmModal
+                isOpen={!!resetBalanceCustomer}
+                onClose={() => setResetBalanceCustomer(null)}
+                onConfirm={confirmResetBalance}
+                title="Reiniciar saldo del cliente"
+                message={resetBalanceCustomer ? `¿Estás seguro de reiniciar la deuda y saldo a favor a $0.00 para ${resetBalanceCustomer.name}?\n\nEsta acción es permanente y no se puede deshacer.` : ''}
+                confirmText="Sí, reiniciar"
+                variant="danger"
+            />
         </div>
     );
 }

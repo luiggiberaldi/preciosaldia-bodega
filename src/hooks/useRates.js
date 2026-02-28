@@ -48,7 +48,7 @@ export function useRates() {
 
     const enableNotifications = async () => {
         if (!('Notification' in window)) {
-            alert("Tu navegador no soporta notificaciones.");
+            console.warn("Este navegador no soporta notificaciones.");
             return;
         }
         const permission = await Notification.requestPermission();

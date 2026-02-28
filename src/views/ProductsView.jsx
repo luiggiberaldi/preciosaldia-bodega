@@ -11,6 +11,7 @@ import { useWallet } from '../hooks/useWallet';
 import { BODEGA_CATEGORIES, UNITS, CATEGORY_COLORS } from '../config/categories';
 import ProductCard from '../components/Products/ProductCard';
 import ProductFormModal from '../components/Products/ProductFormModal';
+import ConfirmModal from '../components/ConfirmModal';
 import CategoryManagerModal from '../components/Products/CategoryManagerModal';
 import { useProducts } from '../hooks/useProducts';
 
@@ -38,6 +39,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
+    const [deleteCategoryConfirmId, setDeleteCategoryConfirmId] = useState(null);
 
     // Share State
     const [shareProduct, setShareProduct] = useState(null);
@@ -268,12 +270,17 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
             return;
         }
 
-        if (window.confirm('¿Seguro que deseas borrar esta categoría?')) {
-            const newCats = categories.filter(c => c.id !== categoryId);
-            setCategories(newCats);
-            if (activeCategory === categoryId) handleSetActiveCategory('todos');
-            triggerHaptic && triggerHaptic();
-        }
+        setDeleteCategoryConfirmId(categoryId);
+    };
+
+    const confirmDeleteCategory = () => {
+        const categoryId = deleteCategoryConfirmId;
+        if (!categoryId) return;
+        const newCats = categories.filter(c => c.id !== categoryId);
+        setCategories(newCats);
+        if (activeCategory === categoryId) handleSetActiveCategory('todos');
+        triggerHaptic && triggerHaptic();
+        setDeleteCategoryConfirmId(null);
     };
 
     // ─── RENDER ─────────────────────────────────────────────
@@ -515,6 +522,17 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 setNewCategoryIcon={setNewCategoryIcon}
                 newCategoryName={newCategoryName}
                 setNewCategoryName={setNewCategoryName}
+            />
+
+            {/* Modal Confirmación: Borrar Categoría */}
+            <ConfirmModal
+                isOpen={!!deleteCategoryConfirmId}
+                onClose={() => setDeleteCategoryConfirmId(null)}
+                onConfirm={confirmDeleteCategory}
+                title="Eliminar categoría"
+                message="¿Seguro que deseas borrar esta categoría? Los productos no se eliminarán, pero quedarán sin categoría asignada."
+                confirmText="Sí, eliminar"
+                variant="warning"
             />
         </div>
     );

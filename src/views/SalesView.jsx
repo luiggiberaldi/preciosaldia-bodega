@@ -6,6 +6,7 @@ import { formatBs } from '../utils/calculatorUtils';
 import { DEFAULT_PAYMENT_METHODS } from '../config/paymentMethods';
 import ReceiptModal from '../components/Sales/ReceiptModal';
 import CheckoutModal from '../components/Sales/CheckoutModal';
+import ConfirmModal from '../components/ConfirmModal';
 import CartPanel from '../components/Sales/CartPanel';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 
@@ -13,6 +14,7 @@ const SALES_KEY = 'bodega_sales_v1';
 
 export default function SalesView({ rates, triggerHaptic }) {
     const [products, setProducts] = useState([]);
+    const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
     const [customers, setCustomers] = useState([]);
     const [selectedCustomerId, setSelectedCustomerId] = useState('');
     const [cart, setCart] = useState([]);
@@ -633,9 +635,7 @@ export default function SalesView({ rates, triggerHaptic }) {
                 onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); }}
                 onClearCart={() => {
                     triggerHaptic && triggerHaptic();
-                    if (window.confirm('¿Estás seguro de vaciar toda la cesta? Esta acción no se puede deshacer.')) {
-                        setCart([]);
-                    }
+                    setShowClearCartConfirm(true);
                 }}
                 triggerHaptic={triggerHaptic}
             />
@@ -694,6 +694,17 @@ export default function SalesView({ rates, triggerHaptic }) {
                     text += `*¡Gracias por su compra!*`;
                     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
                 }}
+            />
+
+            {/* Modal de Confirmación: Vaciar Cesta */}
+            <ConfirmModal
+                isOpen={showClearCartConfirm}
+                onClose={() => setShowClearCartConfirm(false)}
+                onConfirm={() => { setCart([]); setShowClearCartConfirm(false); }}
+                title="¿Vaciar toda la cesta?"
+                message="Todos los productos serán eliminados de la cesta actual. Esta acción no se puede deshacer."
+                confirmText="Sí, vaciar"
+                variant="cart"
             />
         </div>
     );
