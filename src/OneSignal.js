@@ -26,6 +26,11 @@ export default async function runOneSignal() {
           'dialog.blocked.message': 'Sigue las instrucciones para permitir las alertas del BCV:'
         }
       },
+      welcomeNotification: {
+        disable: false,
+        title: 'Precios al Día',
+        message: '¡Alertas BCV activadas!',
+      },
       serviceWorkerPath: 'OneSignalSDKWorker.js',
       serviceWorkerParam: { scope: '/' }
     });
