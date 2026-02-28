@@ -65,17 +65,17 @@ export default function CustomersView({ triggerHaptic }) {
 
         triggerHaptic();
 
-        // Convertir a Bs si el usuario ingresó en $
+        // El sistema almacena todo en USD. Si el usuario ingresa Bs, lo convertimos a USD.
         const rawAmount = parseFloat(amountBs);
-        const amount = currencyMode === 'USD' && bcvRate > 0 ? rawAmount * bcvRate : rawAmount;
+        const amountUsd = currencyMode === 'BS' && bcvRate > 0 ? rawAmount / bcvRate : rawAmount;
         const { type, customer } = transactionModal;
 
-        // 1. Aplicar la Lógica Financiera de los Cuadrantes
+        // 1. Aplicar la Lógica Financiera de los Cuadrantes SIEMPRE EN USD
         let transaccionOpts = {};
         if (type === 'ABONO') {
-            transaccionOpts = { costoTotal: 0, pagoReal: amount, vueltoParaMonedero: amount }; // Todo el abono es "vuelto" para matar deuda o ir a favor
+            transaccionOpts = { costoTotal: 0, pagoReal: amountUsd, vueltoParaMonedero: amountUsd };
         } else if (type === 'CREDITO') {
-            transaccionOpts = { esCredito: true, deudaGenerada: amount };
+            transaccionOpts = { esCredito: true, deudaGenerada: amountUsd };
         }
 
         const updatedCustomer = procesarImpactoCliente(customer, transaccionOpts);
@@ -84,19 +84,24 @@ export default function CustomersView({ triggerHaptic }) {
         const newCustomers = customers.map(c => c.id === customer.id ? updatedCustomer : c);
         await saveCustomers(newCustomers);
 
-        // 3. Registrar "COBRO_DEUDA" en Ventas/Caja si es un Abono real de Dinero
+        // 3. Registrar "COBRO_DEUDA" en Ventas/Caja si es un Abono
         if (type === 'ABONO') {
             const sales = await storageService.getItem('bodega_sales_v1', []);
+
+            // Calculamos Bs y Usd para el registro
+            const totalEnBs = currencyMode === 'BS' ? rawAmount : (rawAmount * bcvRate);
+            const totalEnUsd = currencyMode === 'USD' ? rawAmount : (bcvRate > 0 ? rawAmount / bcvRate : 0);
+
             const cobroRecord = {
                 id: crypto.randomUUID(),
                 timestamp: new Date().toISOString(),
                 tipo: 'COBRO_DEUDA', // Etiqueta clave Anti-Duplicados
                 clienteId: customer.id,
                 clienteName: customer.name,
-                totalBs: amount,
-                totalUsd: 0, // Simplificación, el abono se hizo en Bs
+                totalBs: totalEnBs,
+                totalUsd: totalEnUsd,
                 paymentMethod: paymentMethod,
-                items: [{ name: `Abono de deuda: ${customer.name}`, qty: 1, priceUsd: 0, costBs: 0 }]
+                items: [{ name: `Abono de deuda: ${customer.name}`, qty: 1, priceUsd: totalEnUsd, costBs: 0 }]
             };
             sales.push(cobroRecord);
             await storageService.setItem('bodega_sales_v1', sales);
@@ -171,20 +176,29 @@ export default function CustomersView({ triggerHaptic }) {
 
                             <div className="flex flex-col sm:items-end gap-1 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 pt-3 sm:pt-0">
                                 <div className="flex sm:flex-col justify-between sm:justify-center items-center sm:items-end w-full sm:w-auto">
-                                    <span className="text-xs font-bold text-slate-400">SALDO</span>
+                                    <span className="text-xs font-bold text-slate-400 mb-1">SALDO ACTUAL</span>
                                     {customer.deuda > 0 ? (
-                                        <span className="text-red-500 font-black text-lg flex items-center gap-1">
-                                            <ArrowDownRight size={16} /> -{formatBs(customer.deuda)} <span className="text-[10px]">Bs</span>
-                                        </span>
+                                        <div className="text-right flex flex-col items-end">
+                                            <span className="text-red-500 font-black text-lg flex items-center gap-1 leading-none">
+                                                <ArrowDownRight size={16} /> -${formatUsd(customer.deuda)}
+                                            </span>
+                                            {bcvRate > 0 && <span className="text-xs font-bold text-red-500/70 mt-1">-{formatBs(customer.deuda * bcvRate)} Bs</span>}
+                                        </div>
                                     ) : customer.favor > 0 ? (
-                                        <span className="text-emerald-500 font-black text-lg flex items-center gap-1">
-                                            <ArrowUpRight size={16} /> +{formatBs(customer.favor)} <span className="text-[10px]">Bs</span>
-                                        </span>
+                                        <div className="text-right flex flex-col items-end">
+                                            <span className="text-emerald-500 font-black text-lg flex items-center gap-1 leading-none">
+                                                <ArrowUpRight size={16} /> +${formatUsd(customer.favor)}
+                                            </span>
+                                            {bcvRate > 0 && <span className="text-xs font-bold text-emerald-500/70 mt-1">+{formatBs(customer.favor * bcvRate)} Bs</span>}
+                                        </div>
                                     ) : (
-                                        <span className="text-slate-400 font-black text-lg">0.00 <span className="text-[10px]">Bs</span></span>
+                                        <div className="text-right flex flex-col items-end">
+                                            <span className="text-slate-400 font-black text-lg leading-none">$0.00</span>
+                                            <span className="text-xs font-bold text-slate-400/70 mt-1">0 Bs</span>
+                                        </div>
                                     )}
                                 </div>
-                                <div className="flex flex-wrap lg:flex-nowrap gap-2 mt-2 w-full sm:w-auto">
+                                <div className="flex flex-wrap lg:flex-nowrap gap-2 mt-3 w-full sm:w-auto">
                                     <button
                                         onClick={() => { triggerHaptic(); setTransactionModal({ isOpen: true, type: 'CREDITO', customer }); }}
                                         className="flex-1 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
@@ -268,6 +282,9 @@ export default function CustomersView({ triggerHaptic }) {
                                         autoFocus
                                     />
                                 </div>
+                                {currencyMode === 'BS' && amountBs && bcvRate > 0 && (
+                                    <p className="text-[10px] text-slate-400 mt-1.5 px-1">= ${(parseFloat(amountBs) / bcvRate).toFixed(2)} @ {formatBs(bcvRate)} Bs/$</p>
+                                )}
                                 {currencyMode === 'USD' && amountBs && bcvRate > 0 && (
                                     <p className="text-[10px] text-slate-400 mt-1.5 px-1">= {formatBs(parseFloat(amountBs) * bcvRate)} Bs @ {formatBs(bcvRate)} Bs/$</p>
                                 )}
