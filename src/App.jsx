@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Key } from 'lucide-react';
+import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Key, Moon, Sun } from 'lucide-react';
 
 import SalesView from './views/SalesView';
 import DashboardView from './views/DashboardView';
@@ -206,7 +206,7 @@ export default function App() {
 
         {activeTab === 'inicio' && (
           <ErrorBoundary>
-            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} />
+            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} />
           </ErrorBoundary>
         )}
 

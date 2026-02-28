@@ -21,7 +21,7 @@ export const storageService = {
         try {
             // 1. Intentar leer de IndexedDB
             const value = await localforage.getItem(key);
-            
+
             if (value !== null) {
                 return value;
             }
@@ -29,8 +29,8 @@ export const storageService = {
             // 2. Si no existe, revisar LocalStorage (Migración al vuelo)
             const fallbackValue = localStorage.getItem(key);
             if (fallbackValue !== null) {
-                console.log(`[Storage] Migrando '${key}' de LocalStorage a IndexedDB...`);
-                
+                // Migración silenciosa de localStorage a IndexedDB
+
                 let parsedValue;
                 try {
                     parsedValue = JSON.parse(fallbackValue);
@@ -40,7 +40,7 @@ export const storageService = {
 
                 // Guardar en la nueva base de datos
                 await localforage.setItem(key, parsedValue);
-                
+
                 // Borrar el viejo para liberar el preciado espacio de 5MB
                 localStorage.removeItem(key);
 
@@ -55,7 +55,7 @@ export const storageService = {
             // Fallback drástico en caso de que el navegador bloquee IndexedDB por privacidad extrema
             const backup = localStorage.getItem(key);
             if (backup) {
-                try { return JSON.parse(backup); } catch(e) { return backup; }
+                try { return JSON.parse(backup); } catch (e) { return backup; }
             }
             return defaultValue;
         }

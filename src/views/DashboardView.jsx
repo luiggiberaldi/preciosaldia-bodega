@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, Moon, Sun } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
@@ -9,7 +9,7 @@ import ConfirmModal from '../components/ConfirmModal';
 
 const SALES_KEY = 'bodega_sales_v1';
 
-export default function DashboardView({ rates, triggerHaptic, onNavigate }) {
+export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme }) {
     const [sales, setSales] = useState([]);
     const [products, setProducts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -200,8 +200,15 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate }) {
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-3 sm:p-6 overflow-y-auto scrollbar-hide">
 
             {/* Header */}
-            <div className="flex flex-col items-center justify-center mb-6 pt-2">
-                <img src="/logo.png" alt="Logo Precios al Día" className="h-14 sm:h-16 w-auto object-contain drop-shadow-md" />
+            <div className="flex items-center justify-between mb-6 pt-2">
+                <img src={theme === 'dark' ? '/logodark.png' : '/logo.png'} alt="Logo Precios al Día" className="h-14 sm:h-16 w-auto object-contain drop-shadow-md" />
+                <button
+                    onClick={() => { triggerHaptic(); toggleTheme(); }}
+                    className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-90 transition-all"
+                    title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+                >
+                    {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                </button>
             </div>
 
             {/* Acciones Rápidas */}

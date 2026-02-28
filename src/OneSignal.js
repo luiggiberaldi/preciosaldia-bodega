@@ -29,7 +29,7 @@ export default async function runOneSignal() {
       serviceWorkerPath: 'OneSignalSDKWorker.js',
       serviceWorkerParam: { scope: '/' }
     });
-    console.log("✅ OneSignal Inicializado (Modo BCV)");
+    // OneSignal inicializado correctamente
   } catch (err) {
 
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
