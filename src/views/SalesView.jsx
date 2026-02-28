@@ -644,25 +644,72 @@ export default function SalesView({ rates, triggerHaptic }) {
                 receipt={showReceipt}
                 onClose={() => { setShowReceipt(null); setSelectedCustomerId(''); }}
                 onShareWhatsApp={(r) => {
-                    let text = `*COMPROBANTE DE VENTA | PRECIOS AL DÍA*\n`;
-                    text += `--------------------------------\n`;
-                    text += `🛍️ *Orden:* #${(r.id.substring(0, 6)).toUpperCase()}\n`;
-                    text += `Cliente: ${r.customerName || 'Consumidor Final'}\n`;
-                    text += `Fecha: ${new Date(r.timestamp).toLocaleString('es-VE')}\n`;
-                    text += `===================================\n\n`;
-                    text += `*DETALLE DE PRODUCTOS:*\n`;
-                    r.items.forEach(item => {
-                        const qty = item.isWeight ? `${item.qty.toFixed(3)}Kg` : `${item.qty} Und`;
-                        text += `- ${item.name}\n  ${qty} x $${item.priceUsd.toFixed(2)} = *$${(item.priceUsd * item.qty).toFixed(2)}*\n`;
+                    const fecha = new Date(r.timestamp).toLocaleDateString('es-VE', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
                     });
-                    text += `\n===================================\n`;
-                    text += `*TOTAL A PAGAR: $${r.totalUsd.toFixed(2)}*\n`;
-                    text += ` Ref: ${formatBs(r.totalBs)} Bs a ${formatBs(r.rate)} Bs/$\n`;
-                    if (r.fiadoUsd > 0) {
-                        text += `\n*SALDO PENDIENTE (FIADO): $${r.fiadoUsd.toFixed(2)}*\n`;
-                    }
-                    text += `\n===================================\n`;
-                    text += `*¡Gracias por su compra!*`;
+                    const saleNum = r.id?.slice(-6).toUpperCase() ?? '------';
+                    const sep = '================================';
+                    const sep2 = '--------------------------------';
+
+                    // Items
+                    const itemsLines = (r.items ?? []).map(item => {
+                        const qty = item.isWeight
+                            ? `${parseFloat(item.qty).toFixed(3)} kg`
+                            : `${item.qty} und`;
+                        const sub = (item.priceUsd * item.qty).toFixed(2);
+                        return `- ${item.name}\n  ${qty} x $${parseFloat(item.priceUsd).toFixed(2)} = $${sub}`;
+                    }).join('\n');
+
+                    // Pagos
+                    const paymentsLines = (r.payments ?? []).map(p => {
+                        const isBs = p.currency === 'BS';
+                        const val = isBs
+                            ? `Bs ${Math.ceil(p.amountBs ?? p.amountUsd * r.rate)}`
+                            : `$${parseFloat(p.amountUsd).toFixed(2)}`;
+                        return `  ${p.methodLabel}: ${val}`;
+                    }).join('\n');
+
+                    // Totales
+                    const totalBs = r.totalBs ?? (r.totalUsd * r.rate);
+                    const totalUsdStr = `$${parseFloat(r.totalUsd).toFixed(2)}`;
+                    const totalBsStr = `Bs ${Math.ceil(totalBs)}`;
+
+                    // Vuelto (solo si hay)
+                    const changeLines = r.changeUsd > 0.005
+                        ? `\nVUELTO: $${parseFloat(r.changeUsd).toFixed(2)}`
+                        : '';
+
+                    // Fiado (solo si aplica)
+                    const fiadoLine = r.fiadoUsd > 0.005
+                        ? `\nPENDIENTE (fiado): $${parseFloat(r.fiadoUsd).toFixed(2)}`
+                        : '';
+
+                    // Cliente
+                    const clienteLine = r.customerName && r.customerName !== 'Consumidor Final'
+                        ? `Cliente: ${r.customerName}\n`
+                        : '';
+
+                    const text = [
+                        `COMPROBANTE DE VENTA | PRECIOS AL DIA`,
+                        sep2,
+                        `Orden: #${saleNum}`,
+                        `${clienteLine}Fecha: ${fecha}`,
+                        sep,
+                        ``,
+                        `DETALLE DE PRODUCTOS:`,
+                        itemsLines,
+                        ``,
+                        sep,
+                        `TOTAL: ${totalUsdStr}  /  ${totalBsStr}`,
+                        paymentsLines ? `\nPAGOS:\n${paymentsLines}` : '',
+                        changeLines,
+                        fiadoLine,
+                        sep,
+                        `Gracias por su compra!`,
+                        `Precios Al Dia - Sistema POS`,
+                    ].filter(Boolean).join('\n');
+
                     const phone = formatVzlaPhone(r.customerPhone);
                     const waUrl = phone
                         ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
