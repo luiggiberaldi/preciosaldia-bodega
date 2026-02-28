@@ -125,7 +125,7 @@ export default function SalesView({ rates, triggerHaptic }) {
             return;
         }
 
-        const usdtRate = rates.usdt?.price || effectiveRate;
+        const usdtRate = effectiveRate;
         let priceToUse = product.priceUsdt;
         let cartId = product.id;
         let cartName = product.name;
