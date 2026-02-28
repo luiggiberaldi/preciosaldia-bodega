@@ -8,7 +8,7 @@ const STEPS = [
     {
         icon: Home,
         color: 'text-emerald-500',
-        bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+        bg: 'bg-emerald-100',
         title: 'Inicio',
         headline: 'Tu bodega de un vistazo',
         description: 'Dashboard con resumen de ventas del día, productos con stock bajo y accesos rápidos a todas las funciones.',
@@ -17,7 +17,7 @@ const STEPS = [
     {
         icon: ShoppingCart,
         color: 'text-blue-500',
-        bg: 'bg-blue-100 dark:bg-blue-900/30',
+        bg: 'bg-blue-100',
         title: 'Vender',
         headline: 'Punto de venta rápido',
         description: 'Agrega productos al carrito, aplica descuentos y cobra en efectivo, pago móvil o transferencia. El sistema calcula automáticamente el precio en Bs.',
@@ -26,7 +26,7 @@ const STEPS = [
     {
         icon: Store,
         color: 'text-indigo-500',
-        bg: 'bg-indigo-100 dark:bg-indigo-900/30',
+        bg: 'bg-indigo-100',
         title: 'Inventario',
         headline: 'Tu catálogo de productos',
         descriptionPremium: 'Agrega tus productos con foto, precio en dólares y categoría. La app calcula precio en Bolívares y controla el stock automáticamente.',
@@ -37,7 +37,7 @@ const STEPS = [
     {
         icon: Users,
         color: 'text-amber-500',
-        bg: 'bg-amber-100 dark:bg-amber-900/30',
+        bg: 'bg-amber-100',
         title: 'Clientes',
         headline: 'Gestiona tus clientes',
         descriptionPremium: 'Registra a tus clientes frecuentes, lleva control de fiados y pagos parciales. Todo offline y seguro.',
@@ -98,7 +98,7 @@ export default function OnboardingOverlay({ isPremium = false }) {
 
                 {/* Card */}
                 <div
-                    className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden"
+                    className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden"
                     key={step}
                     style={{
                         animation: `${direction > 0 ? 'slideInRight' : 'slideInLeft'} 0.3s ease-out`,
@@ -123,14 +123,14 @@ export default function OnboardingOverlay({ isPremium = false }) {
                                 Tu bodega inteligente
                             </p>
 
-                            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-6 max-w-[260px] mx-auto">
+                            <p className="text-sm text-slate-500 leading-relaxed mb-6 max-w-[260px] mx-auto">
                                 Inventario, ventas y gestión de clientes en una sola app, diseñada para el bodeguero venezolano.
                             </p>
 
                             {/* Feature pills */}
                             <div className="flex flex-wrap justify-center gap-2 mb-2">
                                 {['Inventario', 'Punto de Venta', 'Clientes', 'Reportes'].map(label => (
-                                    <span key={label} className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-3 py-1.5 rounded-full">
+                                    <span key={label} className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full">
                                         {label}
                                     </span>
                                 ))}
@@ -150,20 +150,20 @@ export default function OnboardingOverlay({ isPremium = false }) {
                             </p>
 
                             {/* Headline */}
-                            <h2 className="text-xl font-black text-slate-900 dark:text-white text-center mb-3 leading-tight">
+                            <h2 className="text-xl font-black text-slate-900 text-center mb-3 leading-tight">
                                 {current.headline}
                             </h2>
 
                             {/* Description */}
-                            <p className="text-sm text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-4">
+                            <p className="text-sm text-slate-500 text-center leading-relaxed mb-4">
                                 {hasVariants
                                     ? (isPremium ? current.descriptionPremium : current.descriptionFree)
                                     : current.description}
                             </p>
 
                             {/* Tip */}
-                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-100 dark:border-slate-700/50">
-                                <p className="text-xs text-slate-600 dark:text-slate-300 font-medium text-center">
+                            <div className="bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
+                                <p className="text-xs text-slate-600 font-medium text-center">
                                     {hasVariants
                                         ? (isPremium ? current.tipPremium : current.tipFree)
                                         : current.tip}
