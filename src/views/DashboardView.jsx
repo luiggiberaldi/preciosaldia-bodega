@@ -3,7 +3,7 @@ import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, Moon, Sun } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
-import { getPaymentLabel, getPaymentMethod } from '../config/paymentMethods';
+import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import ConfirmModal from '../components/ConfirmModal';
 import { generateTicketPDF } from '../utils/ticketGenerator';
@@ -308,12 +308,16 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     <div className="space-y-2">
                         {Object.entries(paymentBreakdown).map(([method, data]) => {
                             const label = getPaymentLabel(method);
+                            const PayIcon = PAYMENT_ICONS[method];
                             const totalBsEquiv = data.currency === 'USD' ? data.total * bcvRate : data.total;
                             const pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0;
                             return (
                                 <div key={method}>
                                     <div className="flex justify-between text-sm mb-1">
-                                        <span className="text-slate-600 dark:text-slate-300 font-medium">{label}</span>
+                                        <span className="text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5">
+                                            {PayIcon && <PayIcon size={14} className="text-slate-400" />}
+                                            {label}
+                                        </span>
                                         <span className="font-bold text-slate-700 dark:text-white">
                                             {data.currency === 'USD' ? `$ ${data.total.toFixed(2)}` : `${formatBs(data.total)} Bs`}
                                         </span>

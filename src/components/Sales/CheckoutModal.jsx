@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { X, Users, Receipt, ChevronDown, Wallet, Zap } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
+import { PAYMENT_ICONS } from '../../config/paymentMethods';
 
 /**
  * CheckoutModal — Zona de Cobro con Barras de Pago (Estilo Listo POS)
@@ -122,7 +123,7 @@ export default function CheckoutModal({
         return (
             <div key={method.id} className="mb-3 last:mb-0">
                 <div className="flex items-center gap-2 mb-1 ml-0.5">
-                    <span className="text-base">{method.icon}</span>
+                    {(() => { const MIcon = method.Icon || PAYMENT_ICONS[method.id]; return MIcon ? <MIcon size={16} className={hasValue ? '' : 'text-slate-400'} /> : <span className="text-base">{method.icon}</span>; })()}
                     <span className={`text-[11px] font-bold uppercase tracking-wide ${hasValue ? styles.title : 'text-slate-400 dark:text-slate-500'}`}>
                         {method.label}
                     </span>

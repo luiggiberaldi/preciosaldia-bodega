@@ -1,16 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, CreditCard } from 'lucide-react';
-import { getActivePaymentMethods, savePaymentMethods, FACTORY_PAYMENT_METHODS } from '../../config/paymentMethods';
+import { Plus, Trash2, CreditCard, Banknote, Smartphone, DollarSign, Store, ShoppingCart, Package, Coins, Key } from 'lucide-react';
+import { getActivePaymentMethods, savePaymentMethods, FACTORY_PAYMENT_METHODS, PAYMENT_ICONS } from '../../config/paymentMethods';
 import { showToast } from '../Toast';
 
-const ICON_OPTIONS = ['💵', '📱', '💳', '💲', '🏦', '💸', '🪙', '💰', '📲', '🔄'];
+const ICON_OPTIONS = [
+    { key: 'Banknote', Icon: Banknote },
+    { key: 'Smartphone', Icon: Smartphone },
+    { key: 'CreditCard', Icon: CreditCard },
+    { key: 'DollarSign', Icon: DollarSign },
+    { key: 'Store', Icon: Store },
+    { key: 'ShoppingCart', Icon: ShoppingCart },
+    { key: 'Package', Icon: Package },
+    { key: 'Coins', Icon: Coins },
+    { key: 'Key', Icon: Key },
+];
 
 export default function PaymentMethodsManager({ triggerHaptic }) {
     const [methods, setMethods] = useState([]);
     const [showAdd, setShowAdd] = useState(false);
     const [newLabel, setNewLabel] = useState('');
     const [newCurrency, setNewCurrency] = useState('BS');
-    const [newIcon, setNewIcon] = useState('💵');
+    const [newIcon, setNewIcon] = useState('Banknote');
 
     useEffect(() => {
         getActivePaymentMethods().then(setMethods);
@@ -50,7 +60,7 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
     const renderMethod = (m) => (
         <div key={m.id} className="flex items-center justify-between py-2.5 px-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 mb-2">
             <div className="flex items-center gap-2.5">
-                <span className="text-lg">{m.icon}</span>
+                {(() => { const MIcon = m.Icon || PAYMENT_ICONS[m.id]; return MIcon ? <MIcon size={18} className="text-slate-500" /> : <span className="text-lg">{m.icon}</span>; })()}
                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{m.label}</span>
                 {m.isFactory && (
                     <span className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">Predeterminado</span>
@@ -106,13 +116,13 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
                         </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {ICON_OPTIONS.map(icon => (
+                        {ICON_OPTIONS.map(({ key, Icon }) => (
                             <button
-                                key={icon}
-                                onClick={() => setNewIcon(icon)}
-                                className={`w-10 h-10 rounded-lg text-lg flex items-center justify-center transition-all ${newIcon === icon ? 'bg-emerald-500 ring-2 ring-emerald-300 scale-110' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'}`}
+                                key={key}
+                                onClick={() => setNewIcon(key)}
+                                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${newIcon === key ? 'bg-emerald-500 text-white ring-2 ring-emerald-300 scale-110' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'}`}
                             >
-                                {icon}
+                                <Icon size={20} />
                             </button>
                         ))}
                     </div>

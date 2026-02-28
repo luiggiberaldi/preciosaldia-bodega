@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tag, Banknote, AlertTriangle, Box, Minus, Plus, Pencil, Trash2 } from 'lucide-react';
-import { CATEGORY_COLORS, UNITS } from '../../config/categories';
+import { CATEGORY_COLORS, CATEGORY_ICONS, UNITS } from '../../config/categories';
 import { formatUsd, formatBs, smartCashRounding } from '../../utils/calculatorUtils';
 
 export default function ProductCard({
@@ -34,8 +34,8 @@ export default function ProductCard({
                 )}
                 {/* Category badge */}
                 {catInfo && catInfo.id !== 'otros' && (
-                    <div className={`absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${CATEGORY_COLORS[catInfo.color] || ''}`}>
-                        {catInfo.icon} {catInfo.label}
+                    <div className={`absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${CATEGORY_COLORS[catInfo.color] || ''}`}>
+                        {(() => { const CatIcon = CATEGORY_ICONS[catInfo.id]; return CatIcon ? <CatIcon size={9} /> : catInfo.icon; })()} {catInfo.label}
                     </div>
                 )}
                 {/* Low stock alert */}
@@ -87,7 +87,7 @@ export default function ProductCard({
                             <span className={`text-base font-black leading-none mb-0.5 ${isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>
                                 {p.stock ?? 0}
                             </span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">{(p.unit === 'kg' || p.unit === 'litro') ? unitInfo?.short : 'UD'}</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">{(p.unit === 'kg' || p.unit === 'litro') ? unitInfo?.short : 'UND'}</span>
                             {p.unit === 'paquete' && p.unitsPerPackage > 0 && Math.floor((p.stock ?? 0) / p.unitsPerPackage) > 0 && (
                                 <span className="text-[8px] text-slate-400 leading-none">= {Math.floor((p.stock ?? 0) / p.unitsPerPackage)} lotes</span>
                             )}
@@ -105,6 +105,6 @@ export default function ProductCard({
                 <button onClick={() => onEdit(p)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-amber-500 transition-colors"><Pencil size={12} /></button>
                 <button onClick={() => onDelete(p.id)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors"><Trash2 size={12} /></button>
             </div>
-        </div>
+        </div >
     );
 }

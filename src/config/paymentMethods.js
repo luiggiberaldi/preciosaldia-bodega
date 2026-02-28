@@ -1,15 +1,16 @@
 import { storageService } from '../utils/storageService';
+import { Banknote, Smartphone, CreditCard, DollarSign } from 'lucide-react';
 
 const PM_KEY = 'bodega_payment_methods_v1';
 
 // ── MÉTODOS DE FÁBRICA (no editables, no eliminables) ──
 export const FACTORY_PAYMENT_METHODS = [
     // Bolívares
-    { id: 'efectivo_bs', label: 'Efectivo en Bolívares', icon: '💵', currency: 'BS', isFactory: true },
-    { id: 'pago_movil', label: 'Pago Móvil', icon: '📱', currency: 'BS', isFactory: true },
-    { id: 'punto_venta', label: 'Punto de Venta', icon: '💳', currency: 'BS', isFactory: true },
+    { id: 'efectivo_bs', label: 'Efectivo en Bolívares', icon: '💵', Icon: Banknote, currency: 'BS', isFactory: true },
+    { id: 'pago_movil', label: 'Pago Móvil', icon: '📱', Icon: Smartphone, currency: 'BS', isFactory: true },
+    { id: 'punto_venta', label: 'Punto de Venta', icon: '💳', Icon: CreditCard, currency: 'BS', isFactory: true },
     // Dólares
-    { id: 'efectivo_usd', label: 'Efectivo en Dólares', icon: '💲', currency: 'USD', isFactory: true },
+    { id: 'efectivo_usd', label: 'Efectivo en Dólares', icon: '💲', Icon: DollarSign, currency: 'USD', isFactory: true },
 ];
 
 // Alias para compatibilidad
@@ -57,7 +58,15 @@ export async function removePaymentMethod(id) {
 export const getPaymentLabel = (id) => {
     const all = FACTORY_PAYMENT_METHODS;
     const method = all.find(m => m.id === id);
-    return method ? `${method.icon} ${method.label}` : id;
+    return method ? method.label : id;
+};
+
+// Icon lookup for React components
+export const PAYMENT_ICONS = {
+    efectivo_bs: Banknote,
+    pago_movil: Smartphone,
+    punto_venta: CreditCard,
+    efectivo_usd: DollarSign,
 };
 
 export const getPaymentMethod = (id) => {

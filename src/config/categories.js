@@ -1,3 +1,9 @@
+import {
+    ShoppingBasket, Droplets, Sparkles, Beef, Wheat,
+    Milk, Drumstick, Leaf, Croissant, ShoppingBag,
+    Package, LayoutGrid
+} from 'lucide-react';
+
 // Categorías predefinidas para el Inventario
 export const BODEGA_CATEGORIES = [
     { id: 'todos', label: 'Todos', icon: '◉', color: 'slate' },
@@ -13,6 +19,22 @@ export const BODEGA_CATEGORIES = [
     { id: 'viveres', label: 'Víveres', icon: '◆', color: 'green' },
     { id: 'otros', label: 'Otros', icon: '◆', color: 'gray' },
 ];
+
+// Lucide icon map for factory categories
+export const CATEGORY_ICONS = {
+    todos: LayoutGrid,
+    bebidas: Droplets,
+    limpieza: Sparkles,
+    charcuteria: Beef,
+    snacks: ShoppingBasket,
+    granos: Wheat,
+    lacteos: Milk,
+    carnes: Drumstick,
+    verduras: Leaf,
+    panaderia: Croissant,
+    viveres: ShoppingBag,
+    otros: Package,
+};
 
 export const UNITS = [
     { id: 'unidad', label: 'Unidad', short: 'uni' },

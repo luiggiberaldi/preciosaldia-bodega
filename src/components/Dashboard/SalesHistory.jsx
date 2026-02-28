@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Clock, Send, Ban, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Clock, Send, Ban, ChevronDown, ChevronUp, Trash2, Shuffle } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
-import { getPaymentLabel, getPaymentMethod } from '../../config/paymentMethods';
+import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS } from '../../config/paymentMethods';
 
 export default function SalesHistory({
     sales,
@@ -38,20 +38,20 @@ export default function SalesHistory({
                 {recentSales.map(s => {
                     const d = new Date(s.timestamp);
                     let methodLabel = 'Efectivo';
-                    let iconChar = '💵';
+                    let PayMethodIcon = PAYMENT_ICONS['efectivo_bs'];
 
                     if (s.payments && s.payments.length === 1) {
                         methodLabel = s.payments[0].methodLabel;
                         const m = getPaymentMethod(s.payments[0].methodId);
-                        if (m) iconChar = m.icon;
+                        if (m) PayMethodIcon = PAYMENT_ICONS[m.id] || m.Icon || null;
                     } else if (s.payments && s.payments.length > 1) {
                         methodLabel = 'Pago Mixto';
-                        iconChar = '🔀';
+                        PayMethodIcon = Shuffle;
                     } else if (s.paymentMethod) {
                         const m = getPaymentMethod(s.paymentMethod);
                         if (m) {
                             methodLabel = m.label;
-                            iconChar = m.icon;
+                            PayMethodIcon = PAYMENT_ICONS[m.id] || m.Icon || null;
                         }
                     }
 
@@ -64,8 +64,8 @@ export default function SalesHistory({
                                 className="flex items-center gap-3 p-3 cursor-pointer select-none active:bg-slate-100 dark:active:bg-slate-800"
                                 onClick={() => setExpandedSaleId(isExpanded ? null : s.id)}
                             >
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xl ${isCanceled ? 'bg-red-100 opacity-50' : 'bg-white dark:bg-slate-700 shadow-sm'}`}>
-                                    {isCanceled ? '🚫' : iconChar}
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isCanceled ? 'bg-red-100 opacity-50' : 'bg-white dark:bg-slate-700 shadow-sm'}`}>
+                                    {isCanceled ? <Ban size={20} className="text-red-400" /> : (PayMethodIcon ? <PayMethodIcon size={20} className="text-slate-500" /> : <span className="text-xl">💵</span>)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className={`text-sm font-bold flex items-center gap-1.5 truncate ${isCanceled ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
