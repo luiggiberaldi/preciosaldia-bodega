@@ -81,7 +81,7 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp }) {
                     </button>
                     <button onClick={onClose}
                         className="flex-1 sm:flex-[1.5] py-4 bg-slate-200 text-slate-700 font-black rounded-xl hover:bg-slate-300 transition-colors uppercase tracking-widest text-xs sm:text-sm focus:outline-none">
-                        Nva. Venta (Esc)
+                        Nueva Venta
                     </button>
                 </div>
 
