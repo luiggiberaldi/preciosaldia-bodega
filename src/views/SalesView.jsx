@@ -334,6 +334,22 @@ export default function SalesView({ rates, triggerHaptic }) {
         setShowCheckout(false);
     };
 
+    // Crear cliente inline desde checkout
+    const handleCreateCustomer = async (name, phone) => {
+        const newCustomer = {
+            id: crypto.randomUUID(),
+            name,
+            phone: phone || '',
+            deuda: 0,
+            favor: 0,
+            createdAt: new Date().toISOString(),
+        };
+        const updated = [...customers, newCustomer];
+        setCustomers(updated);
+        await storageService.setItem('my_customers_v1', updated);
+        return newCustomer;
+    };
+
     if (isLoading) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center">
@@ -614,6 +630,7 @@ export default function SalesView({ rates, triggerHaptic }) {
                     paymentMethods={paymentMethods}
                     onConfirmSale={handleCheckout}
                     onUseSaldoFavor={handleUseSaldoFavor}
+                    onCreateCustomer={handleCreateCustomer}
                     triggerHaptic={triggerHaptic}
                 />
             )}

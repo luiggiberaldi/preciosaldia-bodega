@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { X, Users, Receipt, ChevronDown, Wallet, Zap } from 'lucide-react';
+import { X, Users, Receipt, ChevronDown, Wallet, Zap, UserPlus, Check } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { PAYMENT_ICONS } from '../../config/paymentMethods';
 
@@ -19,10 +19,15 @@ export default function CheckoutModal({
     onConfirmSale,
     onUseSaldoFavor,
     triggerHaptic,
+    onCreateCustomer,
 }) {
     // ── State: un valor por barra ──
     const [barValues, setBarValues] = useState({});
     const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+    const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
+    const [newClientName, setNewClientName] = useState('');
+    const [newClientPhone, setNewClientPhone] = useState('');
+    const [savingClient, setSavingClient] = useState(false);
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
@@ -34,10 +39,17 @@ export default function CheckoutModal({
         }, 0);
     }, [barValues, paymentMethods, effectiveRate]);
 
+    const totalPaidBs = useMemo(() =>
+        paymentMethods.reduce((sum, m) => {
+            const val = parseFloat(barValues[m.id]) || 0;
+            return sum + (m.currency === 'BS' ? val : val * effectiveRate);
+        }, 0)
+        , [barValues, paymentMethods, effectiveRate]);
+
     const remainingUsd = Math.max(0, cartTotalUsd - totalPaidUsd);
     const remainingBs = remainingUsd * effectiveRate;
     const changeUsd = Math.max(0, totalPaidUsd - cartTotalUsd);
-    const changeBs = changeUsd * effectiveRate;
+    const changeBs = Math.max(0, totalPaidBs - cartTotalBs);
     const isPaid = remainingUsd <= 0.01;
 
     // ── Handlers ──
@@ -84,6 +96,22 @@ export default function CheckoutModal({
         triggerHaptic && triggerHaptic();
         if (onUseSaldoFavor) onUseSaldoFavor();
     }, [onUseSaldoFavor, triggerHaptic]);
+
+    // Crear cliente inline
+    const handleCreateClient = async () => {
+        if (!newClientName.trim() || !onCreateCustomer) return;
+        setSavingClient(true);
+        try {
+            const newCustomer = await onCreateCustomer(newClientName.trim(), newClientPhone.trim());
+            setSelectedCustomerId(newCustomer.id);
+            setNewClientName('');
+            setNewClientPhone('');
+            setShowNewCustomerForm(false);
+            setShowCustomerPicker(false);
+        } finally {
+            setSavingClient(false);
+        }
+    };
 
     // Agrupar métodos por moneda
     const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
@@ -274,6 +302,56 @@ export default function CheckoutModal({
                                         )}
                                     </button>
                                 ))}
+
+                                {/* Separador */}
+                                <div className="border-t border-slate-100 dark:border-slate-800" />
+
+                                {/* Botón/Form nuevo cliente */}
+                                {!showNewCustomerForm ? (
+                                    <button
+                                        onClick={() => setShowNewCustomerForm(true)}
+                                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                                    >
+                                        <UserPlus size={14} />
+                                        Nuevo cliente...
+                                    </button>
+                                ) : (
+                                    <div className="p-3 space-y-2 bg-slate-50 dark:bg-slate-900/50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            placeholder="Nombre del cliente *"
+                                            value={newClientName}
+                                            onChange={e => setNewClientName(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
+                                            className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50"
+                                        />
+                                        <input
+                                            type="tel"
+                                            placeholder="Teléfono (opcional)"
+                                            value={newClientPhone}
+                                            onChange={e => setNewClientPhone(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
+                                            className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50"
+                                        />
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => { setShowNewCustomerForm(false); setNewClientName(''); setNewClientPhone(''); }}
+                                                className="flex-1 py-1.5 text-xs font-bold text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button
+                                                onClick={handleCreateClient}
+                                                disabled={!newClientName.trim() || savingClient}
+                                                className="flex-1 py-1.5 text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+                                            >
+                                                <Check size={13} />
+                                                {savingClient ? 'Guardando...' : 'Crear'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
