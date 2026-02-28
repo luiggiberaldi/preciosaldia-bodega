@@ -3,7 +3,7 @@ import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { Search, X, Package, RefreshCw, Mic, Box, ShoppingCart } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
-import { DEFAULT_PAYMENT_METHODS } from '../config/paymentMethods';
+import { getActivePaymentMethods } from '../config/paymentMethods';
 import ReceiptModal from '../components/Sales/ReceiptModal';
 import CheckoutModal from '../components/Sales/CheckoutModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -21,11 +21,11 @@ export default function SalesView({ rates, triggerHaptic }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [showCheckout, setShowCheckout] = useState(false);
     const [showReceipt, setShowReceipt] = useState(null);
-    const [payments, setPayments] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showRateConfig, setShowRateConfig] = useState(false);
-    const [hierarchyPending, setHierarchyPending] = useState(null); // Producto pendiente de selección paquete/unidad
-    const [weightPending, setWeightPending] = useState(null); // Producto pendiente de pesaje (kg/litro)
+    const [hierarchyPending, setHierarchyPending] = useState(null);
+    const [weightPending, setWeightPending] = useState(null);
+    const [paymentMethods, setPaymentMethods] = useState([]);
 
     // Búsqueda y Navegación
     const searchInputRef = useRef(null);
@@ -36,10 +36,6 @@ export default function SalesView({ rates, triggerHaptic }) {
         onResult: (text) => { setSearchTerm(text); searchInputRef.current?.focus(); },
         triggerHaptic,
     });
-
-    // Calculadora de pago
-    const [amountGiven, setAmountGiven] = useState('');
-    const [amountGivenCurrency, setAmountGivenCurrency] = useState('USD');
 
     // ── Tasa BCV (automática o manual) ──
     const [useAutoRate, setUseAutoRate] = useState(() => {
@@ -64,13 +60,15 @@ export default function SalesView({ rates, triggerHaptic }) {
     useEffect(() => {
         let mounted = true;
         const load = async () => {
-            const [saved, savedCustomers] = await Promise.all([
+            const [saved, savedCustomers, methods] = await Promise.all([
                 storageService.getItem('my_products_v1', []),
-                storageService.getItem('my_customers_v1', [])
+                storageService.getItem('my_customers_v1', []),
+                getActivePaymentMethods()
             ]);
             if (mounted) {
                 setProducts(saved);
                 setCustomers(savedCustomers);
+                setPaymentMethods(methods);
                 setIsLoading(false);
             }
         };
@@ -243,112 +241,49 @@ export default function SalesView({ rates, triggerHaptic }) {
         return () => window.removeEventListener('keydown', handleGlobalKeyMap);
     }, [cart, showCheckout, showReceipt]);
 
-    // Calculadora de Vuelto y Pagos Mixtos
-    const totalPaidUsd = payments.reduce((acc, p) => acc + p.amountUsd, 0);
-    const remainingUsd = Math.max(0, cartTotalUsd - totalPaidUsd);
-    const remainingBs = remainingUsd * effectiveRate;
-    const changeUsd = Math.max(0, totalPaidUsd - cartTotalUsd);
-    const changeBs = changeUsd * effectiveRate;
-
-    // Al abrir checkout si el total es algo, lo pre-fill (opcional)
+    // Al cerrar checkout/receipt, limpiar y devolver foco
     useEffect(() => {
-        if (showCheckout) {
-            setAmountGiven('');
-            setPayments([]);
-        }
         if (!showCheckout && !showReceipt && searchInputRef.current) {
             searchInputRef.current.focus();
-            setSelectedCustomerId(''); // Limpiar el cliente al cerrar/completar checkout
+            setSelectedCustomerId('');
         }
     }, [showCheckout, showReceipt]);
 
-    // Función para procesar o añadir un pago parcial
-    const handlePaymentMethodClick = (methodId) => {
-        triggerHaptic && triggerHaptic();
-        const m = DEFAULT_PAYMENT_METHODS.find(x => x.id === methodId);
-        if (!m) return;
-
-        let inputAmount = parseFloat(amountGiven);
-        let inputCurrency = amountGivenCurrency;
-
-        // Si no ingresó monto, asumimos el total restante en la moneda del método de pago
-        if (isNaN(inputAmount) || inputAmount <= 0) {
-            inputCurrency = m.currency;
-            inputAmount = m.currency === 'USD' ? remainingUsd : remainingBs;
-            // Redondear a max 2 decimales para UI limpia
-            inputAmount = Number(inputAmount.toFixed(2));
-        }
-
-        if (inputAmount <= 0) return; // Si no hay nada que pagar, evitamos agregar pago 0
-
-        const amountUsd = inputCurrency === 'USD' ? inputAmount : inputAmount / effectiveRate;
-        const amountBs = inputCurrency === 'BS' ? inputAmount : inputAmount * effectiveRate;
-
-        setPayments(prev => [...prev, {
-            id: crypto.randomUUID(),
-            methodId: m.id,
-            methodLabel: m.label,
-            currency: m.currency,
-            amountInput: inputAmount,
-            amountInputCurrency: inputCurrency,
-            amountUsd,
-            amountBs
-        }]);
-
-        setAmountGiven('');
-    };
-
-    const removePayment = (pid) => {
-        triggerHaptic && triggerHaptic();
-        setPayments(prev => prev.filter(p => p.id !== pid));
-    };
-
-    // Saldo a Favor handler
+    // Saldo a Favor handler — ahora será invocado desde el modal
+    // TODO: saldo a favor se maneja de forma simplificada
     const handleUseSaldoFavor = () => {
-        const c = customers.find(x => x.id === selectedCustomerId);
-        if (!c) return;
-        const expectedSaldo = Math.abs(c.deuda);
-        const amountToUse = Math.min(expectedSaldo, remainingUsd);
-        setPayments(prev => [...prev, {
-            id: crypto.randomUUID(),
-            methodId: 'saldo_favor',
-            methodLabel: 'Saldo a Favor',
-            currency: 'USD',
-            amountInput: Number(amountToUse.toFixed(2)),
-            amountInputCurrency: 'USD',
-            amountUsd: amountToUse,
-            amountBs: amountToUse * effectiveRate
-        }]);
+        // El modal maneja esto internamente ahora
     };
 
     // Checkout Final
-    const handleCheckout = async () => {
+    const handleCheckout = async (payments) => {
         triggerHaptic && triggerHaptic();
 
         const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
         if (cart.length === 0) return;
-        if (!selectedCustomer && remainingUsd > 0.01) return; // Si no hay cliente, no puede fiar
 
-        // --- 🛡️ AUDITORÍA DE DATOS DE VENTA (Golden Rule) ---
-        if (
-            isNaN(cartTotalUsd) || cartTotalUsd < 0 ||
-            isNaN(changeBs) || changeBs < 0 ||
-            isNaN(totalPaidUsd) || totalPaidUsd < 0
-        ) {
-            console.error("❌ BLOODHOUND: Abortando venta. Integridad matemática comprometida (NaN o Negativo).");
+        // Recalcular totales desde payments recibidos
+        const totalPaidUsd = payments.reduce((acc, p) => acc + p.amountUsd, 0);
+        const remainingUsd = Math.max(0, cartTotalUsd - totalPaidUsd);
+        const changeUsd = Math.max(0, totalPaidUsd - cartTotalUsd);
+        const changeBs = changeUsd * effectiveRate;
+
+        if (!selectedCustomer && remainingUsd > 0.01) return;
+
+        // Auditoría de datos
+        if (isNaN(cartTotalUsd) || cartTotalUsd < 0 || isNaN(totalPaidUsd) || totalPaidUsd < 0) {
+            console.error('Abortando venta. Integridad matemática comprometida.');
             showToast('Error de integridad de datos. Revisa los montos.', 'error');
             return;
         }
-        // ---------------------------------------------------
 
-        // Calcular el vuelto principal (asumiremos que todo sobrante se da en la moneda del primer pago excedido o USD por defecto)
         const fiadoAmountUsd = remainingUsd > 0.01 ? remainingUsd : 0;
 
         const sale = {
             id: crypto.randomUUID(),
-            tipo: fiadoAmountUsd > 0 ? "VENTA_FIADA" : "VENTA",
-            status: "COMPLETADA",
+            tipo: fiadoAmountUsd > 0 ? 'VENTA_FIADA' : 'VENTA',
+            status: 'COMPLETADA',
             items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, isWeight: i.isWeight })),
             totalUsd: cartTotalUsd,
             totalBs: cartTotalBs,
@@ -363,11 +298,10 @@ export default function SalesView({ rates, triggerHaptic }) {
             fiadoUsd: fiadoAmountUsd
         };
 
-        // Save sale — generate sequential correlative number
+        // Save sale — sequential correlative
         const existingSales = await storageService.getItem(SALES_KEY, []);
         const maxNumber = existingSales.reduce((mx, s) => Math.max(mx, s.saleNumber || 0), 0);
         sale.saleNumber = maxNumber + 1;
-
         await storageService.setItem(SALES_KEY, [sale, ...existingSales]);
 
         // Deduct stock
@@ -649,23 +583,12 @@ export default function SalesView({ rates, triggerHaptic }) {
                     onClose={() => setShowCheckout(false)}
                     cartTotalUsd={cartTotalUsd}
                     cartTotalBs={cartTotalBs}
-                    amountGiven={amountGiven}
-                    setAmountGiven={setAmountGiven}
-                    amountGivenCurrency={amountGivenCurrency}
-                    setAmountGivenCurrency={setAmountGivenCurrency}
-                    payments={payments}
-                    totalPaidUsd={totalPaidUsd}
-                    remainingUsd={remainingUsd}
-                    remainingBs={remainingBs}
-                    changeUsd={changeUsd}
-                    changeBs={changeBs}
                     effectiveRate={effectiveRate}
                     customers={customers}
                     selectedCustomerId={selectedCustomerId}
                     setSelectedCustomerId={setSelectedCustomerId}
-                    handlePaymentMethodClick={handlePaymentMethodClick}
-                    removePayment={removePayment}
-                    handleCheckout={handleCheckout}
+                    paymentMethods={paymentMethods}
+                    onConfirmSale={handleCheckout}
                     onUseSaldoFavor={handleUseSaldoFavor}
                     triggerHaptic={triggerHaptic}
                 />

@@ -1,86 +1,173 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { X, RefreshCw, Users, Wallet, Receipt, Delete, ChevronDown } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { X, Users, Receipt, ChevronDown, Wallet, Zap } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
-import { DEFAULT_PAYMENT_METHODS } from '../../config/paymentMethods';
 
+/**
+ * CheckoutModal — Zona de Cobro con Barras de Pago (Estilo Listo POS)
+ * Cada método de pago tiene su propia barra con input + botón TOTAL.
+ */
 export default function CheckoutModal({
     onClose,
     cartTotalUsd,
     cartTotalBs,
-    amountGiven,
-    setAmountGiven,
-    amountGivenCurrency,
-    setAmountGivenCurrency,
-    payments,
-    totalPaidUsd,
-    remainingUsd,
-    remainingBs,
-    changeUsd,
-    changeBs,
     effectiveRate,
     customers,
     selectedCustomerId,
     setSelectedCustomerId,
-    handlePaymentMethodClick,
-    removePayment,
-    handleCheckout,
+    paymentMethods,
+    onConfirmSale,
     onUseSaldoFavor,
     triggerHaptic,
 }) {
+    // ── State: un valor por barra ──
+    const [barValues, setBarValues] = useState({});
     const [showCustomerPicker, setShowCustomerPicker] = useState(false);
-    const inputRef = useRef(null);
-
-    // Numpad handler — builds the amount string digit by digit
-    const handleNumpad = (key) => {
-        triggerHaptic && triggerHaptic();
-        if (key === 'C') {
-            setAmountGiven('');
-            return;
-        }
-        if (key === '⌫') {
-            setAmountGiven(prev => prev.slice(0, -1));
-            return;
-        }
-        if (key === '.') {
-            if (amountGiven.includes('.')) return;
-            setAmountGiven(prev => (prev === '' ? '0.' : prev + '.'));
-            return;
-        }
-        // Prevent more than 2 decimal places
-        if (amountGiven.includes('.')) {
-            const decimals = amountGiven.split('.')[1];
-            if (decimals && decimals.length >= 2) return;
-        }
-        setAmountGiven(prev => prev + key);
-    };
-
-    const toggleCurrency = () => {
-        triggerHaptic && triggerHaptic();
-        setAmountGivenCurrency(prev => prev === 'USD' ? 'BS' : 'USD');
-    };
-
-    const fillExact = () => {
-        triggerHaptic && triggerHaptic();
-        const rest = amountGivenCurrency === 'USD' ? remainingUsd : remainingBs;
-        setAmountGiven(rest > 0 ? (amountGivenCurrency === 'BS' ? Math.ceil(rest).toString() : Number(rest.toFixed(2)).toString()) : '');
-    };
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+
+    // ── Cálculos bimoneda ──
+    const totalPaidUsd = useMemo(() => {
+        return paymentMethods.reduce((sum, m) => {
+            const val = parseFloat(barValues[m.id]) || 0;
+            return sum + (m.currency === 'USD' ? val : val / effectiveRate);
+        }, 0);
+    }, [barValues, paymentMethods, effectiveRate]);
+
+    const remainingUsd = Math.max(0, cartTotalUsd - totalPaidUsd);
+    const remainingBs = remainingUsd * effectiveRate;
+    const changeUsd = Math.max(0, totalPaidUsd - cartTotalUsd);
+    const changeBs = changeUsd * effectiveRate;
     const isPaid = remainingUsd <= 0.01;
 
-    // Payment method colors for the grid
-    const methodStyles = {
-        'efectivo_usd': 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300',
-        'efectivo_bs': 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300',
-        'pago_movil': 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300',
-        'punto_venta': 'bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300',
+    // ── Handlers ──
+    const handleBarChange = useCallback((methodId, value) => {
+        // Solo números y punto decimal
+        let v = value.replace(',', '.');
+        if (!/^[0-9.]*$/.test(v)) return;
+        const dots = v.match(/\./g);
+        if (dots && dots.length > 1) return;
+        setBarValues(prev => ({ ...prev, [methodId]: v }));
+    }, []);
+
+    const fillBar = useCallback((methodId, currency) => {
+        triggerHaptic && triggerHaptic();
+        const remaining = currency === 'USD' ? remainingUsd : remainingBs;
+        if (remaining <= 0) return;
+        const val = currency === 'BS' ? Math.ceil(remaining).toString() : Number(remaining.toFixed(2)).toString();
+        setBarValues(prev => ({ ...prev, [methodId]: val }));
+    }, [remainingUsd, remainingBs, triggerHaptic]);
+
+    // Construir payments[] desde barValues al confirmar
+    const handleConfirm = useCallback(() => {
+        triggerHaptic && triggerHaptic();
+        const payments = paymentMethods
+            .filter(m => parseFloat(barValues[m.id]) > 0)
+            .map(m => {
+                const amount = parseFloat(barValues[m.id]);
+                return {
+                    id: crypto.randomUUID(),
+                    methodId: m.id,
+                    methodLabel: m.label,
+                    currency: m.currency,
+                    amountInput: amount,
+                    amountInputCurrency: m.currency,
+                    amountUsd: m.currency === 'USD' ? amount : amount / effectiveRate,
+                    amountBs: m.currency === 'BS' ? amount : amount * effectiveRate,
+                };
+            });
+        onConfirmSale(payments);
+    }, [barValues, paymentMethods, effectiveRate, onConfirmSale, triggerHaptic]);
+
+    // Saldo a favor
+    const handleSaldoFavor = useCallback(() => {
+        triggerHaptic && triggerHaptic();
+        if (onUseSaldoFavor) onUseSaldoFavor();
+    }, [onUseSaldoFavor, triggerHaptic]);
+
+    // Agrupar métodos por moneda
+    const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
+    const methodsBs = paymentMethods.filter(m => m.currency === 'BS');
+
+    // ── Estilos de barra por moneda ──
+    const sectionStyles = {
+        USD: {
+            bg: 'bg-emerald-50/50 dark:bg-emerald-950/20',
+            border: 'border-emerald-100 dark:border-emerald-900/50',
+            title: 'text-emerald-800 dark:text-emerald-300',
+            titleBg: 'bg-emerald-100 dark:bg-emerald-900/50',
+            titleIcon: 'text-emerald-600 dark:text-emerald-400',
+            inputBorder: 'border-emerald-200 dark:border-emerald-800 focus:border-emerald-500 focus:ring-emerald-500/20',
+            inputActive: 'border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/30',
+            btnBg: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 active:bg-emerald-300',
+        },
+        BS: {
+            bg: 'bg-blue-50/50 dark:bg-blue-950/20',
+            border: 'border-blue-100 dark:border-blue-900/50',
+            title: 'text-blue-800 dark:text-blue-300',
+            titleBg: 'bg-blue-100 dark:bg-blue-900/50',
+            titleIcon: 'text-blue-600 dark:text-blue-400',
+            inputBorder: 'border-blue-200 dark:border-blue-800 focus:border-blue-500 focus:ring-blue-500/20',
+            inputActive: 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-950/30',
+            btnBg: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 active:bg-blue-300',
+        },
+    };
+
+    const renderPaymentBar = (method, styles) => {
+        const val = barValues[method.id] || '';
+        const hasValue = parseFloat(val) > 0;
+        const equivUsd = method.currency === 'BS' && hasValue
+            ? (parseFloat(val) / effectiveRate).toFixed(2)
+            : null;
+
+        return (
+            <div key={method.id} className="mb-3 last:mb-0">
+                <div className="flex items-center gap-2 mb-1 ml-0.5">
+                    <span className="text-base">{method.icon}</span>
+                    <span className={`text-[11px] font-bold uppercase tracking-wide ${hasValue ? styles.title : 'text-slate-400 dark:text-slate-500'}`}>
+                        {method.label}
+                    </span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <input
+                            type="text"
+                            inputMode="decimal"
+                            value={val}
+                            onChange={e => handleBarChange(method.id, e.target.value)}
+                            placeholder="0.00"
+                            className={`w-full py-3 px-4 pr-14 rounded-xl border-2 text-lg font-bold outline-none transition-all ${hasValue
+                                    ? styles.inputActive
+                                    : `bg-white dark:bg-slate-900 ${styles.inputBorder}`
+                                } text-slate-800 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700 focus:ring-4`}
+                        />
+                        <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black px-2 py-0.5 rounded-md border ${hasValue
+                                ? `${styles.titleBg} ${styles.title} ${styles.border}`
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
+                            }`}>
+                            {method.currency === 'USD' ? '$' : 'Bs'}
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => fillBar(method.id, method.currency)}
+                        className={`shrink-0 py-3 px-3.5 rounded-xl font-black text-xs transition-all active:scale-95 flex items-center gap-1 ${styles.btnBg}`}
+                    >
+                        <Zap size={14} fill="currentColor" /> Total
+                    </button>
+                </div>
+                {equivUsd && (
+                    <p className="text-[11px] font-bold text-blue-500 dark:text-blue-400 mt-1 ml-1">
+                        ≈ ${equivUsd}
+                    </p>
+                )}
+            </div>
+        );
     };
 
     return (
         <div className="fixed inset-0 z-50 bg-white dark:bg-slate-950 flex flex-col overflow-hidden">
 
             {/* ═══ HEADER ═══ */}
-            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950">
+            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
                 <button onClick={onClose} className="p-2 -ml-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                     <X size={22} />
                 </button>
@@ -91,7 +178,7 @@ export default function CheckoutModal({
             </div>
 
             {/* ═══ SCROLLABLE BODY ═══ */}
-            <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
+            <div className="flex-1 overflow-y-auto overscroll-contain pb-28">
 
                 {/* ── TOTAL BIMONEDA ── */}
                 <div className="px-4 py-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
@@ -102,96 +189,35 @@ export default function CheckoutModal({
                     </div>
                 </div>
 
-                {/* ── MÉTODOS DE PAGO ── */}
-                <div className="px-4 py-3">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Método de Pago</p>
-                    <div className="grid grid-cols-2 gap-2">
-                        {DEFAULT_PAYMENT_METHODS.map(m => (
-                            <button
-                                key={m.id}
-                                onClick={() => handlePaymentMethodClick(m.id)}
-                                className={`flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all active:scale-[0.97] ${methodStyles[m.id] || 'bg-slate-50 border-slate-200 text-slate-700'}`}
-                            >
-                                <span className="text-xl">{m.icon}</span>
-                                <div className="text-left">
-                                    <span className="text-xs font-bold leading-tight block">{m.label}</span>
-                                    <span className="text-[10px] opacity-60 font-medium">{m.currency === 'USD' ? 'Dólares' : 'Bolívares'}</span>
-                                </div>
-                            </button>
-                        ))}
+                {/* ── SECCIÓN DÓLARES ($) ── */}
+                {methodsUsd.length > 0 && (
+                    <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.USD.bg} ${sectionStyles.USD.border} p-3`}>
+                        <h3 className={`text-[11px] font-black uppercase tracking-widest mb-3 flex items-center gap-2 ${sectionStyles.USD.title}`}>
+                            <span className={`p-1 rounded-lg ${sectionStyles.USD.titleBg}`}>💲</span>
+                            Dólares ($)
+                        </h3>
+                        {methodsUsd.map(m => renderPaymentBar(m, sectionStyles.USD))}
                     </div>
-                </div>
+                )}
 
-                {/* ── INPUT + NUMPAD ── */}
-                <div className="px-4 py-2">
-                    {/* Display del monto */}
-                    <div className="relative mb-3">
-                        <div className="flex items-center bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden focus-within:border-emerald-500 transition-colors">
-                            <button
-                                onClick={toggleCurrency}
-                                className="shrink-0 px-3 py-3.5 bg-slate-100 dark:bg-slate-800 text-xs font-black text-slate-500 dark:text-slate-400 flex items-center gap-1 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border-r border-slate-200 dark:border-slate-700"
-                            >
-                                {amountGivenCurrency === 'USD' ? '$' : 'Bs'} <RefreshCw size={11} />
-                            </button>
-                            <input
-                                ref={inputRef}
-                                inputMode="none"
-                                type="text"
-                                value={amountGiven}
-                                readOnly
-                                placeholder="0.00"
-                                className="flex-1 text-center text-xl font-black text-slate-800 dark:text-white bg-transparent py-3.5 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-700"
-                            />
-                            <button
-                                onClick={fillExact}
-                                className="shrink-0 px-3 py-3.5 bg-emerald-50 dark:bg-emerald-900/30 text-[11px] font-black text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-800/50 transition-colors border-l border-slate-200 dark:border-slate-700"
-                            >
-                                EXACTO
-                            </button>
+                {/* ── SECCIÓN BOLÍVARES (Bs) ── */}
+                {methodsBs.length > 0 && (
+                    <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.BS.bg} ${sectionStyles.BS.border} p-3`}>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${sectionStyles.BS.title}`}>
+                                <span className={`p-1 rounded-lg ${sectionStyles.BS.titleBg}`}>💵</span>
+                                Bolívares (Bs)
+                            </h3>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${sectionStyles.BS.titleBg} ${sectionStyles.BS.title}`}>
+                                Tasa: {formatBs(effectiveRate)}
+                            </span>
                         </div>
-                    </div>
-
-                    {/* Numpad Grid */}
-                    <div className="grid grid-cols-4 gap-1.5">
-                        {['1', '2', '3', '⌫', '4', '5', '6', 'C', '7', '8', '9', '00', '.', '0'].map(key => (
-                            <button
-                                key={key}
-                                onClick={() => handleNumpad(key)}
-                                className={`py-3 rounded-xl text-lg font-bold transition-all active:scale-95 ${key === '⌫' ? 'bg-red-50 dark:bg-red-950/30 text-red-500 border border-red-200 dark:border-red-800' :
-                                        key === 'C' ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-500 border border-orange-200 dark:border-orange-800' :
-                                            'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                    }`}
-                            >
-                                {key === '⌫' ? <Delete size={20} className="mx-auto" /> : key}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* ── PAGOS AGREGADOS (Chips) ── */}
-                {payments.length > 0 && (
-                    <div className="px-4 py-3">
-                        <div className="flex items-center justify-between mb-2">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pagos Recibidos</p>
-                            <span className="text-xs font-black text-slate-600 dark:text-slate-300">${totalPaidUsd.toFixed(2)}</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {payments.map(p => (
-                                <div key={p.id} className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                                        {DEFAULT_PAYMENT_METHODS.find(m => m.id === p.methodId)?.icon} {p.amountInputCurrency === 'USD' ? '$' : 'Bs'}{p.amountInput}
-                                    </span>
-                                    <button onClick={() => removePayment(p.id)} className="text-red-400 hover:text-red-600 ml-0.5">
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
+                        {methodsBs.map(m => renderPaymentBar(m, sectionStyles.BS))}
                     </div>
                 )}
 
                 {/* ── BANNER VUELTO / RESTANTE ── */}
-                <div className="px-4 py-2">
+                <div className="px-3 py-2">
                     <div className={`p-3.5 rounded-xl border-2 transition-all ${isPaid
                             ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
                             : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800'
@@ -212,7 +238,7 @@ export default function CheckoutModal({
 
                 {/* ── CLIENTE (colapsable) ── */}
                 {customers.length > 0 && (
-                    <div className="px-4 py-2">
+                    <div className="px-3 py-2">
                         <button
                             onClick={() => setShowCustomerPicker(!showCustomerPicker)}
                             className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors"
@@ -254,9 +280,9 @@ export default function CheckoutModal({
 
                 {/* Saldo a Favor */}
                 {selectedCustomer?.deuda < -0.01 && remainingUsd > 0.01 && (
-                    <div className="px-4 py-1">
+                    <div className="px-3 py-1">
                         <button
-                            onClick={() => { triggerHaptic && triggerHaptic(); onUseSaldoFavor(); }}
+                            onClick={handleSaldoFavor}
                             className="w-full py-2.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2"
                         >
                             <Wallet size={16} /> Usar Saldo a Favor (${Math.abs(selectedCustomer.deuda).toFixed(2)})
@@ -268,7 +294,7 @@ export default function CheckoutModal({
             {/* ═══ BOTÓN CTA FIJO ═══ */}
             <div className="shrink-0 px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <button
-                    onClick={handleCheckout}
+                    onClick={handleConfirm}
                     disabled={!selectedCustomerId && remainingUsd > 0.01}
                     className={`w-full py-4 text-white font-black text-base rounded-2xl shadow-lg transition-all tracking-wide flex items-center justify-center gap-2 ${isPaid
                             ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/25 active:scale-[0.98]'
@@ -282,7 +308,7 @@ export default function CheckoutModal({
                     ) : selectedCustomerId ? (
                         <><Users size={18} /> FIAR RESTANTE (${remainingUsd.toFixed(2)})</>
                     ) : (
-                        <><Receipt size={18} /> AGREGA PAGOS FALTANTES</>
+                        <><Receipt size={18} /> INGRESA LOS PAGOS</>
                     )}
                 </button>
             </div>

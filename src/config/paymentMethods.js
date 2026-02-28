@@ -1,14 +1,70 @@
-// Métodos de pago predefinidos para el POS de bodega (Sistema Bimoneda)
-export const DEFAULT_PAYMENT_METHODS = [
-    // ── BOLÍVARES ──
-    { id: 'efectivo_bs', label: 'Efectivo Bs', icon: '💵', currency: 'BS', color: 'emerald' },
-    { id: 'pago_movil', label: 'Pago Móvil', icon: '📱', currency: 'BS', color: 'indigo' },
-    { id: 'punto_venta', label: 'Punto de Venta', icon: '💳', currency: 'BS', color: 'violet' },
-    // ── DÓLARES ──
-    { id: 'efectivo_usd', label: 'Efectivo $', icon: '💲', currency: 'USD', color: 'blue' },
+import { storageService } from '../utils/storageService';
+
+const PM_KEY = 'bodega_payment_methods_v1';
+
+// ── MÉTODOS DE FÁBRICA (no editables, no eliminables) ──
+export const FACTORY_PAYMENT_METHODS = [
+    // Bolívares
+    { id: 'efectivo_bs', label: 'Efectivo en Bolívares', icon: '💵', currency: 'BS', isFactory: true },
+    { id: 'pago_movil', label: 'Pago Móvil', icon: '📱', currency: 'BS', isFactory: true },
+    { id: 'punto_venta', label: 'Punto de Venta', icon: '💳', currency: 'BS', isFactory: true },
+    // Dólares
+    { id: 'efectivo_usd', label: 'Efectivo en Dólares', icon: '💲', currency: 'USD', isFactory: true },
 ];
 
-// Colores para los métodos de pago en el checkout y dashboard
+// Alias para compatibilidad
+export const DEFAULT_PAYMENT_METHODS = FACTORY_PAYMENT_METHODS;
+
+// ── PERSISTENCIA ──
+
+/** Obtener métodos activos (fábrica + custom) */
+export async function getActivePaymentMethods() {
+    const saved = await storageService.getItem(PM_KEY, null);
+    if (!saved) return [...FACTORY_PAYMENT_METHODS];
+    return saved;
+}
+
+/** Guardar métodos (reemplaza todo el array) */
+export async function savePaymentMethods(methods) {
+    await storageService.setItem(PM_KEY, methods);
+}
+
+/** Agregar un método custom */
+export async function addPaymentMethod({ label, currency, icon }) {
+    const methods = await getActivePaymentMethods();
+    const newMethod = {
+        id: 'custom_' + Date.now(),
+        label,
+        icon: icon || (currency === 'USD' ? '💲' : '💵'),
+        currency,
+        isFactory: false,
+    };
+    methods.push(newMethod);
+    await savePaymentMethods(methods);
+    return methods;
+}
+
+/** Eliminar un método (solo custom, no fábrica) */
+export async function removePaymentMethod(id) {
+    const methods = await getActivePaymentMethods();
+    const filtered = methods.filter(m => m.id !== id || m.isFactory);
+    await savePaymentMethods(filtered);
+    return filtered;
+}
+
+// ── HELPERS ──
+
+export const getPaymentLabel = (id) => {
+    const all = FACTORY_PAYMENT_METHODS;
+    const method = all.find(m => m.id === id);
+    return method ? `${method.icon} ${method.label}` : id;
+};
+
+export const getPaymentMethod = (id) => {
+    return FACTORY_PAYMENT_METHODS.find(m => m.id === id) || FACTORY_PAYMENT_METHODS[0];
+};
+
+// Colores por método (para dashboard/historial)
 export const PAYMENT_COLORS = {
     emerald: {
         active: 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20',
@@ -34,15 +90,4 @@ export const PAYMENT_COLORS = {
         icon: 'text-blue-500',
         bar: 'bg-blue-500',
     },
-};
-
-// Helper: obtener el label de un método por su id
-export const getPaymentLabel = (id) => {
-    const method = DEFAULT_PAYMENT_METHODS.find(m => m.id === id);
-    return method ? `${method.icon} ${method.label}` : id;
-};
-
-// Helper: obtener info completa de método
-export const getPaymentMethod = (id) => {
-    return DEFAULT_PAYMENT_METHODS.find(m => m.id === id) || DEFAULT_PAYMENT_METHODS[0];
 };
