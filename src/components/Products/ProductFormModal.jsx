@@ -1,11 +1,11 @@
 import React, { useRef, useState } from 'react';
-import { Camera, X, AlertTriangle, Package, Tag, Scale, ChevronDown, ChevronUp } from 'lucide-react';
+import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp } from 'lucide-react';
 import { Modal } from '../Modal';
 
 const PACKAGING_TYPES = [
-    { id: 'suelto', label: 'Suelto', icon: '🏷️', desc: 'Unidad individual', color: 'emerald' },
-    { id: 'lote', label: 'Lote', icon: '📦', desc: 'Caja, bulto o paquete', color: 'indigo' },
-    { id: 'granel', label: 'Granel', icon: '⚖️', desc: 'Por Kg o Litro', color: 'amber' },
+    { id: 'suelto', label: 'Suelto', Icon: Tag, desc: 'Unidad individual', color: 'emerald' },
+    { id: 'lote', label: 'Lote', Icon: Package, desc: 'Caja, bulto o paquete', color: 'indigo' },
+    { id: 'granel', label: 'Granel', Icon: Scale, desc: 'Por Kg o Litro', color: 'amber' },
 ];
 
 export default function ProductFormModal({
@@ -128,7 +128,7 @@ export default function ProductFormModal({
                                             ? colorMap[pt.color]
                                             : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300'
                                             }`}>
-                                        <span className="text-xl">{pt.icon}</span>
+                                        <pt.Icon size={22} strokeWidth={2} className={selected ? textColor[pt.color] : 'text-slate-400'} />
                                         <span className={`text-xs font-black uppercase ${selected ? textColor[pt.color] : 'text-slate-500'}`}>{pt.label}</span>
                                         <span className="text-[9px] text-slate-400 leading-tight text-center">{pt.desc}</span>
                                     </button>
@@ -146,7 +146,7 @@ export default function ProductFormModal({
                                         ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
                                         }`}>
-                                    {u === 'kg' ? '⚖️ Kilogramo' : '🫙 Litro'}
+                                    {u === 'kg' ? <><Scale size={14} className="inline -mt-0.5" /> Kilogramo</> : <><Droplets size={14} className="inline -mt-0.5" /> Litro</>}
                                 </button>
                             ))}
                         </div>
