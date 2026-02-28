@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { Users, Search, Plus, CreditCard, ArrowDownRight, ArrowUpRight, User, Phone, X, Save, RefreshCw } from 'lucide-react';
+import { Users, Search, Plus, CreditCard, ArrowDownRight, ArrowUpRight, User, Phone, X, Save, RefreshCw, Clock, ChevronDown } from 'lucide-react';
 import { formatBs, formatUsd } from '../utils/calculatorUtils';
 import { procesarImpactoCliente } from '../utils/financialLogic';
 import { DEFAULT_PAYMENT_METHODS } from '../config/paymentMethods';
@@ -19,6 +19,8 @@ export default function CustomersView({ triggerHaptic }) {
     const [paymentMethod, setPaymentMethod] = useState('efectivo_bs');
     const [resetBalanceCustomer, setResetBalanceCustomer] = useState(null);
     const [bcvRate, setBcvRate] = useState(0);
+    const [expandedHistory, setExpandedHistory] = useState(null); // customerId or null
+    const [historyData, setHistoryData] = useState([]); // sales for expanded customer
 
     useEffect(() => {
         // Leer tasa BCV del storage para conversión
@@ -43,6 +45,22 @@ export default function CustomersView({ triggerHaptic }) {
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.phone && c.phone.includes(searchTerm))
     );
+
+    const toggleHistory = async (customerId) => {
+        if (expandedHistory === customerId) {
+            setExpandedHistory(null);
+            setHistoryData([]);
+            return;
+        }
+        triggerHaptic && triggerHaptic();
+        setExpandedHistory(customerId);
+        const allSales = await storageService.getItem('bodega_sales_v1', []);
+        const customerSales = allSales
+            .filter(s => s.customerId === customerId || s.clienteId === customerId)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .slice(0, 20); // máximo 20 para mantenerlo ligero
+        setHistoryData(customerSales);
+    };
 
     const handleResetBalance = async (customer) => {
         triggerHaptic();
@@ -223,108 +241,169 @@ export default function CustomersView({ triggerHaptic }) {
                                 </div>
                             </div>
 
+                            {/* Historial Colapsable */}
+                            <button
+                                onClick={() => toggleHistory(customer.id)}
+                                className="w-full flex items-center justify-center gap-1.5 py-2 text-[11px] font-bold text-slate-400 hover:text-blue-500 transition-colors border-t border-slate-100 dark:border-slate-800 mt-2"
+                            >
+                                <Clock size={12} />
+                                Historial
+                                <ChevronDown size={12} className={`transition-transform ${expandedHistory === customer.id ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {expandedHistory === customer.id && (
+                                <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    {historyData.length === 0 ? (
+                                        <p className="text-xs text-slate-400 text-center py-3">Sin registros</p>
+                                    ) : (
+                                        historyData.map(sale => {
+                                            const date = new Date(sale.timestamp);
+                                            const dateStr = date.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                                            const timeStr = date.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
+                                            const isCobro = sale.tipo === 'COBRO_DEUDA';
+                                            const isFiada = sale.tipo === 'VENTA_FIADA';
+
+                                            return (
+                                                <div key={sale.id} className="flex items-start gap-2.5 py-2 px-2 bg-slate-50 dark:bg-slate-950 rounded-xl">
+                                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-xs font-black ${isCobro ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500'
+                                                        : isFiada ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-500'
+                                                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-500'
+                                                        }`}>
+                                                        {isCobro ? '💰' : isFiada ? '📋' : '🛒'}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-start">
+                                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                                                {isCobro ? 'Abono de deuda' : isFiada ? 'Venta fiada' : 'Venta'}
+                                                            </p>
+                                                            <span className={`text-xs font-black ${isCobro ? 'text-emerald-500' : isFiada ? 'text-amber-500' : 'text-slate-700 dark:text-white'
+                                                                }`}>
+                                                                {isCobro ? '+' : ''}${formatUsd(sale.totalUsd || 0)}
+                                                            </span>
+                                                        </div>
+                                                        {sale.items && sale.items.length > 0 && (
+                                                            <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                                                {sale.items.map(i => i.name).join(', ')}
+                                                            </p>
+                                                        )}
+                                                        {sale.fiadoUsd > 0 && (
+                                                            <p className="text-[10px] text-amber-500 font-bold mt-0.5">Deuda: ${formatUsd(sale.fiadoUsd)}</p>
+                                                        )}
+                                                        <p className="text-[9px] text-slate-400 mt-0.5">{dateStr} • {timeStr}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
+
                         </div>
                     ))
                 )}
             </div>
 
             {/* Modal para Agregar Cliente */}
-            {isAddModalOpen && (
-                <AddCustomerModal
-                    onClose={() => setIsAddModalOpen(false)}
-                    onSave={async (newC) => {
-                        const updated = [...customers, newC];
-                        await saveCustomers(updated);
-                        setIsAddModalOpen(false);
-                    }}
-                />
-            )}
+            {
+                isAddModalOpen && (
+                    <AddCustomerModal
+                        onClose={() => setIsAddModalOpen(false)}
+                        onSave={async (newC) => {
+                            const updated = [...customers, newC];
+                            await saveCustomers(updated);
+                            setIsAddModalOpen(false);
+                        }}
+                    />
+                )
+            }
 
             {/* Modal para Transacción (Abono / Deuda) */}
-            {transactionModal.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-200">
-                        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <h3 className={`text-xl font-black ${transactionModal.type === 'ABONO' ? 'text-emerald-500' : 'text-red-500'}`}>
-                                {transactionModal.type === 'ABONO' ? 'Recibir Abono' : 'Añadir a Deuda'}
-                            </h3>
-                            <button onClick={() => setTransactionModal({ isOpen: false, type: null, customer: null })} className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <div className="p-5 space-y-4">
-                            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                                Cliente: <strong className="text-slate-900 dark:text-white">{transactionModal.customer.name}</strong>
-                            </p>
-
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Monto ({transactionModal.type === 'ABONO' ? 'Pago Recibido' : 'Nuevo Fiado'}) en {currencyMode === 'BS' ? 'Bs' : '$'}</label>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setCurrencyMode(m => m === 'BS' ? 'USD' : 'BS'); setAmountBs(''); }}
-                                        className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
-                                    >
-                                        <span className={currencyMode === 'BS' ? 'text-blue-500' : 'text-slate-400'}>Bs</span>
-                                        <span className="text-slate-300">/</span>
-                                        <span className={currencyMode === 'USD' ? 'text-emerald-500' : 'text-slate-400'}>$</span>
-                                    </button>
-                                </div>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currencyMode === 'BS' ? 'Bs' : '$'}</span>
-                                    <input
-                                        type="number"
-                                        value={amountBs}
-                                        onChange={(e) => setAmountBs(e.target.value)}
-                                        placeholder="0.00"
-                                        className="w-full form-input bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 pl-12 text-lg font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500/50 transition-all"
-                                        autoFocus
-                                    />
-                                </div>
-                                {currencyMode === 'BS' && amountBs && bcvRate > 0 && (
-                                    <p className="text-[10px] text-slate-400 mt-1.5 px-1">= ${(parseFloat(amountBs) / bcvRate).toFixed(2)} @ {formatBs(bcvRate)} Bs/$</p>
-                                )}
-                                {currencyMode === 'USD' && amountBs && bcvRate > 0 && (
-                                    <p className="text-[10px] text-slate-400 mt-1.5 px-1">= {formatBs(parseFloat(amountBs) * bcvRate)} Bs @ {formatBs(bcvRate)} Bs/$</p>
-                                )}
+            {
+                transactionModal.isOpen && (
+                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-200">
+                            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                                <h3 className={`text-xl font-black ${transactionModal.type === 'ABONO' ? 'text-emerald-500' : 'text-red-500'}`}>
+                                    {transactionModal.type === 'ABONO' ? 'Recibir Abono' : 'Añadir a Deuda'}
+                                </h3>
+                                <button onClick={() => setTransactionModal({ isOpen: false, type: null, customer: null })} className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                                    <X size={20} />
+                                </button>
                             </div>
 
-                            {transactionModal.type === 'ABONO' && (
+                            <div className="p-5 space-y-4">
+                                <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                                    Cliente: <strong className="text-slate-900 dark:text-white">{transactionModal.customer.name}</strong>
+                                </p>
+
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Método de Pago</label>
-                                    <select
-                                        value={paymentMethod}
-                                        onChange={(e) => setPaymentMethod(e.target.value)}
-                                        className="w-full form-select bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500/50 transition-all"
-                                    >
-                                        {DEFAULT_PAYMENT_METHODS.map(method => (
-                                            <option key={method.id} value={method.id}>
-                                                {method.icon} {method.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <p className="text-[10px] text-slate-400 mt-2 px-1">Al registrar un abono, el monto ingresará a las estadísticas y caja del día de hoy.</p>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase">Monto ({transactionModal.type === 'ABONO' ? 'Pago Recibido' : 'Nuevo Fiado'}) en {currencyMode === 'BS' ? 'Bs' : '$'}</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setCurrencyMode(m => m === 'BS' ? 'USD' : 'BS'); setAmountBs(''); }}
+                                            className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+                                        >
+                                            <span className={currencyMode === 'BS' ? 'text-blue-500' : 'text-slate-400'}>Bs</span>
+                                            <span className="text-slate-300">/</span>
+                                            <span className={currencyMode === 'USD' ? 'text-emerald-500' : 'text-slate-400'}>$</span>
+                                        </button>
+                                    </div>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currencyMode === 'BS' ? 'Bs' : '$'}</span>
+                                        <input
+                                            type="number"
+                                            value={amountBs}
+                                            onChange={(e) => setAmountBs(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full form-input bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 pl-12 text-lg font-black text-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500/50 transition-all"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    {currencyMode === 'BS' && amountBs && bcvRate > 0 && (
+                                        <p className="text-[10px] text-slate-400 mt-1.5 px-1">= ${(parseFloat(amountBs) / bcvRate).toFixed(2)} @ {formatBs(bcvRate)} Bs/$</p>
+                                    )}
+                                    {currencyMode === 'USD' && amountBs && bcvRate > 0 && (
+                                        <p className="text-[10px] text-slate-400 mt-1.5 px-1">= {formatBs(parseFloat(amountBs) * bcvRate)} Bs @ {formatBs(bcvRate)} Bs/$</p>
+                                    )}
                                 </div>
-                            )}
 
-                        </div>
+                                {transactionModal.type === 'ABONO' && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Método de Pago</label>
+                                        <select
+                                            value={paymentMethod}
+                                            onChange={(e) => setPaymentMethod(e.target.value)}
+                                            className="w-full form-select bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500/50 transition-all"
+                                        >
+                                            {DEFAULT_PAYMENT_METHODS.map(method => (
+                                                <option key={method.id} value={method.id}>
+                                                    {method.icon} {method.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-[10px] text-slate-400 mt-2 px-1">Al registrar un abono, el monto ingresará a las estadísticas y caja del día de hoy.</p>
+                                    </div>
+                                )}
 
-                        <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                            <button
-                                onClick={handleTransaction}
-                                disabled={!amountBs || parseFloat(amountBs) <= 0}
-                                className={`w-full py-3.5 text-white font-bold rounded-xl active:scale-95 transition-all text-sm flex justify-center items-center gap-2 ${transactionModal.type === 'ABONO'
-                                    ? 'bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/50'
-                                    : 'bg-red-500 hover:bg-red-600 disabled:bg-red-500/50'
-                                    }`}
-                            >
-                                <Save size={18} /> Procesar {transactionModal.type === 'ABONO' ? 'Abono' : 'Deuda'}
-                            </button>
+                            </div>
+
+                            <div className="p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                                <button
+                                    onClick={handleTransaction}
+                                    disabled={!amountBs || parseFloat(amountBs) <= 0}
+                                    className={`w-full py-3.5 text-white font-bold rounded-xl active:scale-95 transition-all text-sm flex justify-center items-center gap-2 ${transactionModal.type === 'ABONO'
+                                        ? 'bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/50'
+                                        : 'bg-red-500 hover:bg-red-600 disabled:bg-red-500/50'
+                                        }`}
+                                >
+                                    <Save size={18} /> Procesar {transactionModal.type === 'ABONO' ? 'Abono' : 'Deuda'}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Modal Confirmación: Reiniciar Saldo */}
             <ConfirmModal
@@ -336,7 +415,7 @@ export default function CustomersView({ triggerHaptic }) {
                 confirmText="Sí, reiniciar"
                 variant="danger"
             />
-        </div>
+        </div >
     );
 }
 
