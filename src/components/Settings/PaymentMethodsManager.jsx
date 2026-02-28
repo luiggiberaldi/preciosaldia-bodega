@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, CreditCard, Banknote, Smartphone, DollarSign, Store, ShoppingCart, Package, Coins, Key } from 'lucide-react';
+import { Plus, Trash2, CreditCard, Banknote, Smartphone, DollarSign, Store, ShoppingCart, Package, Coins, Key, Fingerprint } from 'lucide-react';
 import { getActivePaymentMethods, savePaymentMethods, FACTORY_PAYMENT_METHODS, PAYMENT_ICONS } from '../../config/paymentMethods';
 import { showToast } from '../Toast';
 
@@ -13,6 +13,7 @@ const ICON_OPTIONS = [
     { key: 'Package', Icon: Package },
     { key: 'Coins', Icon: Coins },
     { key: 'Key', Icon: Key },
+    { key: 'Fingerprint', Icon: Fingerprint },
 ];
 
 export default function PaymentMethodsManager({ triggerHaptic }) {
