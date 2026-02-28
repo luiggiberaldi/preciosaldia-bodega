@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tag, Banknote, AlertTriangle, Box, Minus, Plus, Share2, Pencil, Trash2 } from 'lucide-react';
+import { Tag, Banknote, AlertTriangle, Box, Minus, Plus, Pencil, Trash2 } from 'lucide-react';
 import { CATEGORY_COLORS, UNITS } from '../../config/categories';
 import { formatUsd, formatBs, smartCashRounding } from '../../utils/calculatorUtils';
 
@@ -9,7 +9,7 @@ export default function ProductCard({
     streetRate,
     categories,
     onAdjustStock,
-    onShare,
+
     onEdit,
     onDelete
 }) {
@@ -92,7 +92,7 @@ export default function ProductCard({
 
             {/* Actions */}
             <div className="flex border-t border-slate-100 dark:border-slate-800">
-                <button onClick={() => onShare(p)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-indigo-500 transition-colors"><Share2 size={12} /></button>
+
                 <button onClick={() => onEdit(p)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-amber-500 transition-colors"><Pencil size={12} /></button>
                 <button onClick={() => onDelete(p.id)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors"><Trash2 size={12} /></button>
             </div>
