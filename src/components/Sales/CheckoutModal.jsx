@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { X, Users, Receipt, ChevronDown, Wallet, Zap, UserPlus, Check } from 'lucide-react';
+import { X, Users, Receipt, ChevronDown, Wallet, Zap, UserPlus, Check, ArrowLeftRight } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { PAYMENT_ICONS } from '../../config/paymentMethods';
 
@@ -28,6 +28,7 @@ export default function CheckoutModal({
     const [newClientName, setNewClientName] = useState('');
     const [newClientPhone, setNewClientPhone] = useState('');
     const [savingClient, setSavingClient] = useState(false);
+    const [changeUsdGiven, setChangeUsdGiven] = useState('');
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
@@ -248,20 +249,86 @@ export default function CheckoutModal({
                 {/* ── BANNER VUELTO / RESTANTE ── */}
                 <div className="px-3 py-2">
                     <div className={`p-3.5 rounded-xl border-2 transition-all ${isPaid
-                        ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
-                        : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800'
+                            ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
+                            : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800'
                         }`}>
-                        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
-                            {isPaid ? '✓ Vuelto' : 'Resta por Cobrar'}
+                        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isPaid ? 'text-emerald-500' : 'text-orange-500'
+                            }`}>
+                            {isPaid ? 'Vuelto' : 'Resta por Cobrar'}
                         </p>
                         <div className="flex items-end justify-between">
-                            <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                            <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'
+                                }`}>
                                 ${isPaid ? changeUsd.toFixed(2) : remainingUsd.toFixed(2)}
                             </span>
-                            <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
+                            <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'
+                                }`}>
                                 Bs {formatBs(isPaid ? changeBs : remainingBs)}
                             </span>
                         </div>
+
+                        {/* DESGLOSE DE VUELTO — solo visible cuando hay vuelto */}
+                        {isPaid && changeUsd > 0.009 && (() => {
+                            const usdGiven = Math.min(parseFloat(changeUsdGiven) || 0, changeUsd);
+                            const remainingChangeBs = Math.max(0, (changeUsd - usdGiven) * effectiveRate);
+                            return (
+                                <div className="mt-3 pt-3 border-t border-emerald-200 dark:border-emerald-800 space-y-2">
+                                    <p className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1">
+                                        <ArrowLeftRight size={10} />
+                                        Desglosar vuelto
+                                    </p>
+
+                                    {/* Input: cuánto en USD */}
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 relative">
+                                            <input
+                                                type="number"
+                                                inputMode="decimal"
+                                                placeholder="0.00"
+                                                step="0.01"
+                                                min="0"
+                                                max={changeUsd}
+                                                value={changeUsdGiven}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    if (val === '' || parseFloat(val) <= changeUsd) {
+                                                        setChangeUsdGiven(val);
+                                                    }
+                                                }}
+                                                className="w-full bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-lg px-3 py-2 pr-10 text-sm font-black text-emerald-700 dark:text-emerald-300 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-emerald-400">USD</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-400">+</span>
+                                        <div className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-black text-blue-600 dark:text-blue-400 text-right">
+                                            {formatBs(remainingChangeBs)} <span className="text-[10px] font-bold text-blue-400">Bs</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Pills rápidos */}
+                                    <div className="flex gap-1.5">
+                                        <button
+                                            onClick={() => setChangeUsdGiven(changeUsd.toFixed(2))}
+                                            className="flex-1 py-1 text-[10px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/50 active:scale-95 transition-all"
+                                        >
+                                            Todo $
+                                        </button>
+                                        <button
+                                            onClick={() => setChangeUsdGiven('')}
+                                            className="flex-1 py-1 text-[10px] font-black text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 active:scale-95 transition-all"
+                                        >
+                                            Todo Bs
+                                        </button>
+                                        <button
+                                            onClick={() => setChangeUsdGiven((changeUsd / 2).toFixed(2))}
+                                            className="flex-1 py-1 text-[10px] font-black text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                                        >
+                                            Mitad
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
 
