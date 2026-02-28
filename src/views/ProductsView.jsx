@@ -86,6 +86,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     const filteredProducts = products.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+        if (activeCategory === 'bajo-stock') {
+            return matchesSearch && (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
+        }
         const matchesCategory = activeCategory === 'todos' || p.category === activeCategory;
         return matchesSearch && matchesCategory;
     });
@@ -331,34 +334,47 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-3 sm:p-6 overflow-y-auto">
 
-            {/* Header */}
+            {/* Header — Fila 1: Título + Acciones */}
             <div className="shrink-0 mb-3 space-y-2">
-                {/* Title row + compact action buttons */}
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                         <Store size={22} className="text-emerald-500 shrink-0" />
                         <h2 className="text-lg sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight truncate">Inventario</h2>
-                        <span className="px-2 py-0.5 bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] sm:text-xs font-bold rounded-full tabular-nums shrink-0">{products.length} items</span>
-                        {lowStockCount > 0 && (
-                            <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] sm:text-xs font-bold rounded-full shrink-0 flex items-center gap-1">
-                                <AlertTriangle size={10} /> {lowStockCount} bajo
-                            </span>
-                        )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => { triggerHaptic && triggerHaptic(); setIsDeleteAllModalOpen(true); }}
-                            className="p-2 bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400 rounded-xl transition-all active:scale-95" title="Borrar Todo">
-                            <Trash2 size={16} strokeWidth={2.5} />
-                        </button>
+                        {products.length > 0 && (
+                            <button onClick={() => { triggerHaptic && triggerHaptic(); setIsDeleteAllModalOpen(true); }}
+                                className="p-2 bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400 rounded-xl transition-all active:scale-95" title="Borrar Todo">
+                                <Trash2 size={16} strokeWidth={2.5} />
+                            </button>
+                        )}
                         <button onClick={() => { triggerHaptic && triggerHaptic(); setIsSettingsOpen(true); }}
                             className="p-2 bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-xl transition-all active:scale-95" title="Ajustes">
                             <Settings size={16} strokeWidth={2.5} />
                         </button>
                         <button onClick={() => { triggerHaptic && triggerHaptic(); setIsModalOpen(true); }}
-                            className="p-2 bg-emerald-500 text-white rounded-xl shadow-md shadow-emerald-500/20 transition-all active:scale-95" title="Agregar">
+                            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-white rounded-xl shadow-md shadow-emerald-500/20 transition-all active:scale-95 font-bold text-sm" title="Agregar">
                             <Plus size={16} strokeWidth={2.5} />
+                            <span className="hidden sm:inline">Nuevo</span>
                         </button>
                     </div>
+                </div>
+
+                {/* Fila 2: Stats clicables */}
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2.5 py-1 rounded-full">
+                        {products.length} productos
+                    </span>
+                    {lowStockCount > 0 && (
+                        <>
+                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+                            <button
+                                onClick={() => { handleSetActiveCategory('bajo-stock'); triggerHaptic && triggerHaptic(); }}
+                                className="text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-full flex items-center gap-1 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors">
+                                ⚠️ {lowStockCount} bajo stock
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {/* Category Filter Pills — horizontal scroll with fade */}
@@ -419,6 +435,15 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 </div>
             ) : (
                 <>
+                    {/* Bajo stock banner */}
+                    {activeCategory === 'bajo-stock' && (
+                        <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 px-3 py-2 rounded-xl mb-3 shrink-0">
+                            <span className="text-xs font-bold text-amber-600 dark:text-amber-400">Mostrando productos con stock bajo</span>
+                            <button onClick={() => handleSetActiveCategory('todos')} className="text-xs font-bold text-amber-500 hover:text-amber-700 transition-colors flex items-center gap-1">
+                                × Ver todos
+                            </button>
+                        </div>
+                    )}
                     <div className="flex-1 overflow-y-auto pb-4 scrollbar-hide">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                             {paginatedProducts.map(p => (
