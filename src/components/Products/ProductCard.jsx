@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tag, Banknote, AlertTriangle, Box, Minus, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Tag, Banknote, AlertTriangle, Box, Minus, Plus, Pencil, Trash2, Package, Layers } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_ICONS, UNITS } from '../../config/categories';
 import { formatUsd, formatBs, smartCashRounding } from '../../utils/calculatorUtils';
 
@@ -53,7 +53,7 @@ export default function ProductCard({
                 {/* Units per package info */}
                 {p.unit === 'paquete' && p.unitsPerPackage && (
                     <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mb-2 mt-[-4px]">
-                        📦 Lote · {p.unitsPerPackage} uds
+                        <Package size={11} /> Lote · {p.unitsPerPackage} uds
                     </div>
                 )}
 
@@ -65,7 +65,7 @@ export default function ProductCard({
                         <p className="text-[11px] font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
                         {p.unit === 'paquete' && p.sellByUnit && (
                             <p className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mt-0.5 flex items-center gap-0.5">
-                                <Tag size={10} />
+                                <Layers size={10} />
                                 ${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud
                             </p>
                         )}
