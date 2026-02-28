@@ -603,12 +603,20 @@ function EditCustomerModal({ customer, onClose, onSave }) {
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Teléfono</label>
-                        <input
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            className="w-full form-input bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
-                        />
+                        <div className="w-full flex items-center bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus-within:ring-2 focus-within:ring-blue-500/50 transition-all overflow-hidden">
+                            <span className="px-3 py-3 text-sm font-black text-blue-500 border-r border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shrink-0 select-none">+58</span>
+                            <input
+                                type="tel"
+                                placeholder="0412 1234567"
+                                value={phone}
+                                onChange={(e) => {
+                                    const clean = e.target.value.replace(/^\+?58/, '');
+                                    setPhone(clean);
+                                }}
+                                className="flex-1 bg-transparent px-3 py-3 text-slate-800 dark:text-white outline-none text-sm font-medium placeholder:text-slate-400"
+                            />
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-1 ml-1">Venezuela · Ej: 0412 1234567</p>
                     </div>
                     <button
                         type="submit"
@@ -668,13 +676,20 @@ function AddCustomerModal({ onClose, onSave }) {
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Teléfono (opcional)</label>
-                        <input
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            placeholder="Ej. +58 412 1234567"
-                            className="w-full form-input bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
-                        />
+                        <div className="w-full flex items-center bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus-within:ring-2 focus-within:ring-blue-500/50 transition-all overflow-hidden">
+                            <span className="px-3 py-3 text-sm font-black text-blue-500 border-r border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shrink-0 select-none">+58</span>
+                            <input
+                                type="tel"
+                                placeholder="0412 1234567"
+                                value={phone}
+                                onChange={(e) => {
+                                    const clean = e.target.value.replace(/^\+?58/, '');
+                                    setPhone(clean);
+                                }}
+                                className="flex-1 bg-transparent px-3 py-3 text-slate-800 dark:text-white outline-none text-sm font-medium placeholder:text-slate-400"
+                            />
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-1 ml-1">Venezuela · Ej: 0412 1234567</p>
                     </div>
 
                     <button

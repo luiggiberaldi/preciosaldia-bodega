@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, Moon, Sun, RotateCcw } from 'lucide-react';
-import { formatBs } from '../utils/calculatorUtils';
+import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import ConfirmModal from '../components/ConfirmModal';
@@ -149,19 +149,9 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         const saleCustomer = sale.customerId
             ? customers.find(c => c.id === sale.customerId)
             : null;
-        const rawPhone = saleCustomer?.phone?.replace(/[\s\-\(\)]/g, '') ?? '';
-        let phoneForUrl = '';
-        if (rawPhone.length >= 7) {
-            if (rawPhone.startsWith('0')) {
-                phoneForUrl = '58' + rawPhone.slice(1);
-            } else if (!rawPhone.startsWith('+') && !rawPhone.startsWith('58')) {
-                phoneForUrl = '58' + rawPhone;
-            } else {
-                phoneForUrl = rawPhone.replace('+', '');
-            }
-        }
-        const waUrl = phoneForUrl
-            ? `https://wa.me/${phoneForUrl}?text=${encoded}`
+        const phone = formatVzlaPhone(saleCustomer?.phone);
+        const waUrl = phone
+            ? `https://wa.me/${phone}?text=${encoded}`
             : `https://wa.me/?text=${encoded}`;
         window.open(waUrl, '_blank');
     };

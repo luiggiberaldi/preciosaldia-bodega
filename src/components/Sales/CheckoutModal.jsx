@@ -326,14 +326,20 @@ export default function CheckoutModal({
                                             onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
                                             className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50"
                                         />
-                                        <input
-                                            type="tel"
-                                            placeholder="Teléfono (opcional)"
-                                            value={newClientPhone}
-                                            onChange={e => setNewClientPhone(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
-                                            className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50"
-                                        />
+                                        <div className="w-full flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus-within:ring-2 focus-within:ring-emerald-500/50 transition-all overflow-hidden">
+                                            <span className="px-2 py-2 text-xs font-black text-blue-500 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 shrink-0 select-none">+58</span>
+                                            <input
+                                                type="tel"
+                                                placeholder="0412 1234567"
+                                                value={newClientPhone}
+                                                onChange={e => {
+                                                    const clean = e.target.value.replace(/^\+?58/, '');
+                                                    setNewClientPhone(clean);
+                                                }}
+                                                onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
+                                                className="flex-1 bg-transparent px-2 py-2 text-sm text-slate-700 dark:text-white outline-none placeholder:text-slate-400"
+                                            />
+                                        </div>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => { setShowNewCustomerForm(false); setNewClientName(''); setNewClientPhone(''); }}

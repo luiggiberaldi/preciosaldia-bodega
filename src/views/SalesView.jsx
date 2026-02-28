@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { Search, X, Package, RefreshCw, Mic, Box, ShoppingCart } from 'lucide-react';
-import { formatBs } from '../utils/calculatorUtils';
+import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getActivePaymentMethods } from '../config/paymentMethods';
 import { BODEGA_CATEGORIES, CATEGORY_ICONS, CATEGORY_COLORS } from '../config/categories';
 import ReceiptModal from '../components/Sales/ReceiptModal';
@@ -299,6 +299,7 @@ export default function SalesView({ rates, triggerHaptic }) {
             changeBs: fiadoAmountUsd > 0 ? 0 : changeBs,
             customerId: selectedCustomerId || null,
             customerName: selectedCustomer ? selectedCustomer.name : 'Consumidor Final',
+            customerPhone: selectedCustomer?.phone || null,
             fiadoUsd: fiadoAmountUsd
         };
 
@@ -662,7 +663,11 @@ export default function SalesView({ rates, triggerHaptic }) {
                     }
                     text += `\n===================================\n`;
                     text += `*¡Gracias por su compra!*`;
-                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                    const phone = formatVzlaPhone(r.customerPhone);
+                    const waUrl = phone
+                        ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+                        : `https://wa.me/?text=${encodeURIComponent(text)}`;
+                    window.open(waUrl, '_blank');
                 }}
             />
 

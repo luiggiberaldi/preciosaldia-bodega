@@ -20,3 +20,16 @@ import { MessageService } from '../services/MessageService';
 export const generatePaymentMessage = (params) => {
     return MessageService.buildPaymentMessage(params);
 };
+
+// Normaliza número venezolano al formato internacional para wa.me
+// Acepta: 04121234567 → 584121234567
+//         4121234567  → 584121234567
+//         584121234567 → 584121234567
+export const formatVzlaPhone = (raw) => {
+    if (!raw) return null;
+    const digits = raw.replace(/\D/g, '');
+    if (digits.startsWith('58') && digits.length >= 12) return digits;
+    if (digits.startsWith('0')) return '58' + digits.slice(1);
+    if (digits.length >= 10) return '58' + digits;
+    return null;
+};
