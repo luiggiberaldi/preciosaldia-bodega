@@ -415,14 +415,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                             </button>
                             <button
                                 onClick={() => {
-                                    if (deleteConfirmText === 'BORRAR') {
+                                    if (deleteConfirmText.trim().toUpperCase() === 'BORRAR') {
                                         setSales([]);
                                         storageService.removeItem('my_sales_v1');
                                         setIsDeleteModalOpen(false);
                                         setDeleteConfirmText('');
                                     }
                                 }}
-                                disabled={deleteConfirmText !== 'BORRAR'}
+                                disabled={deleteConfirmText.trim().toUpperCase() !== 'BORRAR'}
                                 className="flex-1 py-3.5 bg-red-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold rounded-xl active:scale-[0.98] transition-all flex justify-center items-center gap-2"
                             >
                                 <Trash2 size={18} /> Borrar Historial
