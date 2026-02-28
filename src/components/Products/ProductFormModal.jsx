@@ -64,7 +64,7 @@ export default function ProductFormModal({
                             <select value={category} onChange={e => setCategory(e.target.value)}
                                 className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50">
                                 {categories.filter(c => c.id !== 'todos').map(c => (
-                                    <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                                    <option key={c.id} value={c.id}>{c.label}</option>
                                 ))}
                             </select>
                         </div>
