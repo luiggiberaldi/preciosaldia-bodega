@@ -66,6 +66,10 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [category, setCategory] = useState('otros');
     const [lowStockAlert, setLowStockAlert] = useState('5');
     const [image, setImage] = useState(null);
+    // New packaging states
+    const [packagingType, setPackagingType] = useState('suelto');
+    const [stockInLotes, setStockInLotes] = useState('');
+    const [granelUnit, setGranelUnit] = useState('kg');
     const fileInputRef = useRef(null);
     const categoryScrollRef = useRef(null);
 
@@ -167,21 +171,34 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         const finalCostUsd = costUsd ? parseFloat(costUsd) : (costBs ? parseFloat(costBs) / effectiveUsdtRate : 0);
         const finalCostBs = costBs ? parseFloat(costBs) : (costUsd ? parseFloat(costUsd) * effectiveUsdtRate : 0);
 
-        const isPackageType = unit === 'paquete';
-        const parsedUnitsPerPkg = isPackageType && unitsPerPackage ? parseInt(unitsPerPackage) : 1;
+        // Map packagingType → unit legacy
+        let legacyUnit = 'unidad';
+        if (packagingType === 'lote') legacyUnit = 'paquete';
+        else if (packagingType === 'granel') legacyUnit = granelUnit;
+
+        const isLote = packagingType === 'lote';
+        const parsedUnitsPerPkg = isLote && unitsPerPackage ? parseInt(unitsPerPackage) : 1;
         const autoUnitPrice = parsedUnitsPerPkg > 1 ? finalPriceUsd / parsedUnitsPerPkg : finalPriceUsd;
         const finalUnitPrice = sellByUnit && unitPriceUsd ? parseFloat(unitPriceUsd) : autoUnitPrice;
+
+        // Stock: for lote, convert lotes → units
+        let finalStock = stock ? parseInt(stock) : 0;
+        if (isLote && stockInLotes && parsedUnitsPerPkg > 0) {
+            finalStock = parseInt(stockInLotes) * parsedUnitsPerPkg;
+        }
 
         const productData = {
             name: formattedName,
             priceUsdt: finalPriceUsd,
             costUsd: finalCostUsd,
             costBs: finalCostBs,
-            stock: stock ? parseInt(stock) : 0,
-            unit: unit,
+            stock: finalStock,
+            unit: legacyUnit,
+            packagingType: packagingType,
             unitsPerPackage: parsedUnitsPerPkg,
-            sellByUnit: isPackageType ? sellByUnit : false,
-            unitPriceUsd: isPackageType && sellByUnit ? finalUnitPrice : null,
+            sellByUnit: isLote ? sellByUnit : false,
+            unitPriceUsd: isLote && sellByUnit ? finalUnitPrice : null,
+            stockInLotes: isLote && stockInLotes ? parseInt(stockInLotes) : null,
             category: category,
             lowStockAlert: lowStockAlert ? parseInt(lowStockAlert) : 5,
         };
@@ -224,6 +241,31 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         setCategory(product.category || 'otros');
         setLowStockAlert(product.lowStockAlert ?? 5);
         setImage(product.image);
+
+        // Derive packagingType from legacy unit
+        const u = product.unit || 'unidad';
+        if (product.packagingType) {
+            setPackagingType(product.packagingType);
+        } else if (u === 'paquete') {
+            setPackagingType('lote');
+        } else if (u === 'kg' || u === 'litro') {
+            setPackagingType('granel');
+            setGranelUnit(u);
+        } else {
+            setPackagingType('suelto');
+        }
+
+        // Stock in lotes
+        if (product.stockInLotes) {
+            setStockInLotes(product.stockInLotes.toString());
+        } else if (u === 'paquete' && product.unitsPerPackage && product.stock) {
+            setStockInLotes(Math.floor(product.stock / (product.unitsPerPackage || 1)).toString());
+        } else {
+            setStockInLotes('');
+        }
+
+        if (u === 'kg' || u === 'litro') setGranelUnit(u);
+
         setIsModalOpen(true);
     };
 
@@ -234,6 +276,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     const handleClose = () => {
         setName(''); setPriceUsd(''); setPriceBs(''); setCostUsd(''); setCostBs(''); setStock(''); setUnit('unidad'); setUnitsPerPackage(''); setSellByUnit(false); setUnitPriceUsd(''); setCategory('otros'); setLowStockAlert('5'); setImage(null); setEditingId(null); setIsModalOpen(false);
+        setPackagingType('suelto'); setStockInLotes(''); setGranelUnit('kg');
     };
 
     // Gestionar Categorias
@@ -427,6 +470,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 unitsPerPackage={unitsPerPackage} setUnitsPerPackage={setUnitsPerPackage}
                 sellByUnit={sellByUnit} setSellByUnit={setSellByUnit}
                 unitPriceUsd={unitPriceUsd} setUnitPriceUsd={setUnitPriceUsd}
+                packagingType={packagingType} setPackagingType={setPackagingType}
+                stockInLotes={stockInLotes} setStockInLotes={setStockInLotes}
+                granelUnit={granelUnit} setGranelUnit={setGranelUnit}
                 handleImageUpload={handleImageUpload}
                 handleSave={handleSave}
                 categories={categories}
