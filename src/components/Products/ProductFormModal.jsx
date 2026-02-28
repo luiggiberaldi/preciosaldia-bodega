@@ -69,7 +69,7 @@ export default function ProductFormModal({
                             </select>
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-slate-400 ml-1 mb-1 block uppercase">Unidad</label>
+                            <label className="text-xs font-bold text-slate-400 ml-1 mb-1 block uppercase">Presentación</label>
                             <select value={unit} onChange={e => setUnit(e.target.value)}
                                 className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50">
                                 {UNITS.map(u => (
