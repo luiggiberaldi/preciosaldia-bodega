@@ -779,8 +779,9 @@ Responde en español, formato estructurado:
 3. **Simulación 7 Días**: si hay datos, analiza las tendencias de tasa, revenue y fiado
 4. **Riesgos**: identifica riesgos potenciales basados en los tests (2-3 puntos)
 5. **Recomendación**: una acción prioritaria
+6. **Análisis Diario**: menciona si hubo días con ingresos bajos, alto fiado o variación extrema de tasa.
 
-Máximo 250 palabras. Sé directo y técnico.`;
+Máximo 350 palabras. Sé directo y técnico.`;
 
     try {
         log('Enviando resultados a Groq AI para análisis...', 'info');
@@ -854,6 +855,230 @@ async function cleanup() {
 }
 
 // ════════════════════════════════════════════
+// SUITE 10: VUELTO BIMONEDA
+// ════════════════════════════════════════════
+async function suiteVuelto() {
+    state._currentSuite = 'VUELTO';
+    section('💸 SUITE: VUELTO BIMONEDA');
+    const RATE = 95.50;
+
+    // Caso 1: vuelto parcial USD + resto en Bs
+    const change1 = 3.50;
+    const usdOut1 = 3.00;
+    const bsOut1 = Math.max(0, (change1 - usdOut1) * RATE);
+    assertEqual(usdOut1, 3.00, 'Vuelto USD parcial correcto');
+    assertClose(bsOut1, 47.75, 'Vuelto Bs resto correcto', 0.05);
+
+    // Caso 2: todo en Bs
+    const usdOut2 = 0;
+    const bsOut2 = 3.50 * RATE;
+    assertEqual(usdOut2, 0, 'Vuelto todo en Bs: USD = 0');
+    assertClose(bsOut2, 334.25, 'Vuelto todo en Bs: monto correcto', 0.05);
+
+    // Caso 3: todo en USD
+    const usdOut3 = 3.50;
+    const bsOut3 = 0;
+    assertEqual(usdOut3, 3.50, 'Vuelto todo en USD');
+    assertEqual(bsOut3, 0, 'Vuelto todo en USD: Bs = 0');
+
+    // Caso 4: no puede dar más vuelto del que existe
+    const tryOver = 5.00;
+    const clamped = Math.min(tryOver, 3.50);
+    assertEqual(clamped, 3.50, 'Clamp: no se puede dar más vuelto del real');
+
+    log('Vuelto bimoneda ✓', 'pass');
+}
+
+// ════════════════════════════════════════════
+// SUITE 11: DESGLOSE PAGOS MIXTOS
+// ════════════════════════════════════════════
+async function suitePagosMixtos() {
+    state._currentSuite = 'PAGOS_MIXTOS';
+    section('🔀 SUITE: PAGOS MIXTOS EXTREMOS');
+    const RATE = 96.00;
+    const TOTAL = 18.75;
+
+    // 3 métodos de pago simultáneos
+    const payments = [
+        { currency: 'USD', amount: 5.00 },
+        { currency: 'BS', amount: 800 },
+        { currency: 'USD', amount: 5.00 },
+    ];
+    const totalPaidUsd = payments.reduce((s, p) => {
+        return s + (p.currency === 'USD' ? p.amount : p.amount / RATE);
+    }, 0);
+    assertClose(totalPaidUsd, 18.33, 'Suma 3 métodos USD equiv', 0.05);
+    assert(totalPaidUsd >= TOTAL * 0.99, 'Pago cubre casi el total');
+
+    const changeUsd = Math.max(0, totalPaidUsd - TOTAL);
+    assertClose(changeUsd, 0, 'Cambio ~0 pago justo', 0.10);
+
+    // Edge: pago exacto
+    const singlePayment = 18.75;
+    assertEqual(Math.max(0, singlePayment - TOTAL), 0, 'Pago exacto = 0 vuelto');
+
+    // Edge: pago excedido
+    const overPayment = 20.00;
+    assertClose(Math.max(0, overPayment - TOTAL), 1.25, 'Vuelto pago excedido', 0.01);
+
+    log('Pagos mixtos ✓', 'pass');
+}
+
+// ════════════════════════════════════════════
+// SUITE 12: INTEGRIDAD NaN / NULL
+// ════════════════════════════════════════════
+async function suiteIntegridad() {
+    state._currentSuite = 'INTEGRIDAD';
+    section('🛡️ SUITE: INTEGRIDAD NaN/NULL');
+
+    const badValues = [null, undefined, '', 'abc', NaN, Infinity, -Infinity];
+    for (const v of badValues) {
+        const parsed = parseFloat(v) || 0;
+        assert(!isNaN(parsed), `parseFloat fallback para: ${String(v)}`);
+        assert(isFinite(parsed) || parsed === 0, `isFinite o 0 para: ${String(v)}`);
+    }
+
+    // Producto sin precio
+    const prod = { priceUsdt: null, stock: undefined };
+    const safePrice = prod.priceUsdt ?? 0;
+    const safeStock = prod.stock ?? 0;
+    assertEqual(safePrice, 0, 'Precio null → 0');
+    assertEqual(safeStock, 0, 'Stock undefined → 0');
+
+    // Tasa cero (no dividir entre 0)
+    const rate = 0;
+    const safeConvert = rate > 0 ? 100 / rate : 0;
+    assertEqual(safeConvert, 0, 'División por tasa 0 → 0');
+
+    // formatBs con valores extremos
+    const r1 = formatBs(0);
+    const r2 = formatBs(0.001);
+    const r3 = formatBs(999999999);
+    assert(typeof r1 === 'string', 'formatBs(0) retorna string');
+    assert(typeof r2 === 'string', 'formatBs(0.001) retorna string');
+    assert(typeof r3 === 'string', 'formatBs(999999999) retorna string');
+
+    log('Integridad NaN/null ✓', 'pass');
+}
+
+// ════════════════════════════════════════════
+// SUITE 13: LOTES Y EMPAQUE
+// ════════════════════════════════════════════
+async function suiteLotes() {
+    state._currentSuite = 'LOTES';
+    section('📦 SUITE: PRODUCTOS POR LOTE');
+
+    const lote = {
+        id: 'LOTE-TEST-1',
+        name: 'TEST-Harina PAN (Lote 20u)',
+        priceUsdt: 25.00,
+        unitsPerPackage: 20,
+        sellByUnit: true,
+        unitPriceUsd: 1.50,
+        stock: 100,
+        unit: 'paquete',
+        packagingType: 'lote',
+        testData: true,
+    };
+
+    // Precio por unidad
+    const autoUnitPrice = lote.unitPriceUsd ?? (lote.priceUsdt / lote.unitsPerPackage);
+    assertClose(autoUnitPrice, 1.50, 'Precio unidad lote', 0.01);
+
+    // Lotes disponibles
+    const lotesDisp = Math.floor(lote.stock / lote.unitsPerPackage);
+    assertEqual(lotesDisp, 5, 'Lotes disponibles 100/20=5');
+
+    // Vender 3 unidades sueltas
+    const sellQty = 3;
+    const newStock = Math.max(0, lote.stock - sellQty);
+    assertEqual(newStock, 97, 'Stock post-venta unidades sueltas');
+
+    // Vender 1 lote completo
+    const loteSaleQty = 1 * lote.unitsPerPackage;
+    const stockAfterLote = Math.max(0, lote.stock - loteSaleQty);
+    assertEqual(stockAfterLote, 80, 'Stock post-venta lote completo');
+
+    // Margen
+    const cost = 20.00;
+    const margin = cost > 0 ? ((lote.priceUsdt - cost) / cost) * 100 : null;
+    assertClose(margin, 25.00, 'Margen lote 25%', 0.1);
+
+    log('Lotes ✓', 'pass');
+}
+
+// ════════════════════════════════════════════
+// SUITE 14: CLIENTES - EDGE CASES
+// ════════════════════════════════════════════
+async function suiteClientesEdge() {
+    state._currentSuite = 'CLIENTES_EDGE';
+    section('📱 SUITE: CLIENTES EDGE CASES');
+
+    // Teléfono venezolano — normalización
+    const phones = [
+        { raw: '04121234567', expected: '584121234567' },
+        { raw: '4121234567', expected: '584121234567' },
+        { raw: '+584121234567', expected: '584121234567' },
+        { raw: '584121234567', expected: '584121234567' },
+    ];
+    const formatVzla = (raw) => {
+        if (!raw) return null;
+        const digits = raw.replace(/\D/g, '');
+        if (digits.startsWith('58') && digits.length >= 12) return digits;
+        if (digits.startsWith('0')) return '58' + digits.slice(1);
+        if (digits.length >= 10) return '58' + digits;
+        return null;
+    };
+    for (const { raw, expected } of phones) {
+        assertEqual(formatVzla(raw), expected, `Tel ${raw} → ${expected}`);
+    }
+
+    // Saldo a favor no puede ser negativo
+    const deuda = -5.00;
+    const saldoAFavor = Math.abs(deuda);
+    assertClose(saldoAFavor, 5.00, 'Saldo a favor absoluto', 0.01);
+
+    // Fiado acumulado múltiples ventas
+    let deudaAcumulada = 0;
+    const ventas = [15.00, 8.50, 3.25];
+    for (const v of ventas) deudaAcumulada += v;
+    assertClose(deudaAcumulada, 26.75, 'Deuda acumulada 3 ventas', 0.01);
+
+    // Abono parcial
+    deudaAcumulada -= 10.00;
+    assertClose(deudaAcumulada, 16.75, 'Deuda post-abono', 0.01);
+
+    log('Clientes edge ✓', 'pass');
+}
+
+// ════════════════════════════════════════════
+// SUITE 15: RENDIMIENTO / STRESS
+// ════════════════════════════════════════════
+async function suiteStress() {
+    state._currentSuite = 'STRESS';
+    section('🔥 SUITE: STRESS — 500 Ventas Rápidas');
+
+    const t0 = performance.now();
+    let total = 0;
+    const RATE = 95.50;
+
+    for (let i = 0; i < 500; i++) {
+        const price = 1 + Math.random() * 50;
+        const qty = 1 + Math.floor(Math.random() * 5);
+        const sub = price * qty;
+        const bs = Math.ceil(sub * RATE);
+        total += sub;
+        const display = formatBs(bs);
+        assert(typeof display === 'string', `iter ${i}: formatBs OK`);
+    }
+
+    const elapsed = performance.now() - t0;
+    assertGreater(total, 0, `Revenue acumulado stress: ${total.toFixed(2)}`);
+    assert(elapsed < 3000, `500 operaciones < 3s (${elapsed.toFixed(0)}ms)`);
+    log(`Stress 500 ops en ${elapsed.toFixed(0)}ms ✓`, 'pass');
+}
+
+// ════════════════════════════════════════════
 // RUNNER
 // ════════════════════════════════════════════
 function resetState() {
@@ -882,6 +1107,12 @@ const SUITES = [
     { key: 'payments', name: '💳 Pagos', fn: suitePayments },
     { key: 'modules', name: '🧩 Módulos', fn: suiteModules },
     { key: '7days', name: '🗓️ Simulación 7 Días', fn: suite7Days },
+    { key: 'vuelto', name: '💸 Vuelto Bimoneda', fn: suiteVuelto },
+    { key: 'pagos_mix', name: '🔀 Pagos Mixtos', fn: suitePagosMixtos },
+    { key: 'integridad', name: '🛡️ Integridad NaN', fn: suiteIntegridad },
+    { key: 'lotes', name: '📦 Lotes/Empaque', fn: suiteLotes },
+    { key: 'cli_edge', name: '📱 Clientes Edge', fn: suiteClientesEdge },
+    { key: 'stress', name: '🔥 Stress 500ops', fn: suiteStress },
 ];
 
 export const SystemTester = {

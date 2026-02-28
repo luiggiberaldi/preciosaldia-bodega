@@ -41,7 +41,9 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
             isFactory: false,
         }];
         await savePaymentMethods(updated);
-        setMethods(updated);
+        // Rehidratar para el estado local del componente
+        const hydrated = await getActivePaymentMethods();
+        setMethods(hydrated);
         setNewLabel('');
         setShowAdd(false);
         showToast('Método de pago agregado', 'success');
@@ -51,7 +53,8 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
         triggerHaptic && triggerHaptic();
         const updated = methods.filter(m => m.id !== id);
         await savePaymentMethods(updated);
-        setMethods(updated);
+        const hydrated = await getActivePaymentMethods();
+        setMethods(hydrated);
         showToast('Método eliminado', 'success');
     };
 

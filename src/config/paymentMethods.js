@@ -22,12 +22,22 @@ export const DEFAULT_PAYMENT_METHODS = FACTORY_PAYMENT_METHODS;
 export async function getActivePaymentMethods() {
     const saved = await storageService.getItem(PM_KEY, null);
     if (!saved) return [...FACTORY_PAYMENT_METHODS];
-    return saved;
+
+    // Rehidratar: reinyectar el componente Icon según id
+    return saved.map(m => ({
+        ...m,
+        Icon: PAYMENT_ICONS[m.id] ?? null,
+    }));
 }
 
 /** Guardar métodos (reemplaza todo el array) */
 export async function savePaymentMethods(methods) {
-    await storageService.setItem(PM_KEY, methods);
+    // Serializar: quitar campos no-clonables (Icon, componentes React)
+    const serializable = methods.map(m => {
+        const { Icon, ...rest } = m;
+        return rest;
+    });
+    await storageService.setItem(PM_KEY, serializable);
 }
 
 /** Agregar un método custom */

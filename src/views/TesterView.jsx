@@ -7,13 +7,15 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { SystemTester } from '../testing/SystemTester';
 import {
     FlaskConical, Play, Square, Copy, CheckCircle2, XCircle,
-    Zap, ChevronLeft, ChevronDown, ChevronUp, TerminalSquare, Trash2, Brain
+    Zap, ChevronLeft, ChevronDown, ChevronUp, TerminalSquare, Trash2, Brain,
+    Download, Filter
 } from 'lucide-react';
 
 const SUITE_ICONS = {
     storage: '💾', productos: '📦', carrito: '🛒', bimoneda: '💱',
     checkout: '🧾', clientes: '👥', payments: '💳', modules: '🧩',
-    '7days': '🗓️'
+    '7days': '🗓️', vuelto: '💸', pagos_mix: '🔀', integridad: '🛡️',
+    lotes: '📦', cli_edge: '📱', stress: '🔥'
 };
 
 export const TesterView = ({ onBack }) => {
@@ -23,6 +25,7 @@ export const TesterView = ({ onBack }) => {
     const [summary, setSummary] = useState(null);
     const [copied, setCopied] = useState(false);
     const [expandedAI, setExpandedAI] = useState(true);
+    const [logFilter, setLogFilter] = useState('all');
     const logsEndRef = useRef(null);
 
     // Auto-scroll logs
@@ -127,6 +130,10 @@ export const TesterView = ({ onBack }) => {
     };
 
     const passRate = summary ? ((summary.passed / Math.max(summary.total, 1)) * 100).toFixed(0) : null;
+
+    const visibleLogs = logFilter === 'all'
+        ? logs
+        : logs.filter(l => l.type === logFilter);
 
     return (
         <div className="min-h-screen bg-slate-950 text-white p-3 sm:p-6 space-y-3 sm:space-y-4">
@@ -307,6 +314,22 @@ export const TesterView = ({ onBack }) => {
                         )}
                     </div>
                     <div className="flex items-center gap-1">
+                        <div className="flex gap-1">
+                            {['all', 'pass', 'fail', 'warn'].map(f => (
+                                <button
+                                    key={f}
+                                    onClick={() => setLogFilter(f)}
+                                    className={`px-2 py-1 rounded-lg text-[8px] sm:text-[9px] font-black uppercase transition-all ${logFilter === f
+                                            ? f === 'fail' ? 'bg-rose-600 text-white'
+                                                : f === 'pass' ? 'bg-emerald-600 text-white'
+                                                    : f === 'warn' ? 'bg-amber-500 text-white'
+                                                        : 'bg-indigo-600 text-white'
+                                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                        }`}>
+                                    {f === 'all' ? `All (${logs.length})` : f}
+                                </button>
+                            ))}
+                        </div>
                         <button onClick={handleClear} disabled={isRunning || logs.length === 0}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-all disabled:opacity-30" title="Limpiar">
                             <Trash2 size={13} />
@@ -315,6 +338,22 @@ export const TesterView = ({ onBack }) => {
                             className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] sm:text-xs font-bold transition-all ${copied ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-30'}`}>
                             {copied ? <CheckCircle2 size={11} /> : <Copy size={11} />}
                             <span className="hidden sm:inline">{copied ? '¡Copiado!' : 'Log'}</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                const data = { timestamp: new Date().toISOString(), summary, logs };
+                                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `tester-${Date.now()}.json`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                            }}
+                            disabled={logs.length === 0}
+                            className="flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] sm:text-xs font-bold bg-slate-800 text-slate-300 hover:bg-violet-700 hover:text-white border border-slate-700 transition-all disabled:opacity-30">
+                            <Download size={12} />
+                            <span className="hidden sm:inline">JSON</span>
                         </button>
                     </div>
                 </div>
@@ -327,7 +366,7 @@ export const TesterView = ({ onBack }) => {
                             <p className="text-slate-700 text-[8px] sm:text-[10px]">{suites.length} suites • 7-Day Sim • Groq AI</p>
                         </div>
                     ) : (
-                        logs.map((entry, i) => (
+                        visibleLogs.map((entry, i) => (
                             <div key={i} className={`flex gap-1.5 sm:gap-2 ${logColors[entry.type] || 'text-slate-400'}`}>
                                 <span className="text-slate-600 shrink-0">[{entry.time}]</span>
                                 <span className="break-all">{entry.msg}</span>
