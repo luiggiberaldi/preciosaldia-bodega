@@ -53,7 +53,7 @@ export default function ProductCard({
                 {/* Units per package info */}
                 {p.unit === 'paquete' && p.unitsPerPackage && (
                     <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mb-2 mt-[-4px]">
-                        <Box size={12} /> Trae {p.unitsPerPackage} uds
+                        📦 Lote · {p.unitsPerPackage} uds
                     </div>
                 )}
 
@@ -63,6 +63,12 @@ export default function ProductCard({
                             {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                         </p>
                         <p className="text-[11px] font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
+                        {p.unit === 'paquete' && p.sellByUnit && (
+                            <p className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mt-0.5 flex items-center gap-0.5">
+                                <Tag size={10} />
+                                ${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud
+                            </p>
+                        )}
                     </div>
                     {margin !== null && (
                         <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${margin >= 0 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
@@ -82,6 +88,9 @@ export default function ProductCard({
                                 {p.stock ?? 0}
                             </span>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">{(p.unit === 'kg' || p.unit === 'litro') ? unitInfo?.short : 'UD'}</span>
+                            {p.unit === 'paquete' && p.unitsPerPackage > 0 && Math.floor((p.stock ?? 0) / p.unitsPerPackage) > 0 && (
+                                <span className="text-[8px] text-slate-400 leading-none">= {Math.floor((p.stock ?? 0) / p.unitsPerPackage)} lotes</span>
+                            )}
                         </div>
                         <button onClick={() => onAdjustStock(p.id, 1)} className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-emerald-500 shadow-sm active:scale-95 transition-all">
                             <Plus size={18} strokeWidth={2.5} />
