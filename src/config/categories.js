@@ -15,7 +15,7 @@ export const BODEGA_CATEGORIES = [
 
 export const UNITS = [
     { id: 'unidad', label: 'Unidad', short: 'ud' },
-    { id: 'paquete', label: 'Paquete', short: 'paq' },
+    { id: 'paquete', label: 'Caja/Bulto', short: 'cja' },
     { id: 'kg', label: 'Kilogramo', short: 'kg' },
     { id: 'litro', label: 'Litro', short: 'lt' },
 ];

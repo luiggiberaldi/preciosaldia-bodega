@@ -131,7 +131,7 @@ export default function ProductFormModal({
                         )}
                     </div>
 
-                    {/* ─── JERARQUÍA LITE: Paquete + Unidad ─── */}
+                    {/* ─── JERARQUÍA LITE: Caja/Bulto + Unidad ─── */}
                     {unit === 'paquete' && (
                         <div className="bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30 space-y-3">
                             {/* Cantidad por empaque */}

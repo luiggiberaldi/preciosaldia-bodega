@@ -496,7 +496,7 @@ export default function SalesView({ rates, triggerHaptic }) {
                                 <button onClick={() => addToCart(hierarchyPending, null, 'package')}
                                     className="flex flex-col items-center gap-2 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all active:scale-95">
                                     <Package size={24} className="text-indigo-600 dark:text-indigo-400" />
-                                    <span className="text-xs font-black text-indigo-700 dark:text-indigo-300 uppercase">Paquete</span>
+                                    <span className="text-xs font-black text-indigo-700 dark:text-indigo-300 uppercase">Caja/Bulto</span>
                                     <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">${hierarchyPending.priceUsdt?.toFixed(2)}</span>
                                     <span className="text-[9px] text-slate-400 font-bold">{hierarchyPending.unitsPerPackage} uds</span>
                                 </button>
