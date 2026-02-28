@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { Users, Search, Plus, CreditCard, ArrowDownRight, ArrowUpRight, User, Phone, X, Save, RefreshCw, Clock, ChevronDown, CheckCircle2, ShoppingBag } from 'lucide-react';
+import { Users, Search, Plus, CreditCard, ArrowDownRight, ArrowUpRight, User, Phone, X, Save, RefreshCw, Clock, ChevronDown, CheckCircle2, ShoppingBag, Pencil, Trash2 } from 'lucide-react';
 import { formatBs, formatUsd } from '../utils/calculatorUtils';
 import { procesarImpactoCliente } from '../utils/financialLogic';
 import { DEFAULT_PAYMENT_METHODS } from '../config/paymentMethods';
@@ -22,6 +22,8 @@ export default function CustomersView({ triggerHaptic }) {
     const [expandedHistory, setExpandedHistory] = useState(null);
     const [historyData, setHistoryData] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [editingCustomer, setEditingCustomer] = useState(null);
+    const [deleteCustomerTarget, setDeleteCustomerTarget] = useState(null);
 
     useEffect(() => {
         // Leer tasa BCV del storage para conversión
@@ -307,6 +309,14 @@ export default function CustomersView({ triggerHaptic }) {
                     handleResetBalance(selectedCustomer);
                     setSelectedCustomer(null);
                 }}
+                onEdit={() => {
+                    setEditingCustomer(selectedCustomer);
+                    setSelectedCustomer(null);
+                }}
+                onDelete={() => {
+                    setDeleteCustomerTarget(selectedCustomer);
+                    setSelectedCustomer(null);
+                }}
                 bcvRate={bcvRate}
                 sales={historyData}
             />
@@ -321,6 +331,36 @@ export default function CustomersView({ triggerHaptic }) {
                 confirmText="Sí, reiniciar"
                 variant="danger"
             />
+
+            {/* Modal Confirmación: Eliminar Cliente */}
+            <ConfirmModal
+                isOpen={!!deleteCustomerTarget}
+                onClose={() => setDeleteCustomerTarget(null)}
+                onConfirm={async () => {
+                    const updated = customers.filter(c => c.id !== deleteCustomerTarget.id);
+                    await saveCustomers(updated);
+                    showToast(`Cliente ${deleteCustomerTarget.name} eliminado`, 'success');
+                    setDeleteCustomerTarget(null);
+                }}
+                title="Eliminar cliente"
+                message={deleteCustomerTarget ? `¿Eliminar a ${deleteCustomerTarget.name}? Esta acción no se puede deshacer.` : ''}
+                confirmText="Sí, eliminar"
+                variant="danger"
+            />
+
+            {/* Modal Editar Cliente */}
+            {editingCustomer && (
+                <EditCustomerModal
+                    customer={editingCustomer}
+                    onClose={() => setEditingCustomer(null)}
+                    onSave={async (updated) => {
+                        const newCustomers = customers.map(c => c.id === updated.id ? updated : c);
+                        await saveCustomers(newCustomers);
+                        setEditingCustomer(null);
+                        showToast('Cliente actualizado', 'success');
+                    }}
+                />
+            )}
         </div >
     );
 }
@@ -367,7 +407,7 @@ function CustomerCard({ customer, bcvRate, onClick }) {
 }
 
 // ─── Sub-componente: Bottom Sheet de Detalle ────────────────
-function CustomerDetailSheet({ customer, isOpen, onClose, onDeuda, onAbono, onReset, bcvRate, sales }) {
+function CustomerDetailSheet({ customer, isOpen, onClose, onDeuda, onAbono, onReset, onEdit, onDelete, bcvRate, sales }) {
     if (!isOpen || !customer) return null;
 
     const createdDate = customer.createdAt
@@ -380,9 +420,13 @@ function CustomerDetailSheet({ customer, isOpen, onClose, onDeuda, onAbono, onRe
                 className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white dark:bg-slate-900 rounded-t-3xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300 shadow-2xl"
                 onClick={e => e.stopPropagation()}
             >
-                {/* Drag Handle */}
-                <div className="flex justify-center pt-3 pb-4">
+                {/* Close + Drag Handle */}
+                <div className="flex items-center justify-between px-4 pt-3 pb-2">
+                    <div className="w-8" />
                     <div className="w-8 h-1 bg-slate-300 dark:bg-slate-700 rounded-full" />
+                    <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                        <X size={18} />
+                    </button>
                 </div>
 
                 <div className="px-5 pb-6 space-y-5">
@@ -501,7 +545,79 @@ function CustomerDetailSheet({ customer, isOpen, onClose, onDeuda, onAbono, onRe
                             </div>
                         )}
                     </div>
+
+                    {/* Editar / Eliminar */}
+                    <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <button
+                            onClick={onEdit}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95"
+                        >
+                            <Pencil size={14} /> Editar
+                        </button>
+                        <button
+                            onClick={onDelete}
+                            className="flex items-center justify-center gap-1.5 py-2.5 px-4 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-xl text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors active:scale-95"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Sub-componente: Editar Cliente ───────────────────────
+function EditCustomerModal({ customer, onClose, onSave }) {
+    const [name, setName] = useState(customer.name);
+    const [phone, setPhone] = useState(customer.phone || '');
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        onSave({ ...customer, name: name.trim(), phone: phone.trim() });
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-200">
+                <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                    <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
+                        <Pencil size={20} className="text-blue-500" /> Editar Cliente
+                    </h3>
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+                <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nombre *</label>
+                        <input
+                            type="text"
+                            required
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="w-full form-input bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
+                            autoFocus
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Teléfono</label>
+                        <input
+                            type="tel"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            className="w-full form-input bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
+                        />
+                    </div>
+                    <button
+                        type="submit"
+                        disabled={!name.trim()}
+                        className="w-full py-3.5 bg-blue-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold rounded-xl active:scale-95 transition-all mt-4 flex justify-center items-center gap-2"
+                    >
+                        <Save size={18} /> Guardar Cambios
+                    </button>
+                </form>
             </div>
         </div>
     );
