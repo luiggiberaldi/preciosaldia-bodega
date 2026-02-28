@@ -10,6 +10,7 @@ export default function SalesHistory({
     totalSalesCount,
     onVoidSale,
     onShareWhatsApp,
+    onDownloadPDF,
     onOpenDeleteModal
 }) {
     const [expandedSaleId, setExpandedSaleId] = useState(null);
@@ -108,9 +109,20 @@ export default function SalesHistory({
                                     <div className="flex items-center justify-between gap-2 mt-2">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onShareWhatsApp(s); }}
-                                            className="flex-1 py-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 hover:dark:bg-emerald-900/50 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm">
+                                            disabled={!s.customerName || s.customerName === 'Consumidor Final'}
+                                            className={`flex-1 py-2 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm ${!s.customerName || s.customerName === 'Consumidor Final'
+                                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                                                : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 hover:dark:bg-emerald-900/50'
+                                                }`}>
                                             <Send size={14} /> Enviar Ticket
                                         </button>
+                                        {onDownloadPDF && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onDownloadPDF(s); }}
+                                                className="py-2 px-3 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 hover:dark:bg-blue-900/50 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm">
+                                                PDF
+                                            </button>
+                                        )}
 
                                         {!isCanceled && (
                                             <button

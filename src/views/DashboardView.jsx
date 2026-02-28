@@ -6,6 +6,7 @@ import { formatBs } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import ConfirmModal from '../components/ConfirmModal';
+import { generateTicketPDF } from '../utils/ticketGenerator';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -106,7 +107,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const handleShareWhatsApp = (sale) => {
         let text = `*COMPROBANTE DE VENTA | PRECIOS AL DÍA*\n`;
         text += `--------------------------------\n`;
-        text += `🛍️ *Orden:* #${(sale.id.substring(0, 6)).toUpperCase()}\n`;
+        text += `*Orden:* #${(sale.id.substring(0, 6)).toUpperCase()}\n`;
         text += `Cliente: ${sale.customerName || 'Consumidor Final'}\n`;
         text += `Fecha: ${new Date(sale.timestamp).toLocaleString('es-VE')}\n`;
         text += `===================================\n\n`;
@@ -131,6 +132,11 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
         const encoded = encodeURIComponent(text);
         window.open(`https://wa.me/?text=${encoded}`, '_blank');
+    };
+
+    const handleDownloadPDF = (sale) => {
+        triggerHaptic();
+        generateTicketPDF(sale, bcvRate);
     };
 
     // ── Métricas del Día ──
@@ -371,6 +377,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 totalSalesCount={sales.length}
                 onVoidSale={handleVoidSale}
                 onShareWhatsApp={handleShareWhatsApp}
+                onDownloadPDF={handleDownloadPDF}
                 onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
             />
 
