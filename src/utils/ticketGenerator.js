@@ -7,240 +7,246 @@ import { formatBs } from './calculatorUtils';
  */
 export async function generateTicketPDF(sale, bcvRate) {
     const WIDTH = 80; // mm
-    const MARGIN = 6;
+    const MARGIN = 5;
 
-    // Calcular altura dinámica precisa para que no se corte
+    // Calcular altura estimada (muy holgada)
     const itemCount = sale.items?.length || 0;
     const paymentCount = sale.payments?.length || 0;
-    const HEIGHT_FIADO = sale.fiadoUsd > 0 ? 12 : 0;
-    // Base Header (~45) + Titles (~20) + Totals (~35) + Pagos Titles (~10) + Footer (~20) = 130 + extra
-    const estimatedHeight = 145 + (itemCount * 12) + (paymentCount * 6) + HEIGHT_FIADO;
+    const baseHeight = 110;
+    const itemHeight = itemCount * 10;
+    const paymentHeight = paymentCount * 6;
+    const fiadoHeight = sale.fiadoUsd > 0 ? 15 : 0;
+    const estimatedHeight = baseHeight + itemHeight + paymentHeight + fiadoHeight;
 
     const doc = new jsPDF({
         unit: 'mm',
-        format: [WIDTH, estimatedHeight],
+        format: [WIDTH, Math.max(estimatedHeight, 120)],
     });
 
-    const rate = sale.rate || bcvRate || 1;
-    let y = 0;
-    const centerX = WIDTH / 2;
+    // ── COLORS & FONTS ──
+    const TEXT_DARK = [15, 23, 42];      // slate-900 (Headers/Totals)
+    const TEXT_MAIN = [51, 65, 85];      // slate-700 (Body)
+    const TEXT_MUTED = [100, 116, 139];  // slate-500 (Labels/Dates)
+    const BORDER_COLOR = [226, 232, 240];// slate-200
 
-    // ── COLORS ──
-    const BRAND_BG = [15, 23, 42]; // slate-900
-    const BRAND_ACCENT = [16, 185, 129]; // emerald-500
-    const TEXT_MAIN = [30, 41, 59]; // slate-800
-    const TEXT_MUTED = [100, 116, 139]; // slate-500
-    const LIGHT_BG = [248, 250, 252]; // slate-50
+    const M = MARGIN;
+    const W = WIDTH - MARGIN * 2;
+    const CX = WIDTH / 2;
+    const rightAlignMs = WIDTH - M;
+    let y = 10;
 
-    // ── HEADER (Colored Block) ──
-    doc.setFillColor(...BRAND_BG);
-    doc.rect(0, 0, WIDTH, 46, 'F');
-
-    // Cargar Logo Async 
-    const logoImg = new Image();
-    logoImg.src = '/logo.png';
-    await new Promise((resolve) => {
-        logoImg.onload = resolve;
-        logoImg.onerror = resolve;
-    });
-
-    y = 6;
+    // ── LOGO (Cabecera Blanca -> logo.png) ──
     try {
-        if (logoImg.width > 0) {
-            const logoWidth = 14;
-            const logoHeight = 14;
-            doc.addImage(logoImg, 'PNG', centerX - (logoWidth / 2), y, logoWidth, logoHeight);
-            y += 17;
-        } else {
-            y += 6;
-        }
+        const logoImg = new Image();
+        logoImg.src = '/logo.png';
+        await new Promise((resolve, reject) => {
+            logoImg.onload = resolve;
+            logoImg.onerror = reject;
+        });
+        const logoSize = 16;
+        doc.addImage(logoImg, 'PNG', CX - (logoSize / 2), y, logoSize, logoSize);
+        y += logoSize + 6;
     } catch (e) {
-        y += 6;
+        y += 4;
     }
 
-    doc.setTextColor(255, 255, 255);
+    // ── STORE DETAILS ──
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text('PRECIOS AL DÍA', centerX, y, { align: 'center' });
-
-    y += 5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184); // slate-400
-    doc.text('Tu Bodega Inteligente', centerX, y, { align: 'center' });
-
+    doc.setTextColor(...TEXT_DARK);
+    doc.text('PRECIOS AL DÍA', CX, y, { align: 'center' });
     y += 4;
-    doc.text('preciosaldia.vercel.app', centerX, y, { align: 'center' });
 
-    // ── ORDER INFO ──
-    y += 10;
-    doc.setTextColor(...TEXT_MAIN);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text(`TICKET #${(sale.id.substring(0, 6)).toUpperCase()}`, MARGIN, y);
-
-    y += 5;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...TEXT_MUTED);
-    doc.text(`Cliente:`, MARGIN, y);
-    doc.setTextColor(...TEXT_MAIN);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${sale.customerName || 'Consumidor Final'}`, MARGIN + 12, y);
+    doc.text('Tu Bodega Inteligente', CX, y, { align: 'center' });
+    y += 3.5;
+    doc.text('preciosaldia.vercel.app', CX, y, { align: 'center' });
+    y += 7;
 
-    y += 4;
+    // ── DIVIDER ──
+    doc.setDrawColor(...BORDER_COLOR);
+    doc.setLineWidth(0.3);
+    doc.setLineDashPattern([1, 1], 0); // Dotted line looks like receipt printing
+    doc.line(M, y, WIDTH - M, y);
+    y += 6;
+
+    // ── TICKET INFO ──
+    doc.setLineDashPattern([], 0); // reset dash
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...TEXT_DARK);
+    doc.text(`TICKET: #${sale.id.substring(0, 6).toUpperCase()}`, M, y);
+
+    // Right align date
+    const d = new Date(sale.timestamp);
+    const dateStr = `${d.toLocaleDateString('es-VE')} ${d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}`;
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
     doc.setTextColor(...TEXT_MUTED);
-    const fecha = new Date(sale.timestamp);
-    doc.text(`Fecha:`, MARGIN, y);
+    doc.text(dateStr, WIDTH - M, y, { align: 'right' });
+
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...TEXT_DARK);
+    doc.text(`Cliente:`, M, y);
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(...TEXT_MAIN);
-    doc.text(`${fecha.toLocaleDateString('es-VE')} - ${fecha.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}`, MARGIN + 12, y);
+    doc.text(`${sale.customerName || 'Consumidor Final'}`, M + 13, y);
 
     y += 6;
-    // Separator
-    doc.setDrawColor(226, 232, 240); // slate-200
-    doc.setLineWidth(0.5);
-    doc.line(MARGIN, y, WIDTH - MARGIN, y);
+    doc.setDrawColor(...BORDER_COLOR);
+    doc.setLineDashPattern([1, 1], 0);
+    doc.line(M, y, WIDTH - M, y);
     y += 6;
 
     // ── ITEMS LIST ──
+    doc.setLineDashPattern([], 0);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
     doc.setTextColor(...TEXT_MUTED);
-    doc.text('CANTIDAD / PRODUCTO', MARGIN, y);
-    doc.text('TOTAL', WIDTH - MARGIN, y, { align: 'right' });
-    y += 4;
+    doc.text('CANT', M, y);
+    doc.text('DESCRIPCIÓN', M + 10, y);
+    doc.text('IMPORTE', WIDTH - M, y, { align: 'right' });
+    y += 5;
 
+    const rate = sale.rate || bcvRate || 1;
+
+    doc.setFont('helvetica', 'normal');
     if (sale.items && sale.items.length > 0) {
-        sale.items.forEach((item, index) => {
-            // Alternate background
-            if (index % 2 === 0) {
-                doc.setFillColor(...LIGHT_BG);
-                doc.rect(MARGIN - 2, y - 3, WIDTH - (MARGIN * 2) + 4, 11, 'F');
-            }
+        sale.items.forEach(item => {
+            const qty = item.isWeight ? `${item.qty.toFixed(3)}L/K` : `${item.qty}u`;
+            const subUsd = item.priceUsd * item.qty;
+            const subBs = subUsd * rate;
+            const name = item.name.substring(0, 24); // Truncate cleanly
 
-            const qty = item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`;
-            const subtotalUsd = item.priceUsd * item.qty;
-            const subtotalBs = subtotalUsd * rate;
-
-            doc.setFont('helvetica', 'bold');
             doc.setFontSize(8);
             doc.setTextColor(...TEXT_MAIN);
+            // Cantidad
+            doc.text(qty, M, y);
+            // Nombre
+            doc.text(name, M + 10, y);
+            // Precio USD
+            doc.setFont('helvetica', 'bold');
+            doc.text(`$${subUsd.toFixed(2)}`, WIDTH - M, y, { align: 'right' });
 
-            // Nombre del producto (truncar)
-            const name = item.name.length > 25 ? item.name.substring(0, 22) + '...' : item.name;
-            doc.text(`${qty} × ${name}`, MARGIN, y + 1);
-
-            // Subtotal $
-            doc.text(`$${subtotalUsd.toFixed(2)}`, WIDTH - MARGIN, y + 1, { align: 'right' });
-
-            // Subtotal Bs / Precio unitario
+            y += 4;
+            // Detalle Unitario / Bs
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(7);
             doc.setTextColor(...TEXT_MUTED);
-            doc.text(`(Bs ${formatBs(subtotalBs)})`, WIDTH - MARGIN, y + 5, { align: 'right' });
-            doc.text(`$${item.priceUsd.toFixed(2)} c/u`, MARGIN, y + 5);
+            doc.text(`($${item.priceUsd.toFixed(2)} c/u  ·  Bs ${formatBs(subBs)})`, M + 10, y);
 
-            y += 11;
+            y += 6;
         });
     }
 
     y += 2;
-    doc.line(MARGIN, y, WIDTH - MARGIN, y);
+    doc.setDrawColor(...BORDER_COLOR);
+    doc.setLineDashPattern([1, 1], 0);
+    doc.line(M, y, WIDTH - M, y);
     y += 6;
 
-    // ── TOTALS HIGHLIGHT BLOCK ──
-    doc.setFillColor(...LIGHT_BG);
-    doc.roundedRect(MARGIN, y, WIDTH - (MARGIN * 2), 22, 2, 2, 'F');
+    // ── TOTALS ──
+    doc.setLineDashPattern([], 0);
+    const labelX = rightAlignMs - 25;
 
-    y += 6;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(...BRAND_ACCENT);
-    doc.text(`TOTAL:`, MARGIN + 4, y + 2);
-    doc.text(`$${(sale.totalUsd || 0).toFixed(2)}`, WIDTH - MARGIN - 4, y + 2, { align: 'right' });
-
-    y += 8;
-    doc.setFontSize(11);
+    // Tasa
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text('Tasa BCV:', labelX, y);
     doc.setTextColor(...TEXT_MAIN);
-    doc.text(`En Bs:`, MARGIN + 4, y);
-    doc.text(`Bs ${formatBs(sale.totalBs || 0)}`, WIDTH - MARGIN - 4, y, { align: 'right' });
+    doc.text(`Bs ${formatBs(rate)} / $`, rightAlignMs, y, { align: 'right' });
 
     y += 5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(...TEXT_MUTED);
-    doc.text(`Tasa BCV: ${formatBs(rate)} Bs/$`, centerX, y, { align: 'center' });
+
+    // BIG TOTAL USD
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(...TEXT_DARK);
+    doc.text('TOTAL:', labelX, y + 4);
+    doc.text(`$${parseFloat(sale.totalUsd || 0).toFixed(2)}`, rightAlignMs, y + 4, { align: 'right' });
+
+    y += 10;
+    // TOTAL BS
+    doc.setFontSize(11);
+    doc.setTextColor(...TEXT_MAIN);
+    doc.text('En Bs:', labelX, y);
+    doc.text(`Bs ${formatBs(sale.totalBs || 0)}`, rightAlignMs, y, { align: 'right' });
 
     y += 8;
+    doc.setDrawColor(...BORDER_COLOR);
+    doc.setLineDashPattern([1, 1], 0);
+    doc.line(M, y, rightAlignMs, y);
+    y += 6;
 
-    // ── PAYMENTS & DEBT ──
+    // ── PAYMENTS ──
+    doc.setLineDashPattern([], 0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text('PAGOS REALIZADOS', M, y);
+    y += 5;
+
     if (sale.payments && sale.payments.length > 0) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(...TEXT_MAIN);
-        doc.text('MÉTODOS DE PAGO', MARGIN, y);
-        y += 4;
-
-        doc.setFont('helvetica', 'normal');
         sale.payments.forEach(p => {
             const isBs = p.methodId.includes('_bs') || p.methodId === 'pago_movil';
-            const amountToShow = isBs ? `Bs ${formatBs(p.amountUsd * rate)}` : `$${(p.amountUsd || 0).toFixed(2)}`;
-
-            doc.setTextColor(...TEXT_MUTED);
-            doc.text(p.methodLabel, MARGIN, y);
+            const val = isBs ? `Bs ${formatBs(p.amountUsd * rate)}` : `$${(p.amountUsd || 0).toFixed(2)}`;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
             doc.setTextColor(...TEXT_MAIN);
-            doc.text(amountToShow, WIDTH - MARGIN, y, { align: 'right' });
-            y += 4;
+            doc.text(p.methodLabel, M, y);
+            doc.setFont('helvetica', 'bold');
+            doc.text(val, rightAlignMs, y, { align: 'right' });
+            y += 5;
         });
-    }
-
-    // Fiado / Deuda
-    if (sale.fiadoUsd > 0) {
-        y += 2;
-        doc.setFillColor(254, 226, 226); // red-100
-        doc.roundedRect(MARGIN, y - 3, WIDTH - (MARGIN * 2), 8, 1, 1, 'F');
-        doc.setFont('helvetica', 'bold');
+    } else if (sale.fiadoUsd > 0) {
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
-        doc.setTextColor(220, 38, 38); // red-600
-        doc.text(`PENDIENTE DE PAGO (FIADO)`, MARGIN + 2, y + 2);
-        doc.text(`$${sale.fiadoUsd.toFixed(2)}`, WIDTH - MARGIN - 2, y + 2, { align: 'right' });
-        y += 8;
+        doc.text('A Crédito / Fiado', M, y);
+        doc.text(`$${sale.fiadoUsd.toFixed(2)}`, rightAlignMs, y, { align: 'right' });
+        y += 5;
     }
 
-    // ── FOOTER ──
-    const finalY = Math.max(y + 10, doc.internal.pageSize.getHeight() - 15);
+    if (sale.fiadoUsd > 0 && sale.payments && sale.payments.length > 0) {
+        y += 2;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(220, 38, 38); // red-600
+        doc.text('SALDO PENDIENTE:', M, y);
+        doc.text(`$${sale.fiadoUsd.toFixed(2)}`, rightAlignMs, y, { align: 'right' });
+        y += 5;
+    }
 
-    doc.setDrawColor(...BRAND_ACCENT);
-    doc.setLineWidth(1);
-    doc.line(MARGIN, finalY - 4, WIDTH - MARGIN, finalY - 4);
+    y += 4;
+    // ── FOOTER ──
+    const finalY = doc.internal.pageSize.getHeight() - 15;
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(...TEXT_MAIN);
-    doc.text('¡Gracias por su compra!', centerX, finalY + 2, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setTextColor(...TEXT_DARK);
+    doc.text('¡Gracias por tu compra!', CX, finalY, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(...TEXT_MUTED);
-    doc.text('Comprobante Digital sin valor fiscal', centerX, finalY + 6, { align: 'center' });
+    doc.text('Comprobante digital sin valor fiscal', CX, finalY + 4, { align: 'center' });
 
     // ── DESCARGAR / COMPARTIR ──
     const filename = `ticket_${(sale.id.substring(0, 6)).toUpperCase()}.pdf`;
     const pdfBlob = doc.output('blob');
     const file = new File([pdfBlob], filename, { type: 'application/pdf' });
 
-    // Intentar usar Web Share API (ideal para móvil → WhatsApp)
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
         navigator.share({
             title: `Ticket #${(sale.id.substring(0, 6)).toUpperCase()}`,
             files: [file],
         }).catch(() => {
-            // Fallback: descargar directamente
             doc.save(filename);
         });
     } else {
-        // Desktop o navegador que no soporta share
         doc.save(filename);
     }
 }
