@@ -13,6 +13,7 @@ const SALES_KEY = 'bodega_sales_v1';
 export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme }) {
     const [sales, setSales] = useState([]);
     const [products, setProducts] = useState([]);
+    const [customers, setCustomers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -23,13 +24,15 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     useEffect(() => {
         let mounted = true;
         const load = async () => {
-            const [savedSales, savedProducts] = await Promise.all([
+            const [savedSales, savedProducts, savedCustomers] = await Promise.all([
                 storageService.getItem(SALES_KEY, []),
                 storageService.getItem('my_products_v1', []),
+                storageService.getItem('bodega_customers_v1', []),
             ]);
             if (mounted) {
                 setSales(savedSales);
                 setProducts(savedProducts);
+                setCustomers(savedCustomers);
                 setIsLoading(false);
             }
         };
@@ -131,7 +134,26 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         text += `*¡Gracias por su compra!*`;
 
         const encoded = encodeURIComponent(text);
-        window.open(`https://wa.me/?text=${encoded}`, '_blank');
+
+        // Buscar el cliente de la venta para abrir WhatsApp directo a su número
+        const saleCustomer = sale.customerId
+            ? customers.find(c => c.id === sale.customerId)
+            : null;
+        const rawPhone = saleCustomer?.phone?.replace(/[\s\-\(\)]/g, '') ?? '';
+        let phoneForUrl = '';
+        if (rawPhone.length >= 7) {
+            if (rawPhone.startsWith('0')) {
+                phoneForUrl = '58' + rawPhone.slice(1);
+            } else if (!rawPhone.startsWith('+') && !rawPhone.startsWith('58')) {
+                phoneForUrl = '58' + rawPhone;
+            } else {
+                phoneForUrl = rawPhone.replace('+', '');
+            }
+        }
+        const waUrl = phoneForUrl
+            ? `https://wa.me/${phoneForUrl}?text=${encoded}`
+            : `https://wa.me/?text=${encoded}`;
+        window.open(waUrl, '_blank');
     };
 
     const handleDownloadPDF = (sale) => {
