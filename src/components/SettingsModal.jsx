@@ -2,8 +2,9 @@ import React, { useState, useRef } from 'react';
 import { Upload, Download, AlertTriangle, Check, X, Database, Share2 } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
+import PaymentMethodsManager from './Settings/PaymentMethodsManager';
 
-export default function SettingsModal({ isOpen, onClose, products, onImport }) {
+export default function SettingsModal({ isOpen, onClose, products, onImport, triggerHaptic }) {
     const [importStatus, setImportStatus] = useState(null);
     const [statusMessage, setStatusMessage] = useState('');
     const fileInputRef = useRef(null);
@@ -100,7 +101,7 @@ export default function SettingsModal({ isOpen, onClose, products, onImport }) {
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
 
                 {/* Header */}
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
@@ -114,7 +115,7 @@ export default function SettingsModal({ isOpen, onClose, products, onImport }) {
                 </div>
 
                 {/* Body */}
-                <div className="p-5 space-y-3">
+                <div className="p-5 space-y-3 overflow-y-auto">
 
                     {/* Share Catalog Button */}
                     {onImport && (
@@ -186,6 +187,11 @@ export default function SettingsModal({ isOpen, onClose, products, onImport }) {
                             {statusMessage}
                         </div>
                     )}
+
+                    {/* Divider */}
+                    <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                        <PaymentMethodsManager triggerHaptic={triggerHaptic} />
+                    </div>
                 </div>
             </div>
         </div>

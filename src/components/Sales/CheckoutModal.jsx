@@ -53,7 +53,7 @@ export default function CheckoutModal({
         triggerHaptic && triggerHaptic();
         const remaining = currency === 'USD' ? remainingUsd : remainingBs;
         if (remaining <= 0) return;
-        const val = currency === 'BS' ? Math.ceil(remaining).toString() : Number(remaining.toFixed(2)).toString();
+        const val = Number(remaining.toFixed(2)).toString();
         setBarValues(prev => ({ ...prev, [methodId]: val }));
     }, [remainingUsd, remainingBs, triggerHaptic]);
 
@@ -136,13 +136,13 @@ export default function CheckoutModal({
                             onChange={e => handleBarChange(method.id, e.target.value)}
                             placeholder="0.00"
                             className={`w-full py-3 px-4 pr-14 rounded-xl border-2 text-lg font-bold outline-none transition-all ${hasValue
-                                    ? styles.inputActive
-                                    : `bg-white dark:bg-slate-900 ${styles.inputBorder}`
+                                ? styles.inputActive
+                                : `bg-white dark:bg-slate-900 ${styles.inputBorder}`
                                 } text-slate-800 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700 focus:ring-4`}
                         />
                         <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black px-2 py-0.5 rounded-md border ${hasValue
-                                ? `${styles.titleBg} ${styles.title} ${styles.border}`
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
+                            ? `${styles.titleBg} ${styles.title} ${styles.border}`
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
                             }`}>
                             {method.currency === 'USD' ? '$' : 'Bs'}
                         </span>
@@ -219,8 +219,8 @@ export default function CheckoutModal({
                 {/* ── BANNER VUELTO / RESTANTE ── */}
                 <div className="px-3 py-2">
                     <div className={`p-3.5 rounded-xl border-2 transition-all ${isPaid
-                            ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
-                            : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800'
+                        ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
+                        : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800'
                         }`}>
                         <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
                             {isPaid ? '✓ Vuelto' : 'Resta por Cobrar'}
@@ -297,10 +297,10 @@ export default function CheckoutModal({
                     onClick={handleConfirm}
                     disabled={!selectedCustomerId && remainingUsd > 0.01}
                     className={`w-full py-4 text-white font-black text-base rounded-2xl shadow-lg transition-all tracking-wide flex items-center justify-center gap-2 ${isPaid
-                            ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/25 active:scale-[0.98]'
-                            : selectedCustomerId
-                                ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/25 active:scale-[0.98]'
-                                : 'bg-slate-300 dark:bg-slate-800 text-slate-500 shadow-none cursor-not-allowed'
+                        ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/25 active:scale-[0.98]'
+                        : selectedCustomerId
+                            ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/25 active:scale-[0.98]'
+                            : 'bg-slate-300 dark:bg-slate-800 text-slate-500 shadow-none cursor-not-allowed'
                         }`}
                 >
                     {isPaid ? (
