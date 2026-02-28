@@ -295,10 +295,10 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                     <div className="flex items-center gap-2 min-w-0">
                         <Store size={22} className="text-emerald-500 shrink-0" />
                         <h2 className="text-lg sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight truncate">Inventario</h2>
-                        <span className="text-[10px] sm:text-xs text-slate-400 font-bold tabular-nums shrink-0">{products.length}</span>
+                        <span className="px-2 py-0.5 bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] sm:text-xs font-bold rounded-full tabular-nums shrink-0">{products.length} items</span>
                         {lowStockCount > 0 && (
-                            <span className="text-[10px] sm:text-xs text-amber-500 font-bold shrink-0 flex items-center gap-0.5">
-                                <AlertTriangle size={11} /> {lowStockCount}
+                            <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] sm:text-xs font-bold rounded-full shrink-0 flex items-center gap-1">
+                                <AlertTriangle size={10} /> {lowStockCount} bajo
                             </span>
                         )}
                     </div>
