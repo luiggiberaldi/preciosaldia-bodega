@@ -15,8 +15,15 @@ export default function CustomersView({ triggerHaptic }) {
     // Modal de Abono / Crédito
     const [transactionModal, setTransactionModal] = useState({ isOpen: false, type: null, customer: null }); // type: 'ABONO' | 'CREDITO'
     const [amountBs, setAmountBs] = useState('');
+    const [currencyMode, setCurrencyMode] = useState('BS'); // 'BS' | 'USD'
     const [paymentMethod, setPaymentMethod] = useState('efectivo_bs');
     const [resetBalanceCustomer, setResetBalanceCustomer] = useState(null);
+    const [bcvRate, setBcvRate] = useState(0);
+
+    useEffect(() => {
+        // Leer tasa BCV del storage para conversión
+        storageService.getItem('bcv_rate_v1', 0).then(r => setBcvRate(r || 0));
+    }, []);
 
     useEffect(() => {
         loadCustomers();
@@ -58,7 +65,9 @@ export default function CustomersView({ triggerHaptic }) {
 
         triggerHaptic();
 
-        const amount = parseFloat(amountBs);
+        // Convertir a Bs si el usuario ingresó en $
+        const rawAmount = parseFloat(amountBs);
+        const amount = currencyMode === 'USD' && bcvRate > 0 ? rawAmount * bcvRate : rawAmount;
         const { type, customer } = transactionModal;
 
         // 1. Aplicar la Lógica Financiera de los Cuadrantes
@@ -96,6 +105,7 @@ export default function CustomersView({ triggerHaptic }) {
         // Cerrar modal
         setTransactionModal({ isOpen: false, type: null, customer: null });
         setAmountBs('');
+        setCurrencyMode('BS');
         setPaymentMethod('efectivo_bs');
     };
 
@@ -235,9 +245,20 @@ export default function CustomersView({ triggerHaptic }) {
                             </p>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Monto ({transactionModal.type === 'ABONO' ? 'Pago Recibido' : 'Nuevo Fiado'}) en Bs</label>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Monto ({transactionModal.type === 'ABONO' ? 'Pago Recibido' : 'Nuevo Fiado'}) en {currencyMode === 'BS' ? 'Bs' : '$'}</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setCurrencyMode(m => m === 'BS' ? 'USD' : 'BS'); setAmountBs(''); }}
+                                        className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+                                    >
+                                        <span className={currencyMode === 'BS' ? 'text-blue-500' : 'text-slate-400'}>Bs</span>
+                                        <span className="text-slate-300">/</span>
+                                        <span className={currencyMode === 'USD' ? 'text-emerald-500' : 'text-slate-400'}>$</span>
+                                    </button>
+                                </div>
                                 <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Bs</span>
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">{currencyMode === 'BS' ? 'Bs' : '$'}</span>
                                     <input
                                         type="number"
                                         value={amountBs}
@@ -247,6 +268,9 @@ export default function CustomersView({ triggerHaptic }) {
                                         autoFocus
                                     />
                                 </div>
+                                {currencyMode === 'USD' && amountBs && bcvRate > 0 && (
+                                    <p className="text-[10px] text-slate-400 mt-1.5 px-1">= {formatBs(parseFloat(amountBs) * bcvRate)} Bs @ {formatBs(bcvRate)} Bs/$</p>
+                                )}
                             </div>
 
                             {transactionModal.type === 'ABONO' && (

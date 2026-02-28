@@ -107,7 +107,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const handleShareWhatsApp = (sale) => {
         let text = `*COMPROBANTE DE VENTA | PRECIOS AL DÍA*\n`;
         text += `--------------------------------\n`;
-        text += `*Orden:* #${(sale.id.substring(0, 6)).toUpperCase()}\n`;
+        text += `*Orden:* #${sale.id.substring(0, 6).toUpperCase()}\n`;
         text += `Cliente: ${sale.customerName || 'Consumidor Final'}\n`;
         text += `Fecha: ${new Date(sale.timestamp).toLocaleString('es-VE')}\n`;
         text += `===================================\n\n`;
