@@ -5,18 +5,20 @@ import { formatBs } from './calculatorUtils';
  * Genera un ticket PDF estilo punto de venta 80mm
  * y lo descarga o comparte via Web Share API
  */
-export function generateTicketPDF(sale, bcvRate) {
+export async function generateTicketPDF(sale, bcvRate) {
     const WIDTH = 80; // mm
     const MARGIN = 6;
 
-    // Calcular altura dinámica
+    // Calcular altura dinámica precisa para que no se corte
     const itemCount = sale.items?.length || 0;
     const paymentCount = sale.payments?.length || 0;
-    const estimatedHeight = 110 + (itemCount * 12) + (paymentCount * 6);
+    const HEIGHT_FIADO = sale.fiadoUsd > 0 ? 12 : 0;
+    // Base Header (~45) + Titles (~20) + Totals (~35) + Pagos Titles (~10) + Footer (~20) = 130 + extra
+    const estimatedHeight = 145 + (itemCount * 12) + (paymentCount * 6) + HEIGHT_FIADO;
 
     const doc = new jsPDF({
         unit: 'mm',
-        format: [WIDTH, Math.max(estimatedHeight, 130)],
+        format: [WIDTH, estimatedHeight],
     });
 
     const rate = sale.rate || bcvRate || 1;
@@ -32,9 +34,30 @@ export function generateTicketPDF(sale, bcvRate) {
 
     // ── HEADER (Colored Block) ──
     doc.setFillColor(...BRAND_BG);
-    doc.rect(0, 0, WIDTH, 28, 'F');
+    doc.rect(0, 0, WIDTH, 46, 'F');
 
-    y = 12;
+    // Cargar Logo Async 
+    const logoImg = new Image();
+    logoImg.src = '/logo.png';
+    await new Promise((resolve) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = resolve;
+    });
+
+    y = 6;
+    try {
+        if (logoImg.width > 0) {
+            const logoWidth = 14;
+            const logoHeight = 14;
+            doc.addImage(logoImg, 'PNG', centerX - (logoWidth / 2), y, logoWidth, logoHeight);
+            y += 17;
+        } else {
+            y += 6;
+        }
+    } catch (e) {
+        y += 6;
+    }
+
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
@@ -50,7 +73,7 @@ export function generateTicketPDF(sale, bcvRate) {
     doc.text('preciosaldia.vercel.app', centerX, y, { align: 'center' });
 
     // ── ORDER INFO ──
-    y = 36;
+    y += 10;
     doc.setTextColor(...TEXT_MAIN);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
