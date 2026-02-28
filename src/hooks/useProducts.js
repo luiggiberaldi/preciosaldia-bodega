@@ -23,7 +23,7 @@ export function useProducts(rates) {
         return saved && parseFloat(saved) > 0 ? saved : '';
     });
 
-    const effectiveUsdtRate = useAutoRate ? rates.bcv : (parseFloat(customRate) > 0 ? parseFloat(customRate) : rates.bcv);
+    const effectiveUsdtRate = useAutoRate ? rates.bcv?.price : (parseFloat(customRate) > 0 ? parseFloat(customRate) : rates.bcv?.price);
 
     // Initial Load
     useEffect(() => {
