@@ -201,7 +201,10 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
             {/* Header */}
             <div className="flex items-center justify-between mb-6 pt-2">
-                <img src={theme === 'dark' ? '/logodark.png' : '/logo.png'} alt="Logo Precios al Día" className="h-14 sm:h-16 w-auto object-contain drop-shadow-md" />
+                <div className="relative h-14 sm:h-16">
+                    <img src="/logo.png" alt="Logo Precios al Día" className={`h-14 sm:h-16 w-auto object-contain drop-shadow-md transition-opacity duration-200 ${theme === 'dark' ? 'opacity-0 absolute' : 'opacity-100'}`} />
+                    <img src="/logodark.png" alt="Logo Precios al Día" className={`h-14 sm:h-16 w-auto object-contain drop-shadow-md transition-opacity duration-200 ${theme === 'dark' ? 'opacity-100' : 'opacity-0 absolute'}`} />
+                </div>
                 <button
                     onClick={() => { triggerHaptic(); toggleTheme(); }}
                     className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-90 transition-all"
