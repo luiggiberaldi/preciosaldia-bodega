@@ -4,6 +4,7 @@ import { showToast } from '../components/Toast';
 import { Search, X, Package, RefreshCw, Mic, Box, ShoppingCart } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
 import { getActivePaymentMethods } from '../config/paymentMethods';
+import { BODEGA_CATEGORIES, CATEGORY_ICONS, CATEGORY_COLORS } from '../config/categories';
 import ReceiptModal from '../components/Sales/ReceiptModal';
 import CheckoutModal from '../components/Sales/CheckoutModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -441,34 +442,57 @@ export default function SalesView({ rates, triggerHaptic }) {
                     {searchResults.length > 0 && (
                         <div className="absolute top-full mt-2 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-20 overflow-hidden">
                             {searchResults.map((p, index) => {
-                                const usdtRate = rates.usdt?.price || effectiveRate;
-                                const valBs = p.priceUsdt * usdtRate;
-                                const valUsd = valBs / effectiveRate;
-                                const inCart = cart.find(i => i.id === p.id);
+                                const isLowStock = (p.stock ?? 0) <= (p.lowStockAlert ?? 5) && (p.stock ?? 0) >= 0;
+                                const isOutOfStock = (p.stock ?? 0) === 0;
+                                const catInfo = BODEGA_CATEGORIES.find(c => c.id === p.category);
+                                const catColor = catInfo ? CATEGORY_COLORS[catInfo.color] : null;
+                                const CatIcon = catInfo ? CATEGORY_ICONS[catInfo.id] : null;
                                 const isSelected = index === selectedIndex;
                                 return (
-                                    <button key={p.id} onClick={() => addToCart(p)}
+                                    <button
+                                        key={p.id}
+                                        onClick={() => addToCart(p)}
                                         onMouseEnter={() => setSelectedIndex(index)}
-                                        className={`w-full flex items-center gap-3 p-3 text-left border-b border-slate-50 dark:border-slate-800/50 last:border-0 transition-colors
-                                            ${isSelected ? 'bg-emerald-50 dark:bg-emerald-900/20 border-l-4 border-l-emerald-500' : 'bg-transparent border-l-4 border-l-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
-                                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden text-slate-400">
-                                            {p.image ? <img src={p.image} className="w-full h-full object-contain" /> : <Package size={16} />}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 dark:border-slate-800/50 last:border-0 transition-all active:scale-[0.98]
+                                            ${isSelected
+                                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-l-4 border-l-emerald-500'
+                                                : 'bg-transparent border-l-4 border-l-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                                            }
+                                            ${isOutOfStock ? 'opacity-50' : ''}`}
+                                    >
+                                        <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden">
+                                            {p.image
+                                                ? <img src={p.image} className="w-full h-full object-contain" alt={p.name} />
+                                                : CatIcon
+                                                    ? <CatIcon size={20} className="text-slate-400" />
+                                                    : <Package size={16} className="text-slate-400" />
+                                            }
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className={`text-sm font-bold truncate ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                                        <div className="flex-1 min-w-0 text-left">
+                                            <p className={`text-sm font-bold truncate leading-tight ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-100'}`}>
                                                 {p.name}
                                             </p>
-                                            <p className="text-[11px] text-slate-400">Stock: {p.stock ?? 0} · Barcode: {p.barcode || 'N/A'}</p>
+                                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                                {catInfo && catInfo.id !== 'otros' && catInfo.id !== 'todos' && catColor && (
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${catColor}`}>
+                                                        {catInfo.label}
+                                                    </span>
+                                                )}
+                                                <span className={`text-[10px] font-medium flex items-center gap-1
+                                                    ${isOutOfStock ? 'text-red-500' : isLowStock ? 'text-amber-500' : 'text-slate-400'}`}>
+                                                    {isLowStock && !isOutOfStock && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />}
+                                                    {isOutOfStock ? 'Sin stock' : `Stock: ${p.stock ?? 0}`}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div className="text-right shrink-0">
-                                            <p className="text-sm font-black text-slate-800 dark:text-white">${valUsd.toFixed(2)}</p>
-                                            <p className="text-[11px] font-bold text-slate-400">{formatBs(valBs)} Bs</p>
+                                            <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                                                ${p.priceUsdt?.toFixed(2)}
+                                            </p>
+                                            <p className="text-[10px] font-medium text-slate-400">
+                                                {formatBs(p.priceUsdt * effectiveRate)} Bs
+                                            </p>
                                         </div>
-                                        {inCart && (
-                                            <div className="shrink-0 ml-2 w-6 h-6 bg-emerald-100 dark:bg-emerald-900/50 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-xs font-black">
-                                                {inCart.qty}
-                                            </div>
-                                        )}
                                     </button>
                                 );
                             })}
