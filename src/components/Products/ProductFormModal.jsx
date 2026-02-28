@@ -177,6 +177,35 @@ export default function ProductFormModal({
                         </div>
                     )}
 
+                    {/* ─── COST SECTION (first) ─── */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 mb-1 block uppercase tracking-wider">
+                                Costo ($){priceSuffix}
+                            </label>
+                            <input type="number" inputMode="decimal" value={costUsd} onChange={e => handleCostUsdChange(e.target.value)} placeholder="1.00"
+                                className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
+                        </div>
+                        <div>
+                            <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 mb-1 block uppercase tracking-wider">
+                                Costo (Bs){priceSuffix}
+                            </label>
+                            <input type="number" inputMode="decimal" value={costBs} onChange={e => handleCostBsChange(e.target.value)} placeholder="0.00"
+                                className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
+                        </div>
+                    </div>
+
+                    {/* ─── LOTE: Auto unit cost ─── */}
+                    {isLote && parsedUnits > 1 && parsedCost > 0 && (
+                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-xl text-[11px]">
+                            <span className="text-slate-500 font-medium">Costo por unidad:</span>
+                            <span className="font-bold text-slate-700 dark:text-white flex items-center gap-1.5">
+                                ${(parsedCost / parsedUnits).toFixed(2)}
+                                <span className="text-[8px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 px-1.5 py-0.5 rounded font-black">AUTO</span>
+                            </span>
+                        </div>
+                    )}
+
                     {/* ─── PRICE SECTION ─── */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -214,41 +243,12 @@ export default function ProductFormModal({
                         </div>
                     )}
 
-                    {/* ─── COST SECTION ─── */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 mb-1 block uppercase tracking-wider">
-                                Costo ($){priceSuffix}
-                            </label>
-                            <input type="number" inputMode="decimal" value={costUsd} onChange={e => handleCostUsdChange(e.target.value)} placeholder="1.00"
-                                className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
-                        </div>
-                        <div>
-                            <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 mb-1 block uppercase tracking-wider">
-                                Costo (Bs){priceSuffix}
-                            </label>
-                            <input type="number" inputMode="decimal" value={costBs} onChange={e => handleCostBsChange(e.target.value)} placeholder="0.00"
-                                className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
-                        </div>
-                    </div>
-
-                    {/* ─── LOTE: Auto unit cost ─── */}
-                    {isLote && parsedUnits > 1 && parsedCost > 0 && (
-                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-xl text-[11px]">
-                            <span className="text-slate-500 font-medium">Costo por unidad:</span>
-                            <span className="font-bold text-slate-700 dark:text-white flex items-center gap-1.5">
-                                ${(parsedCost / parsedUnits).toFixed(2)}
-                                <span className="text-[8px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 px-1.5 py-0.5 rounded font-black">AUTO</span>
-                            </span>
-                        </div>
-                    )}
-
                     {/* ─── MARGIN PANEL ─── */}
                     <div className={`p-3 rounded-xl border space-y-1.5 min-h-[60px] ${mainMarginPct !== null && mainMarginPct < 0
-                            ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30'
-                            : mainMarginPct !== null && mainMarginPct === 0
-                                ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/30'
-                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'
+                        ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30'
+                        : mainMarginPct !== null && mainMarginPct === 0
+                            ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/30'
+                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'
                         }`}>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Margen de Ganancia</p>
                         {parsedPrice > 0 && parsedCost > 0 ? (

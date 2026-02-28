@@ -10,6 +10,7 @@ export const BODEGA_CATEGORIES = [
     { id: 'carnes', label: 'Carnes', icon: '◆', color: 'red' },
     { id: 'verduras', label: 'Verduras', icon: '◆', color: 'green' },
     { id: 'panaderia', label: 'Panadería', icon: '◆', color: 'amber' },
+    { id: 'viveres', label: 'Víveres', icon: '◆', color: 'green' },
     { id: 'otros', label: 'Otros', icon: '◆', color: 'gray' },
 ];
 
