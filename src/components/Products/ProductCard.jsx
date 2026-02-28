@@ -60,7 +60,7 @@ export default function ProductCard({
                 <div className="flex justify-between items-end mb-3">
                     <div>
                         <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none">
-                            {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {p.unit !== 'unidad' ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
+                            {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                         </p>
                         <p className="text-[11px] font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
                     </div>
@@ -81,7 +81,7 @@ export default function ProductCard({
                             <span className={`text-base font-black leading-none mb-0.5 ${isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>
                                 {p.stock ?? 0}
                             </span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">{unitInfo?.short || 'ud'}</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">{(p.unit === 'kg' || p.unit === 'litro') ? unitInfo?.short : 'UD'}</span>
                         </div>
                         <button onClick={() => onAdjustStock(p.id, 1)} className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-emerald-500 shadow-sm active:scale-95 transition-all">
                             <Plus size={18} strokeWidth={2.5} />
