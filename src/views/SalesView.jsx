@@ -357,7 +357,7 @@ export default function SalesView({ rates, triggerHaptic }) {
                         {/* Tasa Móvil (visible solo en sm) */}
                         <div className="sm:hidden">
                             <button onClick={() => setShowRateConfig(!showRateConfig)} className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                                <RefreshCw size={12} className={showRateConfig ? "animate-spin text-emerald-500" : "text-slate-400"} />
+                                <RefreshCw size={12} className={showRateConfig ? "text-emerald-500" : "text-slate-400"} />
                                 <strong className="text-xs text-emerald-600 dark:text-emerald-400">{formatBs(effectiveRate)}</strong>
                             </button>
                         </div>
@@ -367,7 +367,7 @@ export default function SalesView({ rates, triggerHaptic }) {
                     <div className="hidden sm:flex items-center gap-2">
                         <button onClick={() => setShowRateConfig(!showRateConfig)} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 transition-colors group">
                             <span className="text-xs text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1">
-                                <RefreshCw size={12} className={showRateConfig ? "animate-spin text-emerald-500" : "group-hover:text-emerald-500"} />
+                                <RefreshCw size={12} className={showRateConfig ? "text-emerald-500" : "group-hover:text-emerald-500"} />
                                 BCV:
                             </span>
                             <strong className="text-sm text-emerald-600 dark:text-emerald-400">{formatBs(effectiveRate)} Bs</strong>
