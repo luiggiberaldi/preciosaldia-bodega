@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { Users, Search, Plus, CreditCard, ArrowDownRight, ArrowUpRight, User, Phone, X, Save, RefreshCw, Clock, ChevronDown } from 'lucide-react';
+import { Users, Search, Plus, CreditCard, ArrowDownRight, ArrowUpRight, User, Phone, X, Save, RefreshCw, Clock, ChevronDown, CheckCircle2, ShoppingBag } from 'lucide-react';
 import { formatBs, formatUsd } from '../utils/calculatorUtils';
 import { procesarImpactoCliente } from '../utils/financialLogic';
 import { DEFAULT_PAYMENT_METHODS } from '../config/paymentMethods';
@@ -19,8 +19,9 @@ export default function CustomersView({ triggerHaptic }) {
     const [paymentMethod, setPaymentMethod] = useState('efectivo_bs');
     const [resetBalanceCustomer, setResetBalanceCustomer] = useState(null);
     const [bcvRate, setBcvRate] = useState(0);
-    const [expandedHistory, setExpandedHistory] = useState(null); // customerId or null
-    const [historyData, setHistoryData] = useState([]); // sales for expanded customer
+    const [expandedHistory, setExpandedHistory] = useState(null);
+    const [historyData, setHistoryData] = useState([]);
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
 
     useEffect(() => {
         // Leer tasa BCV del storage para conversión
@@ -174,131 +175,15 @@ export default function CustomersView({ triggerHaptic }) {
                     </div>
                 ) : (
                     filteredCustomers.map(customer => (
-                        <div key={customer.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                                    <span className="text-xl font-black text-blue-600 dark:text-blue-400">
-                                        {customer.name.charAt(0).toUpperCase()}
-                                    </span>
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-slate-800 dark:text-white text-lg">{customer.name}</h3>
-                                    {customer.phone && (
-                                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                                            <Phone size={10} /> {customer.phone}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col sm:items-end gap-1 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 pt-3 sm:pt-0">
-                                <div className="flex sm:flex-col justify-between sm:justify-center items-center sm:items-end w-full sm:w-auto">
-                                    <span className="text-xs font-bold text-slate-400 mb-1">SALDO ACTUAL</span>
-                                    {customer.deuda > 0 ? (
-                                        <div className="text-right flex flex-col items-end">
-                                            <span className="text-red-500 font-black text-lg flex items-center gap-1 leading-none">
-                                                <ArrowDownRight size={16} /> -${formatUsd(customer.deuda)}
-                                            </span>
-                                            {bcvRate > 0 && <span className="text-xs font-bold text-red-500/70 mt-1">-{formatBs(customer.deuda * bcvRate)} Bs</span>}
-                                        </div>
-                                    ) : customer.favor > 0 ? (
-                                        <div className="text-right flex flex-col items-end">
-                                            <span className="text-emerald-500 font-black text-lg flex items-center gap-1 leading-none">
-                                                <ArrowUpRight size={16} /> +${formatUsd(customer.favor)}
-                                            </span>
-                                            {bcvRate > 0 && <span className="text-xs font-bold text-emerald-500/70 mt-1">+{formatBs(customer.favor * bcvRate)} Bs</span>}
-                                        </div>
-                                    ) : (
-                                        <div className="text-right flex flex-col items-end">
-                                            <span className="text-slate-400 font-black text-lg leading-none">$0.00</span>
-                                            <span className="text-xs font-bold text-slate-400/70 mt-1">0 Bs</span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex flex-wrap lg:flex-nowrap gap-2 mt-3 w-full sm:w-auto">
-                                    <button
-                                        onClick={() => { triggerHaptic(); setTransactionModal({ isOpen: true, type: 'CREDITO', customer }); }}
-                                        className="flex-1 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
-                                    >
-                                        + Deuda (Fiado)
-                                    </button>
-                                    <button
-                                        onClick={() => { triggerHaptic(); setTransactionModal({ isOpen: true, type: 'ABONO', customer }); }}
-                                        className="flex-1 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors"
-                                    >
-                                        + Abono
-                                    </button>
-                                    {(customer.deuda !== 0 || customer.favor !== 0) && (
-                                        <button
-                                            onClick={() => handleResetBalance(customer)}
-                                            className="w-full lg:w-auto px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1 mt-1 lg:mt-0"
-                                            title="Poner Saldo en 0"
-                                        >
-                                            <RefreshCw size={12} /> Poner en 0
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Historial Colapsable */}
-                            <button
-                                onClick={() => toggleHistory(customer.id)}
-                                className="w-full flex items-center justify-center gap-1.5 py-2 text-[11px] font-bold text-slate-400 hover:text-blue-500 transition-colors border-t border-slate-100 dark:border-slate-800 mt-2"
-                            >
-                                <Clock size={12} />
-                                Historial
-                                <ChevronDown size={12} className={`transition-transform ${expandedHistory === customer.id ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {expandedHistory === customer.id && (
-                                <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                    {historyData.length === 0 ? (
-                                        <p className="text-xs text-slate-400 text-center py-3">Sin registros</p>
-                                    ) : (
-                                        historyData.map(sale => {
-                                            const date = new Date(sale.timestamp);
-                                            const dateStr = date.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' });
-                                            const timeStr = date.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
-                                            const isCobro = sale.tipo === 'COBRO_DEUDA';
-                                            const isFiada = sale.tipo === 'VENTA_FIADA';
-
-                                            return (
-                                                <div key={sale.id} className="flex items-start gap-2.5 py-2 px-2 bg-slate-50 dark:bg-slate-950 rounded-xl">
-                                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-xs font-black ${isCobro ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500'
-                                                        : isFiada ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-500'
-                                                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-500'
-                                                        }`}>
-                                                        {isCobro ? '💰' : isFiada ? '📋' : '🛒'}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex justify-between items-start">
-                                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                                                                {isCobro ? 'Abono de deuda' : isFiada ? 'Venta fiada' : 'Venta'}
-                                                            </p>
-                                                            <span className={`text-xs font-black ${isCobro ? 'text-emerald-500' : isFiada ? 'text-amber-500' : 'text-slate-700 dark:text-white'
-                                                                }`}>
-                                                                {isCobro ? '+' : ''}${formatUsd(sale.totalUsd || 0)}
-                                                            </span>
-                                                        </div>
-                                                        {sale.items && sale.items.length > 0 && (
-                                                            <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                                                                {sale.items.map(i => i.name).join(', ')}
-                                                            </p>
-                                                        )}
-                                                        {sale.fiadoUsd > 0 && (
-                                                            <p className="text-[10px] text-amber-500 font-bold mt-0.5">Deuda: ${formatUsd(sale.fiadoUsd)}</p>
-                                                        )}
-                                                        <p className="text-[9px] text-slate-400 mt-0.5">{dateStr} • {timeStr}</p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
-                            )}
-
-                        </div>
+                        <CustomerCard
+                            key={customer.id}
+                            customer={customer}
+                            bcvRate={bcvRate}
+                            onClick={() => {
+                                setSelectedCustomer(customer);
+                                toggleHistory(customer.id);
+                            }}
+                        />
                     ))
                 )}
             </div>
@@ -405,6 +290,27 @@ export default function CustomersView({ triggerHaptic }) {
                 )
             }
 
+            {/* Customer Detail Bottom Sheet */}
+            <CustomerDetailSheet
+                customer={selectedCustomer}
+                isOpen={!!selectedCustomer}
+                onClose={() => setSelectedCustomer(null)}
+                onDeuda={() => {
+                    setTransactionModal({ isOpen: true, type: 'CREDITO', customer: selectedCustomer });
+                    setSelectedCustomer(null);
+                }}
+                onAbono={() => {
+                    setTransactionModal({ isOpen: true, type: 'ABONO', customer: selectedCustomer });
+                    setSelectedCustomer(null);
+                }}
+                onReset={() => {
+                    handleResetBalance(selectedCustomer);
+                    setSelectedCustomer(null);
+                }}
+                bcvRate={bcvRate}
+                sales={historyData}
+            />
+
             {/* Modal Confirmación: Reiniciar Saldo */}
             <ConfirmModal
                 isOpen={!!resetBalanceCustomer}
@@ -419,7 +325,188 @@ export default function CustomersView({ triggerHaptic }) {
     );
 }
 
-// Sub-componente para Agregar Nuevo Cliente
+// ─── Sub-componente: Tarjeta Compacta ───────────────────────
+function CustomerCard({ customer, bcvRate, onClick }) {
+    return (
+        <div
+            onClick={onClick}
+            className="bg-white dark:bg-slate-900 rounded-2xl px-4 py-3 border border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.98] transition-all cursor-pointer flex items-center gap-3"
+        >
+            <div className="w-11 h-11 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                <span className="text-lg font-black text-blue-600 dark:text-blue-400">
+                    {customer.name.charAt(0).toUpperCase()}
+                </span>
+            </div>
+            <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-slate-800 dark:text-white text-sm truncate">{customer.name}</h3>
+                {customer.phone && (
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <Phone size={10} /> {customer.phone}
+                    </p>
+                )}
+            </div>
+            <div className="text-right shrink-0">
+                {customer.deuda > 0 ? (
+                    <>
+                        <p className="text-sm font-black text-red-500 leading-tight">-${formatUsd(customer.deuda)}</p>
+                        {bcvRate > 0 && <p className="text-[10px] font-bold text-red-400/70">-{formatBs(customer.deuda * bcvRate)} Bs</p>}
+                    </>
+                ) : customer.favor > 0 ? (
+                    <>
+                        <p className="text-sm font-black text-emerald-500 leading-tight">+${formatUsd(customer.favor)}</p>
+                        {bcvRate > 0 && <p className="text-[10px] font-bold text-emerald-400/70">+{formatBs(customer.favor * bcvRate)} Bs</p>}
+                    </>
+                ) : (
+                    <p className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                        <CheckCircle2 size={12} className="text-emerald-400" /> Al día
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ─── Sub-componente: Bottom Sheet de Detalle ────────────────
+function CustomerDetailSheet({ customer, isOpen, onClose, onDeuda, onAbono, onReset, bcvRate, sales }) {
+    if (!isOpen || !customer) return null;
+
+    const createdDate = customer.createdAt
+        ? new Date(customer.createdAt).toLocaleDateString('es-VE', { month: 'long', year: 'numeric' })
+        : null;
+
+    return (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+            <div
+                className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white dark:bg-slate-900 rounded-t-3xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300 shadow-2xl"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Drag Handle */}
+                <div className="flex justify-center pt-3 pb-4">
+                    <div className="w-8 h-1 bg-slate-300 dark:bg-slate-700 rounded-full" />
+                </div>
+
+                <div className="px-5 pb-6 space-y-5">
+                    {/* Header */}
+                    <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                            <span className="text-2xl font-black text-blue-600 dark:text-blue-400">
+                                {customer.name.charAt(0).toUpperCase()}
+                            </span>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-black text-slate-800 dark:text-white">{customer.name}</h3>
+                            {customer.phone && (
+                                <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                                    <Phone size={12} /> {customer.phone}
+                                </p>
+                            )}
+                            {createdDate && (
+                                <p className="text-[10px] text-slate-400 mt-0.5">Cliente desde {createdDate}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Saldo */}
+                    <div className="flex gap-2">
+                        {customer.deuda > 0 ? (
+                            <div className="flex-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 rounded-xl px-3 py-2.5 text-center">
+                                <p className="text-[10px] font-bold text-red-400 uppercase">Debe</p>
+                                <p className="text-lg font-black text-red-500">-${formatUsd(customer.deuda)}</p>
+                                {bcvRate > 0 && <p className="text-[10px] font-bold text-red-400/70">-{formatBs(customer.deuda * bcvRate)} Bs</p>}
+                            </div>
+                        ) : customer.favor > 0 ? (
+                            <div className="flex-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-xl px-3 py-2.5 text-center">
+                                <p className="text-[10px] font-bold text-emerald-400 uppercase">A favor</p>
+                                <p className="text-lg font-black text-emerald-500">+${formatUsd(customer.favor)}</p>
+                                {bcvRate > 0 && <p className="text-[10px] font-bold text-emerald-400/70">+{formatBs(customer.favor * bcvRate)} Bs</p>}
+                            </div>
+                        ) : (
+                            <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-center">
+                                <p className="text-sm font-black text-slate-400 flex items-center justify-center gap-1">
+                                    <CheckCircle2 size={14} className="text-emerald-400" /> Al día
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Acciones */}
+                    <div className="grid grid-cols-3 gap-2">
+                        <button
+                            onClick={onDeuda}
+                            className="flex flex-col items-center gap-1.5 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors active:scale-95"
+                        >
+                            <ArrowDownRight size={18} />
+                            <span>+ Deuda</span>
+                        </button>
+                        <button
+                            onClick={onAbono}
+                            className="flex flex-col items-center gap-1.5 py-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors active:scale-95"
+                        >
+                            <ArrowUpRight size={18} />
+                            <span>+ Abono</span>
+                        </button>
+                        {(customer.deuda !== 0 || customer.favor !== 0) && (
+                            <button
+                                onClick={onReset}
+                                className="flex flex-col items-center gap-1.5 py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95"
+                            >
+                                <RefreshCw size={18} />
+                                <span>Poner en 0</span>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Historial */}
+                    <div>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                            <Clock size={12} /> Historial
+                        </h4>
+                        {(!sales || sales.length === 0) ? (
+                            <p className="text-xs text-slate-400 text-center py-6">Sin registros aún</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {sales.slice(0, 10).map(sale => {
+                                    const date = new Date(sale.timestamp);
+                                    const dateStr = date.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                                    const timeStr = date.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
+                                    const isCobro = sale.tipo === 'COBRO_DEUDA';
+                                    const isFiada = sale.tipo === 'VENTA_FIADA';
+                                    return (
+                                        <div key={sale.id} className="flex items-start gap-2.5 py-2 px-2 bg-slate-50 dark:bg-slate-950 rounded-xl">
+                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${isCobro ? 'bg-emerald-100 dark:bg-emerald-900/30' : isFiada ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
+                                                {isCobro ? <ArrowUpRight size={14} className="text-emerald-500" /> : isFiada ? <CreditCard size={14} className="text-amber-500" /> : <ShoppingBag size={14} className="text-blue-500" />}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start">
+                                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                                        {isCobro ? 'Abono de deuda' : isFiada ? 'Venta fiada' : 'Venta'}
+                                                    </p>
+                                                    <span className={`text-xs font-black ${isCobro ? 'text-emerald-500' : isFiada ? 'text-amber-500' : 'text-slate-700 dark:text-white'}`}>
+                                                        {isCobro ? '+' : ''}${formatUsd(sale.totalUsd || 0)}
+                                                    </span>
+                                                </div>
+                                                {sale.items && sale.items.length > 0 && (
+                                                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                                        {sale.items.map(i => i.name).join(', ')}
+                                                    </p>
+                                                )}
+                                                {sale.fiadoUsd > 0 && (
+                                                    <p className="text-[10px] text-amber-500 font-bold mt-0.5">Deuda: ${formatUsd(sale.fiadoUsd)}</p>
+                                                )}
+                                                <p className="text-[9px] text-slate-400 mt-0.5">{dateStr} • {timeStr}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function AddCustomerModal({ onClose, onSave }) {
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
