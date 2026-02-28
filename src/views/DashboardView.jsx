@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, Moon, Sun } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, Moon, Sun, RotateCcw } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
@@ -18,6 +18,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [voidSaleTarget, setVoidSaleTarget] = useState(null);
+    const [isResetTodayOpen, setIsResetTodayOpen] = useState(false);
 
     const bcvRate = rates.bcv?.price || 0;
 
@@ -105,6 +106,15 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             console.error('Error anulando venta:', error);
             showToast('Hubo un problema anulando la venta', 'error');
         }
+    };
+
+    const handleResetToday = async () => {
+        const today = new Date().toISOString().split('T')[0];
+        const remaining = sales.filter(s => !s.timestamp?.startsWith(today));
+        await storageService.setItem(SALES_KEY, remaining);
+        setSales(remaining);
+        setIsResetTodayOpen(false);
+        showToast('Datos del día reiniciados', 'success');
     };
 
     const handleShareWhatsApp = (sale) => {
@@ -270,7 +280,16 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center shadow-inner">
                             <span className="text-emerald-600 dark:text-emerald-400 font-black text-xl">$</span>
                         </div>
-                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-lg tracking-wider">HOY</span>
+                        <div className="flex items-center gap-2 relative z-10">
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-lg tracking-wider">HOY</span>
+                            <button
+                                onClick={() => { triggerHaptic && triggerHaptic(); setIsResetTodayOpen(true); }}
+                                className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                title="Reiniciar día"
+                            >
+                                <RotateCcw size={13} />
+                            </button>
+                        </div>
                     </div>
                     <div className="relative z-10">
                         <div className="flex items-baseline gap-1">
@@ -479,6 +498,15 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 message={`Esta acción:\n• Marcará la venta como ANULADA\n• Devolverá el stock a la bodega\n• Revertirá deudas o saldos a favor\n\nEsta acción no se puede deshacer.`}
                 confirmText="Sí, anular"
                 variant="danger"
+            />
+            <ConfirmModal
+                isOpen={isResetTodayOpen}
+                onClose={() => setIsResetTodayOpen(false)}
+                onConfirm={handleResetToday}
+                title="Reiniciar datos del día"
+                message="¿Borrar todas las ventas de hoy? Esta acción no se puede deshacer."
+                confirmText="Sí, reiniciar"
+                confirmClassName="bg-red-500 hover:bg-red-600 text-white"
             />
         </div>
     );
