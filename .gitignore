@@ -53,3 +53,5 @@ TASASALDIA_MANUAL_TEXTO.md
 "licencia tasas al dia.html"
 .agent/
 CONTEXT.md
+.vercel
+.env*.local
