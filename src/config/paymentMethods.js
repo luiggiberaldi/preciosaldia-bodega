@@ -1,5 +1,5 @@
 import { storageService } from '../utils/storageService';
-import { Banknote, Smartphone, CreditCard, DollarSign } from 'lucide-react';
+import { Banknote, Smartphone, CreditCard, DollarSign, Store, ShoppingCart, Package, Coins, Key, Fingerprint } from 'lucide-react';
 
 const PM_KEY = 'bodega_payment_methods_v1';
 
@@ -26,7 +26,8 @@ export async function getActivePaymentMethods() {
     // Rehidratar: reinyectar el componente Icon según id
     return saved.map(m => ({
         ...m,
-        Icon: PAYMENT_ICONS[m.id] ?? null,
+        // Factory: por id | Custom: por iconKey string
+        Icon: PAYMENT_ICONS[m.id] ?? ICON_COMPONENTS[m.icon] ?? null,
     }));
 }
 
@@ -77,6 +78,12 @@ export const PAYMENT_ICONS = {
     pago_movil: Smartphone,
     punto_venta: CreditCard,
     efectivo_usd: DollarSign,
+};
+
+// Mapa para rehidratar íconos custom por su key string
+export const ICON_COMPONENTS = {
+    Banknote, Smartphone, CreditCard, DollarSign,
+    Store, ShoppingCart, Package, Coins, Key, Fingerprint,
 };
 
 export const getPaymentMethod = (id) => {

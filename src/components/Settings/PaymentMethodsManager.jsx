@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, CreditCard, Banknote, Smartphone, DollarSign, Store, ShoppingCart, Package, Coins, Key, Fingerprint } from 'lucide-react';
-import { getActivePaymentMethods, savePaymentMethods, FACTORY_PAYMENT_METHODS, PAYMENT_ICONS } from '../../config/paymentMethods';
+import { getActivePaymentMethods, savePaymentMethods, FACTORY_PAYMENT_METHODS, PAYMENT_ICONS, ICON_COMPONENTS } from '../../config/paymentMethods';
 import { showToast } from '../Toast';
 
 const ICON_OPTIONS = [
@@ -64,7 +64,7 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
     const renderMethod = (m) => (
         <div key={m.id} className="flex items-center justify-between py-2.5 px-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 mb-2">
             <div className="flex items-center gap-2.5">
-                {(() => { const MIcon = m.Icon || PAYMENT_ICONS[m.id]; return MIcon ? <MIcon size={18} className="text-slate-500" /> : <span className="text-lg">{m.icon}</span>; })()}
+                {(() => { const MIcon = m.Icon || PAYMENT_ICONS[m.id] || ICON_COMPONENTS[m.icon]; return MIcon ? <MIcon size={18} className="text-slate-500" /> : <span className="text-lg">{m.icon}</span>; })()}
                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{m.label}</span>
                 {m.isFactory && (
                     <span className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">Predeterminado</span>
