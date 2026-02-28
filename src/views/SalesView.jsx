@@ -153,6 +153,7 @@ export default function SalesView({ rates, triggerHaptic }) {
                 id: cartId,
                 name: cartName,
                 priceUsd: priceInBcvUsd,
+                costBs: product.costBs || 0,
                 qty: qtyToAdd,
                 isWeight: !!qtyOverride,
                 _originalId: product.id, // Para descontar stock correctamente
