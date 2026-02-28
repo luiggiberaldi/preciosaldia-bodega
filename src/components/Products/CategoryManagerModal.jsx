@@ -24,13 +24,6 @@ export default function CategoryManagerModal({
                     <div className="flex gap-2">
                         <input
                             type="text"
-                            placeholder="Icono (ej. 🍎)"
-                            value={newCategoryIcon}
-                            onChange={(e) => setNewCategoryIcon(e.target.value)}
-                            className="w-16 form-input bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2 py-2 text-center text-lg focus:ring-2 focus:ring-emerald-500/50"
-                        />
-                        <input
-                            type="text"
                             placeholder="Nombre categoría"
                             value={newCategoryName}
                             onChange={(e) => setNewCategoryName(e.target.value)}
@@ -53,9 +46,6 @@ export default function CategoryManagerModal({
                         {categories.map(cat => (
                             <div key={cat.id} className="flex justify-between items-center bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-3 rounded-xl shadow-sm">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-xl shadow-inner">
-                                        {cat.icon}
-                                    </div>
                                     <span className="font-bold text-slate-700 dark:text-slate-200">{cat.label}</span>
                                 </div>
                                 {cat.id !== 'todos' && cat.id !== 'otros' && (
