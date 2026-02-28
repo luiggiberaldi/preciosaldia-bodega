@@ -47,32 +47,18 @@ export async function generateTicketPDF(sale, bcvRate) {
         const img = new Image();
         img.src = '/logo.png';
         await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
-        doc.addImage(img, 'PNG', CX - 7, y, 14, 14);
-        y += 17;
+        const logoW = 50;
+        const logoH = 12; // ~4:1 aspect ratio matching original
+        doc.addImage(img, 'PNG', CX - logoW / 2, y, logoW, logoH);
+        y += logoH + 4;
     } catch (_) { y += 2; }
-
-    // ════════════════════════════════════
-    //  NOMBRE TIENDA
-    // ════════════════════════════════════
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(...INK);
-    doc.text('PRECIOS AL DÍA', CX, y, { align: 'center' });
-    y += 4;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(...MUTED);
-    doc.text('Tu Bodega Inteligente', CX, y, { align: 'center' });
-    y += 3;
-    doc.text('preciosaldia.vercel.app', CX, y, { align: 'center' });
-    y += 5;
 
     dash(y); y += 5;
 
     // ════════════════════════════════════
     //  INFO DEL TICKET (cada dato en su línea)
     // ════════════════════════════════════
-    const ticketId = sale.id.substring(0, 6).toUpperCase();
+    const saleNum = String(sale.saleNumber || 0).padStart(7, '0');
     const d = new Date(sale.timestamp);
     const fecha = d.toLocaleDateString('es-VE');
     const hora = d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
@@ -80,9 +66,9 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(...INK);
-    doc.text('Ticket:', M, y);
+    doc.text('N°:', M, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(`#${ticketId}`, M + 14, y);
+    doc.text(`#${saleNum}`, M + 8, y);
     doc.setFontSize(7);
     doc.setTextColor(...MUTED);
     doc.text(`${fecha}  ${hora}`, RIGHT, y, { align: 'right' });
@@ -237,12 +223,12 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.text('Comprobante digital · Sin valor fiscal', CX, y, { align: 'center' });
 
     // ── DESCARGAR / COMPARTIR ──
-    const filename = 'ticket_' + ticketId + '.pdf';
+    const filename = 'ticket_' + saleNum + '.pdf';
     const blob = doc.output('blob');
     const file = new File([blob], filename, { type: 'application/pdf' });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ title: 'Ticket #' + ticketId, files: [file] })
+        navigator.share({ title: 'Ticket #' + saleNum, files: [file] })
             .catch(() => doc.save(filename));
     } else {
         doc.save(filename);

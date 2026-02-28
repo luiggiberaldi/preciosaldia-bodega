@@ -363,8 +363,11 @@ export default function SalesView({ rates, triggerHaptic }) {
             fiadoUsd: fiadoAmountUsd
         };
 
-        // Save sale
+        // Save sale — generate sequential correlative number
         const existingSales = await storageService.getItem(SALES_KEY, []);
+        const maxNumber = existingSales.reduce((mx, s) => Math.max(mx, s.saleNumber || 0), 0);
+        sale.saleNumber = maxNumber + 1;
+
         await storageService.setItem(SALES_KEY, [sale, ...existingSales]);
 
         // Deduct stock
