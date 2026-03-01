@@ -181,7 +181,7 @@ export default function App() {
         </div>
       )}
 
-      <main className={`flex-1 w-full max-w-md md:max-w-3xl lg:max-w-7xl mx-auto relative pb-24 flex flex-col ${activeTab === 'ventas' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      <main className={`flex-1 w-full max-w-md md:max-w-3xl lg:max-w-7xl mx-auto relative ${isKeyboardOpen ? 'pb-4' : 'pb-24'} flex flex-col ${activeTab === 'ventas' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
 
         {/* Hidden Admin Trigger Area */}
         <div
