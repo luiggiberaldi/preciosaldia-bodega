@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { storageService } from '../utils/storageService';
+import { createClient } from '@supabase/supabase-js';
+
+const APP_VERSION = '1.0.0';
+const PRODUCT_ID = 'bodega';
 
 // FIX 1: Salt desde variable de entorno
 const MASTER_SECRET_KEY = import.meta.env.VITE_LICENSE_SALT;
@@ -75,6 +79,94 @@ export function useSecurity() {
         });
     }, []);
 
+    // Heartbeat silencioso cada 4h + chequeo de revocación
+    useEffect(() => {
+        if (!isPremium || !deviceId) return
+
+        // Función de chequeo rápido de estado
+        const verifyStatus = async () => {
+            try {
+                const supa = createClient(
+                    import.meta.env.VITE_SUPABASE_URL,
+                    import.meta.env.VITE_SUPABASE_ANON_KEY
+                )
+
+                const { data: license } = await supa
+                    .from('licenses')
+                    .select('active')
+                    .eq('device_id', deviceId)
+                    .eq('product_id', PRODUCT_ID)
+                    .single()
+
+                if (license && license.active === false && isPremium) {
+                    // Revocado
+                    localStorage.removeItem('pda_premium_token');
+                    setIsPremium(false);
+                    setIsDemo(false);
+                    setDemoExpiredMsg("Tu licencia ha sido desactivada. Contacta al administrador.");
+                } else if (license && license.active === true && !isPremium) {
+                    // Reactivado remotamente -> Recargar para restaurar
+                    window.location.reload();
+                }
+            } catch (e) { }
+        }
+
+        const sendHeartbeat = async () => {
+            verifyStatus(); // Chequeo constante
+            try {
+                const supa = createClient(
+                    import.meta.env.VITE_SUPABASE_URL,
+                    import.meta.env.VITE_SUPABASE_ANON_KEY
+                )
+                // Actualizar last_seen
+                await supa.from('licenses')
+                    .update({ last_seen_at: new Date().toISOString() })
+                    .eq('device_id', deviceId)
+                    .eq('product_id', PRODUCT_ID)
+
+                // Registrar heartbeat record
+                await supa.from('heartbeats').insert({
+                    device_id: deviceId,
+                    product_id: PRODUCT_ID,
+                    app_version: APP_VERSION,
+                })
+            } catch (e) { }
+        }
+
+        // 1. Ejecutar heartbeat completo al montar y cada 4 horas
+        sendHeartbeat();
+        const heartbeatInterval = setInterval(sendHeartbeat, 4 * 60 * 60 * 1000);
+
+        // 2. Poll de estado cada 1 minuto para revocaciones rápidas
+        const statusInterval = setInterval(verifyStatus, 60 * 1000);
+
+        // 3. Revisar apenas el usuario regrese a la app
+        const handleVisibility = () => { if (document.visibilityState === 'visible') verifyStatus(); };
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        // 4. Supabase Realtime (Si está habilitado en la tabla)
+        const supa = createClient(
+            import.meta.env.VITE_SUPABASE_URL,
+            import.meta.env.VITE_SUPABASE_ANON_KEY
+        )
+        const subscription = supa.channel(`licenses_sync_${deviceId}`)
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'licenses', filter: `device_id=eq.${deviceId}` },
+                (payload) => {
+                    verifyStatus(); // Si hay un cambio, verificar inmediatamente
+                }
+            )
+            .subscribe();
+
+        return () => {
+            clearInterval(heartbeatInterval);
+            clearInterval(statusInterval);
+            document.removeEventListener('visibilitychange', handleVisibility);
+            supa.removeChannel(subscription);
+        }
+    }, [isPremium, deviceId])
+
     // Countdown timer para demo
     useEffect(() => {
         if (!isDemo || !demoExpires) return;
@@ -88,7 +180,7 @@ export function useSecurity() {
                 setIsPremium(false);
                 setIsDemo(false);
                 setDemoTimeLeft('');
-                setDemoExpiredMsg("Tu prueba gratuita de 3 días ha finalizado. Esperamos que hayas disfrutado la experiencia completa.");
+                setDemoExpiredMsg("Tu licencia temporal ha finalizado. Esperamos que hayas disfrutado la experiencia completa.");
             } else {
                 updateTimeLeft(demoExpires);
             }
@@ -137,6 +229,8 @@ export function useSecurity() {
                 } catch {
                     isValid = token === validCode;
                 }
+
+                // Si el token local ya venció o fue alterado
                 if (!isValid && isPremium) {
                     localStorage.removeItem('pda_premium_token');
                     setIsPremium(false);
@@ -175,6 +269,45 @@ export function useSecurity() {
         const storedToken = rawStored ? decodeToken(rawStored) : null;
 
         if (!storedToken) {
+            // Fallback: verificar si existe licencia activa en Supabase (ej: reactivada remotamente)
+            try {
+                const supa = createClient(
+                    import.meta.env.VITE_SUPABASE_URL,
+                    import.meta.env.VITE_SUPABASE_ANON_KEY
+                );
+                const { data: remoteLicense } = await supa
+                    .from('licenses')
+                    .select('type, active, expires_at')
+                    .eq('device_id', currentDeviceId)
+                    .eq('product_id', PRODUCT_ID)
+                    .single();
+
+                if (remoteLicense && remoteLicense.active === true) {
+                    const validCode = await generateActivationCode(currentDeviceId);
+                    const isTimeLimited = (remoteLicense.type === 'demo7' || remoteLicense.type === 'demo30');
+                    const expiresAt = remoteLicense.expires_at ? new Date(remoteLicense.expires_at).getTime() : null;
+
+                    if (isTimeLimited && expiresAt) {
+                        if (Date.now() < expiresAt) {
+                            const token = { code: validCode, expires: expiresAt, isDemo: true };
+                            localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
+                            setIsPremium(true);
+                            setIsDemo(true);
+                            setDemoExpires(expiresAt);
+                        }
+                    } else {
+                        // Permanente — restaurar token ofuscado
+                        localStorage.setItem('pda_premium_token', encodeToken(validCode));
+                        setIsPremium(true);
+                        setIsDemo(false);
+                    }
+                    setLoading(false);
+                    return;
+                }
+            } catch (e) {
+                // Sin red — no se puede restaurar
+            }
+
             setIsPremium(false);
             setLoading(false);
             return;
@@ -182,6 +315,8 @@ export function useSecurity() {
 
         const validTokenStr = await generateActivationCode(currentDeviceId);
         let isPremiumConfirmed = false;
+        let confirmedDemo = false;
+        let confirmedExpires = null;
 
         try {
             const tokenObj = JSON.parse(storedToken);
@@ -192,12 +327,14 @@ export function useSecurity() {
                         setIsDemo(true);
                         setDemoExpires(tokenObj.expires);
                         isPremiumConfirmed = true;
+                        confirmedDemo = true;
+                        confirmedExpires = tokenObj.expires;
                     } else {
                         console.warn("Demo Expirada");
                         localStorage.removeItem('pda_premium_token');
                         setIsPremium(false);
                         setIsDemo(false);
-                        setDemoExpiredMsg("Tu prueba gratuita de 3 días ha finalizado. Esperamos que hayas disfrutado la experiencia completa.");
+                        setDemoExpiredMsg("Tu licencia temporal ha finalizado. Esperamos que hayas disfrutado la experiencia completa.");
                     }
                 } else {
                     setIsPremium(false);
@@ -211,6 +348,7 @@ export function useSecurity() {
                 setIsPremium(true);
                 setIsDemo(false);
                 isPremiumConfirmed = true;
+                confirmedDemo = false;
             } else {
                 setIsPremium(false);
             }
@@ -226,6 +364,51 @@ export function useSecurity() {
             } catch { }
         }
 
+        // Migración silenciosa de licencias pre-Supabase
+        if (isPremiumConfirmed) {
+            const migrateToSupabase = async () => {
+                try {
+                    const supa = createClient(
+                        import.meta.env.VITE_SUPABASE_URL,
+                        import.meta.env.VITE_SUPABASE_ANON_KEY
+                    )
+
+                    // Verificar si ya existe en Supabase
+                    const { data: existing } = await supa
+                        .from('licenses')
+                        .select('id')
+                        .eq('device_id', currentDeviceId)
+                        .eq('product_id', PRODUCT_ID)
+                        .single()
+
+                    // Si NO existe, registrarla ahora
+                    if (!existing) {
+                        await supa.from('licenses').insert({
+                            device_id: currentDeviceId,
+                            product_id: PRODUCT_ID,
+                            type: confirmedDemo ? 'demo3' : 'permanent',
+                            active: true,
+                            expires_at: confirmedExpires
+                                ? new Date(confirmedExpires).toISOString()
+                                : null,
+                            code: 'MIGRADA-PRESUPABASE',
+                            last_seen_at: new Date().toISOString(),
+                        })
+                    } else {
+                        // Si ya existe, solo actualizar last_seen
+                        await supa.from('licenses')
+                            .update({ last_seen_at: new Date().toISOString() })
+                            .eq('device_id', currentDeviceId)
+                            .eq('product_id', PRODUCT_ID)
+                    }
+                } catch (e) {
+                    // Silencioso — nunca afecta la app
+                }
+            }
+
+            migrateToSupabase()  // llamar sin await para no bloquear
+        }
+
         setLoading(false);
     };
 
@@ -234,13 +417,39 @@ export function useSecurity() {
      * Solo puede usarse UNA VEZ por dispositivo.
      */
     const activateDemo = async () => {
-        // FIX 3: Verificar demo en IndexedDB
+        // FIX 3: Verificar demo en IndexedDB (local)
         const demoRecord = await storageService.getItem('pda_demo_flag_v1', null);
         if (demoRecord?.used) {
             return { success: false, status: 'DEMO_USED' };
         }
 
         const currentDeviceId = deviceId || localStorage.getItem('pda_device_id');
+
+        // Verificar en servidor (por si borraron IndexedDB)
+        try {
+            const supa = createClient(
+                import.meta.env.VITE_SUPABASE_URL,
+                import.meta.env.VITE_SUPABASE_ANON_KEY
+            );
+            const { data: existingDemo } = await supa
+                .from('demos')
+                .select('id')
+                .eq('device_id', currentDeviceId)
+                .eq('product_id', PRODUCT_ID)
+                .maybeSingle();
+
+            if (existingDemo) {
+                await storageService.setItem('pda_demo_flag_v1', {
+                    used: true,
+                    ts: Date.now(),
+                    deviceId: currentDeviceId,
+                });
+                return { success: false, status: 'DEMO_USED' };
+            }
+        } catch (e) {
+            // Sin red → solo validar local
+        }
+
         const validCode = await generateActivationCode(currentDeviceId);
         const expires = Date.now() + DEMO_DURATION_MS;
         const demoToken = {
@@ -264,22 +473,75 @@ export function useSecurity() {
         setDemoExpires(expires);
         setDemoUsed(true);
 
+        // Reportar demo a Supabase (silencioso)
+        try {
+            const supa = createClient(
+                import.meta.env.VITE_SUPABASE_URL,
+                import.meta.env.VITE_SUPABASE_ANON_KEY
+            )
+            const expiresAt = new Date(expires).toISOString()
+
+            await supa.from('demos').upsert({
+                device_id: currentDeviceId,
+                product_id: PRODUCT_ID,
+                expires_at: expiresAt,
+                app_version: APP_VERSION,
+            }, { onConflict: 'device_id,product_id' })
+        } catch (e) {
+            // Nunca bloquear si falla la red
+        }
+
         return { success: true, status: 'DEMO_ACTIVATED' };
     };
 
     /**
-     * Desbloquea con código de activación (licencia permanente).
+     * Desbloquea con código de activación.
+     * Consulta Supabase para determinar si es permanente o temporal (7/30 días).
      */
     const unlockApp = async (inputCode) => {
         const validCode = await generateActivationCode(deviceId);
-        if (inputCode.trim().toUpperCase() === validCode) {
-            // FIX 2: Guardar token ofuscado
-            localStorage.setItem('pda_premium_token', encodeToken(validCode));
+        if (inputCode.trim().toUpperCase() !== validCode) {
+            return { success: false, status: 'INVALID_CODE' };
+        }
+
+        // Consultar Supabase para obtener tipo y expiración
+        let licenseType = 'permanent';
+        let expiresAt = null;
+        try {
+            const supa = createClient(
+                import.meta.env.VITE_SUPABASE_URL,
+                import.meta.env.VITE_SUPABASE_ANON_KEY
+            );
+            const { data } = await supa
+                .from('licenses')
+                .select('type, expires_at')
+                .eq('device_id', deviceId)
+                .eq('product_id', PRODUCT_ID)
+                .single();
+
+            if (data?.type) licenseType = data.type;
+            if (data?.expires_at) expiresAt = new Date(data.expires_at).getTime();
+        } catch (e) {
+            // Sin red → tratar como permanente (fallback seguro)
+        }
+
+        const isTimeLimited = (licenseType === 'demo7' || licenseType === 'demo30');
+
+        if (isTimeLimited && expiresAt) {
+            // Guardar como JSON con expiración (mismo formato que demo)
+            const token = { code: validCode, expires: expiresAt, isDemo: true };
+            localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
             setIsPremium(true);
-            setIsDemo(false);
+            setIsDemo(true);
+            setDemoExpires(expiresAt);
             return { success: true, status: 'PREMIUM_ACTIVATED' };
         }
-        return { success: false, status: 'INVALID_CODE' };
+
+        // Permanente
+        localStorage.setItem('pda_premium_token', encodeToken(validCode));
+        setIsPremium(true);
+        setIsDemo(false);
+        return { success: true, status: 'PREMIUM_ACTIVATED' };
     };
 
     /**

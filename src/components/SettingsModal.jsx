@@ -1,13 +1,17 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Download, AlertTriangle, Check, X, Database, Share2 } from 'lucide-react';
+import { Upload, Download, AlertTriangle, Check, X, Database, Share2, Fingerprint, Copy } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import PaymentMethodsManager from './Settings/PaymentMethodsManager';
+
+import { useSecurity } from '../hooks/useSecurity';
 
 export default function SettingsModal({ isOpen, onClose, products, onImport, triggerHaptic }) {
     const [importStatus, setImportStatus] = useState(null);
     const [statusMessage, setStatusMessage] = useState('');
     const fileInputRef = useRef(null);
+    const { deviceId } = useSecurity();
+    const [idCopied, setIdCopied] = useState(false);
 
     if (!isOpen) return null;
 
@@ -187,6 +191,28 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                             {statusMessage}
                         </div>
                     )}
+
+                    {/* Device ID para soporte */}
+                    <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl">
+                        <p className="text-[9px] uppercase tracking-wider font-bold text-slate-400 mb-1 flex items-center gap-1">
+                            <Fingerprint size={10} /> ID de Instalación
+                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="font-mono text-xs font-black text-slate-600 dark:text-slate-300 select-all">{deviceId || '...'}</p>
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(deviceId).then(() => {
+                                        setIdCopied(true);
+                                        setTimeout(() => setIdCopied(false), 2000);
+                                    });
+                                }}
+                                className="text-slate-400 hover:text-teal-500 transition-colors p-1 rounded"
+                            >
+                                {idCopied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                            </button>
+                        </div>
+                        <p className="text-[8px] text-slate-400 mt-1">Comparte este ID si necesitas soporte técnico.</p>
+                    </div>
 
                     {/* Divider */}
                     <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
