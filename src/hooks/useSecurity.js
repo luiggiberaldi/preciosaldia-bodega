@@ -418,7 +418,7 @@ export function useSecurity() {
                         .select('id')
                         .eq('device_id', currentDeviceId)
                         .eq('product_id', PRODUCT_ID)
-                        .single()
+                        .maybeSingle()
 
                     // Si NO existe, registrarla ahora
                     if (!existing) {
@@ -556,7 +556,7 @@ export function useSecurity() {
                 .select('type, expires_at')
                 .eq('device_id', deviceId)
                 .eq('product_id', PRODUCT_ID)
-                .single();
+                .maybeSingle();
 
             if (data?.type) licenseType = data.type;
             if (data?.expires_at) expiresAt = new Date(data.expires_at).getTime();
