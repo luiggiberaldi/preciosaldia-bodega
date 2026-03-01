@@ -452,7 +452,7 @@ export function useSecurity() {
     };
 
     /**
-     * Activa la demo de 3 días sin necesidad de código.
+     * Activa la demo de 7 días sin necesidad de código.
      * Solo puede usarse UNA VEZ por dispositivo.
      */
     const activateDemo = async () => {
