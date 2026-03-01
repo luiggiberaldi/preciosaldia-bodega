@@ -61,17 +61,53 @@ export function useSecurity() {
     }, []);
 
     useEffect(() => {
-        // 1. Obtener o Generar Device ID
-        let storedId = localStorage.getItem('pda_device_id');
-        if (!storedId) {
-            const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-            storedId = `PDA-${randomPart}`;
-            localStorage.setItem('pda_device_id', storedId);
-        }
-        setDeviceId(storedId);
+        // 1. Obtener o Generar Device ID a través de fingerprinting
+        const generateFingerprint = async () => {
+            const nav = window.navigator;
+            const screen = window.screen;
 
-        // 2. Verificar Licencia
-        checkLicense(storedId);
+            const components = [
+                nav.userAgent,
+                nav.language,
+                nav.hardwareConcurrency || 1,
+                nav.deviceMemory || 1,
+                screen.width,
+                screen.height,
+                screen.colorDepth,
+                new Date().getTimezoneOffset()
+            ].join('|');
+
+            if (!window.crypto || !window.crypto.subtle) {
+                // Fallback (solo en http sin SSL)
+                let hash = 0;
+                for (let i = 0; i < components.length; i++) {
+                    hash = ((hash << 5) - hash) + components.charCodeAt(i);
+                    hash |= 0;
+                }
+                const hex = Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
+                return `PDA-${hex}`;
+            }
+
+            // Mismo hardware = mismo hash SHA-256
+            const encoder = new TextEncoder();
+            const data = encoder.encode(components);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase().substring(0, 8);
+            return `PDA-${hex}`;
+        };
+
+        const initDeviceId = async () => {
+            let storedId = localStorage.getItem('pda_device_id');
+            if (!storedId) {
+                storedId = await generateFingerprint();
+                localStorage.setItem('pda_device_id', storedId);
+            }
+            setDeviceId(storedId);
+            checkLicense(storedId);
+        };
+
+        initDeviceId();
 
         // FIX 3: Leer demo flag desde IndexedDB
         storageService.getItem('pda_demo_flag_v1', null).then(r => {
@@ -96,7 +132,7 @@ export function useSecurity() {
                     .select('active')
                     .eq('device_id', deviceId)
                     .eq('product_id', PRODUCT_ID)
-                    .single()
+                    .maybeSingle()
 
                 if (license && license.active === false && isPremium) {
                     // Revocado
