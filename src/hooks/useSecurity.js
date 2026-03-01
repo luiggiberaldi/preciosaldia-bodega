@@ -7,7 +7,7 @@ const PRODUCT_ID = 'bodega';
 
 // FIX 1: Salt desde variable de entorno
 const MASTER_SECRET_KEY = import.meta.env.VITE_LICENSE_SALT;
-const DEMO_DURATION_MS = 72 * 60 * 60 * 1000; // 72 horas (3 días)
+const DEMO_DURATION_MS = 168 * 60 * 60 * 1000; // 168 horas (7 días)
 
 // FIX 2: Ofuscación XOR + btoa para tokens en localStorage
 const XOR_KEY = 'PDA_SEC_2026';
@@ -323,7 +323,7 @@ export function useSecurity() {
 
                 if (remoteLicense && remoteLicense.active === true) {
                     const validCode = await generateActivationCode(currentDeviceId);
-                    const isTimeLimited = (remoteLicense.type === 'demo7' || remoteLicense.type === 'demo30');
+                    const isTimeLimited = (remoteLicense.type === 'demo7');
                     const expiresAt = remoteLicense.expires_at ? new Date(remoteLicense.expires_at).getTime() : null;
 
                     if (isTimeLimited && expiresAt) {
@@ -425,7 +425,7 @@ export function useSecurity() {
                         await supa.from('licenses').insert({
                             device_id: currentDeviceId,
                             product_id: PRODUCT_ID,
-                            type: confirmedDemo ? 'demo3' : 'permanent',
+                            type: confirmedDemo ? 'demo7' : 'permanent',
                             active: true,
                             expires_at: confirmedExpires
                                 ? new Date(confirmedExpires).toISOString()
@@ -564,7 +564,7 @@ export function useSecurity() {
             // Sin red → tratar como permanente (fallback seguro)
         }
 
-        const isTimeLimited = (licenseType === 'demo7' || licenseType === 'demo30');
+        const isTimeLimited = (licenseType === 'demo7');
 
         if (isTimeLimited && expiresAt) {
             // Guardar como JSON con expiración (mismo formato que demo)
