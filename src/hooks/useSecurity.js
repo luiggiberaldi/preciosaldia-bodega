@@ -81,7 +81,7 @@ export function useSecurity() {
 
     // Heartbeat silencioso cada 4h + chequeo de revocación
     useEffect(() => {
-        if (!isPremium || !deviceId) return
+        if (!isPremium || !deviceId || !import.meta.env.VITE_SUPABASE_URL) return
 
         // Función de chequeo rápido de estado
         const verifyStatus = async () => {
@@ -145,25 +145,28 @@ export function useSecurity() {
         document.addEventListener('visibilitychange', handleVisibility);
 
         // 4. Supabase Realtime (Si está habilitado en la tabla)
-        const supa = createClient(
-            import.meta.env.VITE_SUPABASE_URL,
-            import.meta.env.VITE_SUPABASE_ANON_KEY
-        )
-        const subscription = supa.channel(`licenses_sync_${deviceId}`)
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'licenses', filter: `device_id=eq.${deviceId}` },
-                (payload) => {
-                    verifyStatus(); // Si hay un cambio, verificar inmediatamente
-                }
+        let subscription = null;
+        try {
+            const supa = createClient(
+                import.meta.env.VITE_SUPABASE_URL,
+                import.meta.env.VITE_SUPABASE_ANON_KEY
             )
-            .subscribe();
+            subscription = supa.channel(`licenses_sync_${deviceId}`)
+                .on(
+                    'postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'licenses', filter: `device_id=eq.${deviceId}` },
+                    (payload) => {
+                        verifyStatus(); // Si hay un cambio, verificar inmediatamente
+                    }
+                )
+                .subscribe();
+        } catch (e) { }
 
         return () => {
             clearInterval(heartbeatInterval);
             clearInterval(statusInterval);
             document.removeEventListener('visibilitychange', handleVisibility);
-            supa.removeChannel(subscription);
+            if (subscription) subscription.unsubscribe();
         }
     }, [isPremium, deviceId])
 
