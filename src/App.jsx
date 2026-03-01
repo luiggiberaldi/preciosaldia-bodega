@@ -133,12 +133,13 @@ export default function App() {
       {/* Tutorial Onboarding (First Use, after Terms) */}
       <OnboardingOverlay isPremium={isPremium} />
 
-      {/* Demo Banner (discreto — bottom-left, above nav) */}
+      {/* Demo Banner (discreto — bottom, above nav) */}
       {isDemo && demoTimeLeft && (
-        <div className="fixed bottom-20 left-3 z-[100]">
-          <div className="px-2.5 py-1 bg-amber-500/90 backdrop-blur-sm rounded-full shadow-lg shadow-amber-500/20">
-            <p className="text-[10px] font-bold text-slate-900">
-              ⏱ {demoTimeLeft}
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 fade-in duration-500 pointer-events-none">
+          <div className="px-3 py-1.5 bg-slate-900/90 dark:bg-white/10 backdrop-blur-md rounded-full border border-white/10 shadow-xl flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+            <p className="text-[10px] font-semibold text-white tracking-wide">
+              Licencia: <span className="text-amber-400 font-bold">{demoTimeLeft}</span>
             </p>
           </div>
         </div>
