@@ -1,14 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { Search, X, Package, RefreshCw, Mic, Box, ShoppingCart } from 'lucide-react';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getActivePaymentMethods } from '../config/paymentMethods';
 import { BODEGA_CATEGORIES, CATEGORY_ICONS, CATEGORY_COLORS } from '../config/categories';
-import ReceiptModal from '../components/Sales/ReceiptModal';
-import CheckoutModal from '../components/Sales/CheckoutModal';
-import ConfirmModal from '../components/ConfirmModal';
-import CartPanel from '../components/Sales/CartPanel';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 
 const SALES_KEY = 'bodega_sales_v1';
@@ -32,9 +27,14 @@ export default function SalesView({ rates, triggerHaptic }) {
     const searchInputRef = useRef(null);
     const [selectedIndex, setSelectedIndex] = useState(0);
 
+    const handleSetSearchTerm = (text) => {
+        setSearchTerm(text);
+        setSelectedIndex(0);
+    };
+
     // Audio / Voice Search (Groq Whisper)
     const { isRecording, isProcessingAudio, toggleRecording } = useVoiceSearch({
-        onResult: (text) => { setSearchTerm(text); searchInputRef.current?.focus(); },
+        onResult: (text) => { handleSetSearchTerm(text); searchInputRef.current?.focus(); },
         triggerHaptic,
     });
 
@@ -94,10 +94,7 @@ export default function SalesView({ rates, triggerHaptic }) {
         return () => window.removeEventListener('focus', handleFocus);
     }, []);
 
-    // Reseteamos index cuando cambia la busqueda
-    useEffect(() => {
-        setSelectedIndex(0);
-    }, [searchTerm]);
+
 
     // Search results (permite buscar por código de barra también)
     const searchResults = searchTerm.length >= 1
@@ -163,10 +160,10 @@ export default function SalesView({ rates, triggerHaptic }) {
                 _unitsPerPackage: product.unitsPerPackage || 1,
             }];
         });
-        setSearchTerm('');
+        handleSetSearchTerm('');
         setHierarchyPending(null);
         searchInputRef.current?.focus();
-    }, [triggerHaptic, rates, effectiveRate]);
+    }, [triggerHaptic, effectiveRate]);
 
     // Eventos del Input para teclado interactivo y Escáner
     const handleSearchKeyDown = (e) => {
@@ -189,7 +186,7 @@ export default function SalesView({ rates, triggerHaptic }) {
                 const p = products.find(p => p.id === pluCode || p.barcode?.includes(pluCode) || p.barcode?.includes(searchTerm.substring(0, 7)));
                 if (p) {
                     addToCart({ ...p, isWeight: true }, weightKg);
-                    setSearchTerm('');
+                    handleSetSearchTerm('');
                     return;
                 }
             }
@@ -237,19 +234,24 @@ export default function SalesView({ rates, triggerHaptic }) {
                 if (cart.length > 0 && !showCheckout && !showReceipt) setShowCheckout(true);
             }
             if (e.key === 'Escape') {
-                if (showCheckout) setShowCheckout(false);
-                if (showReceipt) setShowReceipt(null);
+                if (showCheckout) {
+                    setShowCheckout(false);
+                    setSelectedCustomerId('');
+                }
+                if (showReceipt) {
+                    setShowReceipt(null);
+                    setSelectedCustomerId('');
+                }
             }
         };
         window.addEventListener('keydown', handleGlobalKeyMap);
         return () => window.removeEventListener('keydown', handleGlobalKeyMap);
     }, [cart, showCheckout, showReceipt]);
 
-    // Al cerrar checkout/receipt, limpiar y devolver foco
+    // Al cerrar checkout/receipt, devolver foco
     useEffect(() => {
         if (!showCheckout && !showReceipt && searchInputRef.current) {
             searchInputRef.current.focus();
-            setSelectedCustomerId('');
         }
     }, [showCheckout, showReceipt]);
 
@@ -336,6 +338,7 @@ export default function SalesView({ rates, triggerHaptic }) {
         setShowReceipt(sale);
         setCart([]);
         setShowCheckout(false);
+        setSelectedCustomerId('');
     };
 
     // Crear cliente inline desde checkout
@@ -427,15 +430,14 @@ export default function SalesView({ rates, triggerHaptic }) {
                         ref={searchInputRef}
                         type="text"
                         value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
+                        onChange={e => handleSetSearchTerm(e.target.value)}
                         onKeyDown={handleSearchKeyDown}
                         placeholder="Buscar producto..."
                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl sm:rounded-2xl py-3 pl-10 sm:pl-12 pr-14 sm:pr-20 text-slate-800 dark:text-white font-medium outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-inner text-sm sm:text-base transition-all" />
 
-                    {/* Botones al lado derecho del input */}
                     <div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 flex items-center pr-1 gap-0.5">
                         {searchTerm && (
-                            <button onClick={() => { setSearchTerm(''); searchInputRef.current?.focus(); }} className="text-slate-400 hover:text-slate-600 p-1.5 transition-colors">
+                            <button onClick={() => { handleSetSearchTerm(''); searchInputRef.current?.focus(); }} className="text-slate-400 hover:text-slate-600 p-1.5 transition-colors">
                                 <X size={18} />
                             </button>
                         )}
@@ -624,7 +626,10 @@ export default function SalesView({ rates, triggerHaptic }) {
             {/* ZONA DE COBRO */}
             {showCheckout && (
                 <CheckoutModal
-                    onClose={() => setShowCheckout(false)}
+                    onClose={() => {
+                        setShowCheckout(false);
+                        setSelectedCustomerId('');
+                    }}
                     cartTotalUsd={cartTotalUsd}
                     cartTotalBs={cartTotalBs}
                     effectiveRate={effectiveRate}

@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { Users, Search, Plus, CreditCard, ArrowDownRight, ArrowUpRight, User, Phone, X, Save, RefreshCw, Clock, ChevronDown, CheckCircle2, ShoppingBag, Pencil, Trash2 } from 'lucide-react';
 import { formatBs, formatUsd } from '../utils/calculatorUtils';
 import { procesarImpactoCliente } from '../utils/financialLogic';
 import { DEFAULT_PAYMENT_METHODS } from '../config/paymentMethods';
-import ConfirmModal from '../components/ConfirmModal';
 
 export default function CustomersView({ triggerHaptic }) {
     const [customers, setCustomers] = useState([]);
@@ -30,14 +28,15 @@ export default function CustomersView({ triggerHaptic }) {
         storageService.getItem('bcv_rate_v1', 0).then(r => setBcvRate(r || 0));
     }, []);
 
-    useEffect(() => {
-        loadCustomers();
-    }, []);
-
     const loadCustomers = async () => {
         const saved = await storageService.getItem('my_customers_v1', []);
         setCustomers(saved);
     };
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        loadCustomers();
+    }, []);
 
     const saveCustomers = async (updatedCustomers) => {
         setCustomers(updatedCustomers);

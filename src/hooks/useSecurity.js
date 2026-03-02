@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { storageService } from '../utils/storageService';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../core/supabaseClient';
 
 const APP_VERSION = '1.0.0';
 const PRODUCT_ID = 'bodega';
@@ -35,17 +35,6 @@ const decodeToken = (encoded) => {
 };
 
 
-let supabaseClient = null;
-function getSupa() {
-    if (!supabaseClient && import.meta.env.VITE_SUPABASE_URL) {
-        supabaseClient = createClient(
-            import.meta.env.VITE_SUPABASE_URL,
-            import.meta.env.VITE_SUPABASE_ANON_KEY
-        );
-    }
-    if (!supabaseClient) throw new Error("No supabase");
-    return supabaseClient;
-}
 
 export function useSecurity() {
     const [deviceId, setDeviceId] = useState('');
@@ -135,14 +124,12 @@ export function useSecurity() {
         // Función de chequeo rápido de estado
         const verifyStatus = async () => {
             try {
-                const supa = getSupa();
-
-                const { data: license } = await supa
+                const { data: license, error } = await supabase
                     .from('licenses')
-                    .select('active, type')
+                    .select('type, active, expires_at, special_features, updated_at')
                     .eq('device_id', deviceId)
                     .eq('product_id', PRODUCT_ID)
-                    .maybeSingle()
+                    .maybeSingle();
 
                 if (license && license.active === false && isPremium) {
                     // Revocado
@@ -179,15 +166,14 @@ export function useSecurity() {
         const sendHeartbeat = async () => {
             verifyStatus(); // Chequeo constante
             try {
-                const supa = getSupa();
                 // Actualizar last_seen
-                await supa.from('licenses')
+                await supabase.from('licenses')
                     .update({ last_seen_at: new Date().toISOString() })
                     .eq('device_id', deviceId)
                     .eq('product_id', PRODUCT_ID)
 
                 // Registrar heartbeat record
-                await supa.from('heartbeats').insert({
+                await supabase.from('heartbeats').insert({
                     device_id: deviceId,
                     product_id: PRODUCT_ID,
                     app_version: APP_VERSION,
@@ -209,8 +195,7 @@ export function useSecurity() {
         // 4. Supabase Realtime (Si está habilitado en la tabla)
         let subscription = null;
         try {
-            const supa = getSupa();
-            subscription = supa.channel(`licenses_sync_${deviceId}`)
+            subscription = supabase.channel(`licenses_sync_${deviceId}`)
                 .on(
                     'postgres_changes',
                     { event: 'UPDATE', schema: 'public', table: 'licenses', filter: `device_id=eq.${deviceId}` },
@@ -333,8 +318,7 @@ export function useSecurity() {
         if (!storedToken) {
             // Fallback: verificar si existe licencia activa en Supabase (ej: reactivada remotamente)
             try {
-                const supa = getSupa();
-                const { data: remoteLicense } = await supa
+                const { data: remoteLicense, error } = await supabase
                     .from('licenses')
                     .select('type, active, expires_at')
                     .eq('device_id', currentDeviceId)
@@ -427,10 +411,8 @@ export function useSecurity() {
         if (isPremiumConfirmed) {
             const migrateToSupabase = async () => {
                 try {
-                    const supa = getSupa();
-
                     // Verificar si ya existe en Supabase
-                    const { data: existing } = await supa
+                    const { data: existing } = await supabase
                         .from('licenses')
                         .select('id')
                         .eq('device_id', currentDeviceId)
@@ -439,7 +421,7 @@ export function useSecurity() {
 
                     // Si NO existe, registrarla ahora
                     if (!existing) {
-                        await supa.from('licenses').insert({
+                        await supabase.from('licenses').insert({
                             device_id: currentDeviceId,
                             product_id: PRODUCT_ID,
                             type: confirmedDemo ? 'demo7' : 'permanent',
@@ -452,7 +434,7 @@ export function useSecurity() {
                         })
                     } else {
                         // Si ya existe, solo actualizar last_seen
-                        await supa.from('licenses')
+                        await supabase.from('licenses')
                             .update({ last_seen_at: new Date().toISOString() })
                             .eq('device_id', currentDeviceId)
                             .eq('product_id', PRODUCT_ID)
@@ -483,9 +465,8 @@ export function useSecurity() {
 
         // Verificar en servidor (por si borraron IndexedDB)
         try {
-            const supa = getSupa();
-            const { data: existingDemo } = await supa
-                .from('demos')
+            const { data: existingDemo } = await supabase
+                .from('licenses')
                 .select('id')
                 .eq('device_id', currentDeviceId)
                 .eq('product_id', PRODUCT_ID)
@@ -528,10 +509,9 @@ export function useSecurity() {
 
         // Reportar demo a Supabase (silencioso)
         try {
-            const supa = getSupa();
             const expiresAt = new Date(expires).toISOString()
 
-            await supa.from('demos').upsert({
+            await supabase.from('demos').upsert({
                 device_id: currentDeviceId,
                 product_id: PRODUCT_ID,
                 expires_at: expiresAt,
@@ -559,8 +539,7 @@ export function useSecurity() {
         let expiresAt = null;
         let lastSeenAt = null;
         try {
-            const supa = getSupa();
-            const { data } = await supa
+            const { data } = await supabase
                 .from('licenses')
                 .select('type, expires_at, last_seen_at')
                 .eq('device_id', deviceId)
