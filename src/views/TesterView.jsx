@@ -12,10 +12,12 @@ import {
 } from 'lucide-react';
 
 const SUITE_ICONS = {
+    dash_validations: '📊', chaos_data: '🌪️', extreme_stress: '🌋', quota_mock: '🔌',
+    currency_svc: '🧳', rate_svc: '📊', financial: '💰', utils_extra: '🛠️', pay_methods: '💳', msg_service: '💬',
     storage: '💾', productos: '📦', carrito: '🛒', bimoneda: '💱',
     checkout: '🧾', clientes: '👥', payments: '💳', modules: '🧩',
     '7days': '🗓️', vuelto: '💸', pagos_mix: '🔀', integridad: '🛡️',
-    lotes: '📦', cli_edge: '📱', stress: '🔥'
+    lotes: '📦', cli_edge: '📱', stress_catalogo: '⚡', ventas_ganancias: '📈', catalogo_tasas: '💱'
 };
 
 export const TesterView = ({ onBack }) => {
@@ -35,19 +37,20 @@ export const TesterView = ({ onBack }) => {
         }
     }, [logs]);
 
-    const handleRunAll = useCallback(async () => {
+    const handleRunAll = useCallback(async (fastMode = true) => {
         setIsRunning(true);
         setLogs([]);
         setSummary(null);
         setCopied(false);
         try {
             await SystemTester.runAll({
+                fastMode,
                 onLog: (entry) => setLogs(prev => [...prev, entry]),
                 onProgress: (p) => setProgress(p),
                 onComplete: (s) => { setSummary(s); setProgress(null); }
             });
         } catch (err) {
-            setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg: `💥 Error fatal: ${err.message}`, type: 'fail' }]);
+            setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg: `💥 Error fatal: ${err.message}`, type: 'error' }]);
         }
         setIsRunning(false);
     }, []);
@@ -63,7 +66,7 @@ export const TesterView = ({ onBack }) => {
             });
             setSummary(result);
         } catch (err) {
-            setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg: `💥 ${err.message}`, type: 'fail' }]);
+            setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg: `💥 ${err.message}`, type: 'error' }]);
         }
         setIsRunning(false);
     }, []);
@@ -86,15 +89,19 @@ export const TesterView = ({ onBack }) => {
         text += '── LOG COMPLETO ──\n';
         text += logs.map(l => `[${l.time}] ${l.msg}`).join('\n');
 
-        if (summary) {
-            text += '\n\n── RESUMEN ──\n';
-            text += `Total: ${summary.total} | Pass: ${summary.passed} | Fail: ${summary.failed} | Tiempo: ${summary.elapsed}s\n`;
-            text += `Pass Rate: ${((summary.passed / Math.max(summary.total, 1)) * 100).toFixed(0)}%\n`;
+        if (summary && summary.suites) {
+            const passed = summary.suites.filter(s => s.status === 'passed').length;
+            const failed = summary.suites.filter(s => s.status === 'failed').length;
+            const elapsed = summary.startedAt && summary.finishedAt ? ((summary.finishedAt - summary.startedAt) / 1000).toFixed(1) : 0;
 
-            if (summary.results?.length) {
+            text += '\n\n── RESUMEN ──\n';
+            text += `Total: ${summary.suites.length} | Pass: ${passed} | Fail: ${failed} | Tiempo: ${elapsed}s\n`;
+            text += `Pass Rate: ${((passed / Math.max(summary.suites.length, 1)) * 100).toFixed(0)}%\n`;
+
+            if (summary.suites?.length) {
                 text += '\n── DETALLE ──\n';
-                summary.results.forEach(r => {
-                    text += `${r.passed ? '✅' : '❌'} [${r.suite}] ${r.test}${!r.passed && r.detail ? ` — ${r.detail}` : ''}\n`;
+                summary.suites.forEach(r => {
+                    text += `${r.status === 'passed' ? '✅' : '❌'} [${r.id}] ${r.name}${r.error ? ` — ${r.error}` : ''}\n`;
                 });
             }
 
@@ -120,8 +127,8 @@ export const TesterView = ({ onBack }) => {
     const suites = SystemTester.getSuites();
 
     const logColors = {
-        pass: 'text-emerald-400',
-        fail: 'text-rose-400',
+        success: 'text-emerald-400',
+        error: 'text-rose-400',
         warn: 'text-amber-400',
         info: 'text-slate-400',
         section: 'text-indigo-400 font-bold',
@@ -129,7 +136,12 @@ export const TesterView = ({ onBack }) => {
         day: 'text-violet-400 font-bold',
     };
 
-    const passRate = summary ? ((summary.passed / Math.max(summary.total, 1)) * 100).toFixed(0) : null;
+    const totalSuites = summary?.suites?.length || 0;
+    const passedSuites = summary?.suites?.filter(s => s.status === 'passed').length || 0;
+    const failedSuites = summary?.suites?.filter(s => s.status === 'failed').length || 0;
+    const elapsedSec = summary?.startedAt && summary?.finishedAt ? ((summary.finishedAt - summary.startedAt) / 1000).toFixed(1) : 0;
+
+    const passRate = totalSuites > 0 ? ((passedSuites / totalSuites) * 100).toFixed(0) : 0;
 
     const visibleLogs = logFilter === 'all'
         ? logs
@@ -148,8 +160,8 @@ export const TesterView = ({ onBack }) => {
                         <FlaskConical size={18} />
                     </div>
                     <div>
-                        <h1 className="text-sm sm:text-lg font-black tracking-tight">System Tester <span className="text-indigo-400">v2.0</span></h1>
-                        <p className="text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-widest font-bold">E2E • 7-Day Sim • Groq AI</p>
+                        <h1 className="text-sm sm:text-lg font-black tracking-tight">System Tester <span className="text-indigo-400">v3.0</span></h1>
+                        <p className="text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-widest font-bold">Refactorizado • Seguro • Fast Mode</p>
                     </div>
                 </div>
 
@@ -169,10 +181,16 @@ export const TesterView = ({ onBack }) => {
                             <Square size={14} /> <span className="hidden sm:inline">Detener</span>
                         </button>
                     ) : (
-                        <button onClick={handleRunAll}
-                            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-lg shadow-emerald-600/30 animate-pulse hover:animate-none active:scale-95">
-                            <Play size={14} /> Run All
-                        </button>
+                        <div className="flex gap-2">
+                            <button onClick={() => handleRunAll(false)}
+                                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs sm:text-sm font-bold transition-all active:scale-95">
+                                <FlaskConical size={14} /> <span className="hidden sm:inline">Completos</span>
+                            </button>
+                            <button onClick={() => handleRunAll(true)}
+                                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-lg shadow-emerald-600/30 active:scale-95">
+                                <Zap size={14} /> Rápidos
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
@@ -217,19 +235,19 @@ export const TesterView = ({ onBack }) => {
             {summary && (
                 <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                     <div className="bg-slate-800/80 rounded-xl p-2 sm:p-3 text-center border border-slate-700">
-                        <p className="text-lg sm:text-2xl font-black text-white">{summary.total}</p>
+                        <p className="text-lg sm:text-2xl font-black text-white">{totalSuites}</p>
                         <p className="text-[7px] sm:text-[9px] text-slate-500 uppercase font-bold">Total</p>
                     </div>
                     <div className="bg-emerald-950/50 rounded-xl p-2 sm:p-3 text-center border border-emerald-800/30">
-                        <p className="text-lg sm:text-2xl font-black text-emerald-400">{summary.passed}</p>
+                        <p className="text-lg sm:text-2xl font-black text-emerald-400">{passedSuites}</p>
                         <p className="text-[7px] sm:text-[9px] text-emerald-500 uppercase font-bold">Pass</p>
                     </div>
                     <div className="bg-rose-950/50 rounded-xl p-2 sm:p-3 text-center border border-rose-800/30">
-                        <p className="text-lg sm:text-2xl font-black text-rose-400">{summary.failed}</p>
+                        <p className="text-lg sm:text-2xl font-black text-rose-400">{failedSuites}</p>
                         <p className="text-[7px] sm:text-[9px] text-rose-500 uppercase font-bold">Fail</p>
                     </div>
                     <div className="bg-slate-800/80 rounded-xl p-2 sm:p-3 text-center border border-slate-700">
-                        <p className="text-lg sm:text-2xl font-black text-slate-300">{summary.elapsed}s</p>
+                        <p className="text-lg sm:text-2xl font-black text-slate-300">{elapsedSec}s</p>
                         <p className="text-[7px] sm:text-[9px] text-slate-500 uppercase font-bold">Tiempo</p>
                     </div>
                 </div>
@@ -237,18 +255,18 @@ export const TesterView = ({ onBack }) => {
 
             {/* ── Pass Rate Badge ── */}
             {summary && (
-                <div className={`flex items-center justify-center gap-3 p-3 rounded-xl border ${summary.failed === 0
+                <div className={`flex items-center justify-center gap-3 p-3 rounded-xl border ${failedSuites === 0
                     ? 'bg-emerald-950/30 border-emerald-700/30'
-                    : summary.failed <= 3 ? 'bg-amber-950/30 border-amber-700/30'
+                    : failedSuites <= 3 ? 'bg-amber-950/30 border-amber-700/30'
                         : 'bg-rose-950/30 border-rose-700/30'
                     }`}>
-                    <span className="text-3xl sm:text-4xl">{summary.failed === 0 ? '🟢' : summary.failed <= 3 ? '🟡' : '🔴'}</span>
+                    <span className="text-3xl sm:text-4xl">{failedSuites === 0 ? '🟢' : failedSuites <= 3 ? '🟡' : '🔴'}</span>
                     <div>
-                        <p className={`text-sm sm:text-lg font-black ${summary.failed === 0 ? 'text-emerald-400' : summary.failed <= 3 ? 'text-amber-400' : 'text-rose-400'}`}>
-                            {summary.failed === 0 ? 'ALL TESTS PASSED' : `${summary.failed} TEST${summary.failed > 1 ? 'S' : ''} FAILED`}
+                        <p className={`text-sm sm:text-lg font-black ${failedSuites === 0 ? 'text-emerald-400' : failedSuites <= 3 ? 'text-amber-400' : 'text-rose-400'}`}>
+                            {failedSuites === 0 ? 'ALL SUITES PASSED' : `${failedSuites} SUITE${failedSuites > 1 ? 'S' : ''} FAILED`}
                         </p>
                         <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold">
-                            {passRate}% pass rate • {summary.elapsed}s • v2.0
+                            {passRate}% pass rate • {elapsedSec}s • v3.0
                         </p>
                     </div>
                 </div>
@@ -315,16 +333,16 @@ export const TesterView = ({ onBack }) => {
                     </div>
                     <div className="flex items-center gap-1">
                         <div className="flex gap-1">
-                            {['all', 'pass', 'fail', 'warn'].map(f => (
+                            {['all', 'success', 'error', 'warn'].map(f => (
                                 <button
                                     key={f}
                                     onClick={() => setLogFilter(f)}
                                     className={`px-2 py-1 rounded-lg text-[8px] sm:text-[9px] font-black uppercase transition-all ${logFilter === f
-                                            ? f === 'fail' ? 'bg-rose-600 text-white'
-                                                : f === 'pass' ? 'bg-emerald-600 text-white'
-                                                    : f === 'warn' ? 'bg-amber-500 text-white'
-                                                        : 'bg-indigo-600 text-white'
-                                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                        ? f === 'error' ? 'bg-rose-600 text-white'
+                                            : f === 'success' ? 'bg-emerald-600 text-white'
+                                                : f === 'warn' ? 'bg-amber-500 text-white'
+                                                    : 'bg-indigo-600 text-white'
+                                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
                                         }`}>
                                     {f === 'all' ? `All (${logs.length})` : f}
                                 </button>
@@ -378,22 +396,26 @@ export const TesterView = ({ onBack }) => {
             </div>
 
             {/* ── Results Detail ── */}
-            {summary?.results && summary.results.length > 0 && (
+            {summary?.suites && summary.suites.length > 0 && (
                 <div className="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
                     <div className="px-3 sm:px-4 py-2 bg-slate-800/50 border-b border-slate-700">
-                        <span className="text-[9px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">Detalle de Tests</span>
+                        <span className="text-[9px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">Detalle de Suites</span>
                     </div>
                     <div className="max-h-40 sm:max-h-60 overflow-y-auto p-1.5 sm:p-2 space-y-0.5 sm:space-y-1">
-                        {summary.results.map((r, i) => (
-                            <div key={i} className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[9px] sm:text-xs ${r.passed ? 'bg-emerald-950/30' : 'bg-rose-950/30'}`}>
-                                {r.passed
-                                    ? <CheckCircle2 size={10} className="text-emerald-500 shrink-0" />
-                                    : <XCircle size={10} className="text-rose-500 shrink-0" />
-                                }
-                                <span className={`font-bold shrink-0 ${r.passed ? 'text-emerald-400' : 'text-rose-400'}`}>[{r.suite}]</span>
-                                <span className="text-slate-300 truncate">{r.test}</span>
-                                {!r.passed && r.detail && (
-                                    <span className="text-rose-500/70 text-[8px] ml-auto shrink-0 max-w-[25%] truncate">{r.detail}</span>
+                        {summary.suites.map((s, i) => (
+                            <div key={i} className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[9px] sm:text-xs ${s.status === 'passed' ? 'bg-emerald-950/30' :
+                                s.status === 'failed' ? 'bg-rose-950/30' :
+                                    s.status === 'skipped' ? 'bg-slate-800' : 'bg-slate-800'
+                                }`}>
+                                {s.status === 'passed' ? <CheckCircle2 size={10} className="text-emerald-500 shrink-0" /> :
+                                    s.status === 'failed' ? <XCircle size={10} className="text-rose-500 shrink-0" /> :
+                                        s.status === 'skipped' ? <Square size={10} className="text-slate-500 shrink-0" /> : ''}
+                                <span className={`font-bold shrink-0 ${s.status === 'passed' ? 'text-emerald-400' :
+                                    s.status === 'failed' ? 'text-rose-400' : 'text-slate-400'
+                                    }`}>[{s.id}]</span>
+                                <span className="text-slate-300 truncate">{s.name}</span>
+                                {s.error && (
+                                    <span className="text-rose-500/70 text-[8px] ml-auto shrink-0 max-w-[25%] truncate">{s.error}</span>
                                 )}
                             </div>
                         ))}
@@ -403,7 +425,7 @@ export const TesterView = ({ onBack }) => {
 
             {/* ── Footer ── */}
             <p className="text-center text-[7px] sm:text-[9px] text-slate-700 font-mono uppercase pb-20">
-                Precios al Día • System Tester v2.0 • {new Date().getFullYear()} • TEMPORAL
+                Precios al Día • System Tester v3.0 • {new Date().getFullYear()}
             </p>
         </div>
     );

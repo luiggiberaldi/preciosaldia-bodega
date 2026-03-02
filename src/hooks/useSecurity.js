@@ -564,7 +564,7 @@ export function useSecurity() {
                 finalExpiresAt = Date.now() + 168 * 60 * 60 * 1000;
                 try {
                     // Sincronizar silenciosamente la nueva fecha en DB
-                    getSupa().from('licenses').update({ expires_at: new Date(finalExpiresAt).toISOString() })
+                    supabase.from('licenses').update({ expires_at: new Date(finalExpiresAt).toISOString() })
                         .eq('device_id', deviceId).eq('product_id', PRODUCT_ID).then();
                 } catch (e) { }
             }
