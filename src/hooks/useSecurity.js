@@ -139,7 +139,7 @@ export function useSecurity() {
 
                 const { data: license } = await supa
                     .from('licenses')
-                    .select('active')
+                    .select('active, type')
                     .eq('device_id', deviceId)
                     .eq('product_id', PRODUCT_ID)
                     .maybeSingle()
@@ -150,9 +150,15 @@ export function useSecurity() {
                     setIsPremium(false);
                     setIsDemo(false);
                     setDemoExpiredMsg("Tu licencia ha sido desactivada. Contacta al administrador.");
-                } else if (license && license.active === true && !isPremium) {
-                    // Reactivado remotamente -> Recargar para restaurar
-                    window.location.reload();
+                } else if (license && license.active === true) {
+                    // Si pasó a permanente en backend pero el estado local es demo -> recargar
+                    if (license.type === 'permanent' && isDemo) {
+                        localStorage.removeItem('pda_premium_token');
+                        window.location.reload();
+                    } else if (!isPremium) {
+                        // Reactivado remotamente -> Recargar para restaurar
+                        window.location.reload();
+                    }
                 }
             } catch (e) { }
         }
@@ -536,7 +542,7 @@ export function useSecurity() {
         }
 
         // Consultar Supabase para obtener tipo y expiración
-                let licenseType = 'permanent';
+        let licenseType = 'permanent';
         let expiresAt = null;
         let lastSeenAt = null;
         try {
@@ -568,7 +574,7 @@ export function useSecurity() {
                     // Sincronizar silenciosamente la nueva fecha en DB
                     getSupa().from('licenses').update({ expires_at: new Date(finalExpiresAt).toISOString() })
                         .eq('device_id', deviceId).eq('product_id', PRODUCT_ID).then();
-                } catch (e) {}
+                } catch (e) { }
             }
 
             if (finalExpiresAt) {
