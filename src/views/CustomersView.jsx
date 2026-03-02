@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Users, Plus, Search, User, X, Trash2, Pencil, Phone, RefreshCw, Save, ArrowDownRight, ArrowUpRight, Clock, CheckCircle2 } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { formatBs, formatUsd } from '../utils/calculatorUtils';
 import { procesarImpactoCliente } from '../utils/financialLogic';
 import { DEFAULT_PAYMENT_METHODS } from '../config/paymentMethods';
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function CustomersView({ triggerHaptic }) {
     const [customers, setCustomers] = useState([]);

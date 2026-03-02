@@ -1,10 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { RefreshCw, Search, ShoppingCart, Mic, Package, X } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getActivePaymentMethods } from '../config/paymentMethods';
 import { BODEGA_CATEGORIES, CATEGORY_ICONS, CATEGORY_COLORS } from '../config/categories';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import CartPanel from '../components/Sales/CartPanel';
+import ConfirmModal from '../components/ConfirmModal';
+import ReceiptModal from '../components/Sales/ReceiptModal';
+import CheckoutModal from '../components/Sales/CheckoutModal';
 
 const SALES_KEY = 'bodega_sales_v1';
 

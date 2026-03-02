@@ -126,7 +126,7 @@ export function useSecurity() {
             try {
                 const { data: license, error } = await supabase
                     .from('licenses')
-                    .select('type, active, expires_at, special_features, updated_at')
+                    .select('type, active, expires_at')
                     .eq('device_id', deviceId)
                     .eq('product_id', PRODUCT_ID)
                     .maybeSingle();
