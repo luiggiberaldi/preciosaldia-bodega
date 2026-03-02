@@ -320,7 +320,7 @@ export function useSecurity() {
                     .select('type, active, expires_at')
                     .eq('device_id', currentDeviceId)
                     .eq('product_id', PRODUCT_ID)
-                    .single();
+                    .maybeSingle();
 
                 if (remoteLicense && remoteLicense.active === true) {
                     const validCode = await generateActivationCode(currentDeviceId);
@@ -536,33 +536,51 @@ export function useSecurity() {
         }
 
         // Consultar Supabase para obtener tipo y expiración
-        let licenseType = 'permanent';
+                let licenseType = 'permanent';
         let expiresAt = null;
+        let lastSeenAt = null;
         try {
             const supa = getSupa();
             const { data } = await supa
                 .from('licenses')
-                .select('type, expires_at')
+                .select('type, expires_at, last_seen_at')
                 .eq('device_id', deviceId)
                 .eq('product_id', PRODUCT_ID)
                 .maybeSingle();
 
             if (data?.type) licenseType = data.type;
+            // Manejo estricto de fechas UTC
             if (data?.expires_at) expiresAt = new Date(data.expires_at).getTime();
+            if (data?.last_seen_at) lastSeenAt = data.last_seen_at;
         } catch (e) {
             // Sin red → tratar como permanente (fallback seguro)
         }
 
         const isTimeLimited = (licenseType === 'demo7');
 
-        if (isTimeLimited && expiresAt) {
-            // Guardar como JSON con expiración (mismo formato que demo)
-            const token = { code: validCode, expires: expiresAt, isDemo: true };
-            localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
-            setIsPremium(true);
-            setIsDemo(true);
-            setDemoExpires(expiresAt);
-            return { success: true, status: 'PREMIUM_ACTIVATED' };
+        if (isTimeLimited) {
+            let finalExpiresAt = expiresAt;
+            // Si el admin generó la demo, pero no se ha conectado el dispositivo (last_seen_at nulo),
+            // el contador de 7 días inicia EXACTAMENTE AHORA, no cuando se generó el código.
+            if (!lastSeenAt) {
+                finalExpiresAt = Date.now() + 168 * 60 * 60 * 1000;
+                try {
+                    // Sincronizar silenciosamente la nueva fecha en DB
+                    getSupa().from('licenses').update({ expires_at: new Date(finalExpiresAt).toISOString() })
+                        .eq('device_id', deviceId).eq('product_id', PRODUCT_ID).then();
+                } catch (e) {}
+            }
+
+            if (finalExpiresAt) {
+                expiresAt = finalExpiresAt;
+                // Guardar como JSON con expiración (mismo formato que demo)
+                const token = { code: validCode, expires: expiresAt, isDemo: true };
+                localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
+                setIsPremium(true);
+                setIsDemo(true);
+                setDemoExpires(expiresAt);
+                return { success: true, status: 'PREMIUM_ACTIVATED' };
+            }
         }
 
         // Permanente
