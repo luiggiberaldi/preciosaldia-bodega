@@ -152,7 +152,20 @@ export function useSecurity() {
                     setDemoExpiredMsg("Tu licencia ha sido desactivada. Contacta al administrador.");
                 } else if (license && license.active === true) {
                     // Si pasó a permanente en backend pero el estado local es demo -> recargar
-                    if (license.type === 'permanent' && isDemo) {
+                    const rawStored = localStorage.getItem('pda_premium_token');
+                    let isDemoLocal = false;
+                    if (rawStored) {
+                        try {
+                            isDemoLocal = decodeToken(rawStored).includes('"isDemo":true');
+                        } catch (e) {
+                            isDemoLocal = rawStored.includes('"isDemo":true');
+                        }
+                    }
+
+                    const isMismatch = (license.type === 'permanent' && isDemoLocal) ||
+                        (license.type === 'demo7' && !isDemoLocal);
+
+                    if (isMismatch) {
                         localStorage.removeItem('pda_premium_token');
                         window.location.reload();
                     } else if (!isPremium) {
