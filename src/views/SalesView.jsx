@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { RefreshCw, Search, ShoppingCart, Mic, Package, X, Home, LayoutGrid, Users, BarChart3 } from 'lucide-react';
+import { RefreshCw, Search, ShoppingCart, Mic, Package, X, Home, Store, Users, BarChart3 } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
@@ -868,7 +868,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
                     <div className="flex items-center justify-around max-w-md mx-auto px-2 py-1.5">
                         {[
                             { id: 'inicio', icon: Home, label: 'Inicio' },
-                            { id: 'catalogo', icon: LayoutGrid, label: 'Catálogo' },
+                            { id: 'catalogo', icon: Store, label: 'Inventario' },
                             { id: 'clientes', icon: Users, label: 'Clientes' },
                             { id: 'reportes', icon: BarChart3, label: 'Reportes' },
                         ].map(nav => (
