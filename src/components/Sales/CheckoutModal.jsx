@@ -50,9 +50,9 @@ export default function CheckoutModal({
 
     const remainingUsd = Math.max(0, cartTotalUsd - totalPaidUsd);
     const remainingBs = remainingUsd * effectiveRate;
-    const changeUsd = Math.max(0, totalPaidUsd - cartTotalUsd);
-    const changeBs = Math.max(0, totalPaidBs - cartTotalBs);
-    const isPaid = remainingUsd <= 0.01;
+    const changeUsd = Math.max(0, Math.round((totalPaidUsd - cartTotalUsd) * 100) / 100);
+    const changeBs = Math.max(0, Math.round((totalPaidBs - cartTotalBs) * 100) / 100);
+    const isPaid = remainingUsd < 0.009;
 
     // ── Handlers ──
     const handleBarChange = useCallback((methodId, value) => {

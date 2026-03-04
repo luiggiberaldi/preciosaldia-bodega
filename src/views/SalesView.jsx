@@ -163,12 +163,20 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
     // ── Callbacks ─────────────────────────────────
     const addToCart = useCallback((product, qtyOverride = null, forceMode = null) => {
         triggerHaptic && triggerHaptic();
+
+        // Validación temprana: rechazar productos sin precio válido
+        if (!product.priceUsdt || isNaN(product.priceUsdt) || product.priceUsdt <= 0) {
+            playError();
+            showToast('Este producto no tiene precio válido. Edítalo primero.', 'warning');
+            return;
+        }
+
         playAdd();
 
         if (product.sellByUnit && product.unitPriceUsd && !forceMode && !qtyOverride) { setHierarchyPending(product); return; }
         if ((product.unit === 'kg' || product.unit === 'litro') && !qtyOverride) { setWeightPending(product); return; }
 
-        let priceToUse = product.priceUsdt;
+        let priceToUse = parseFloat(product.priceUsdt) || 0;
         let cartId = product.id;
         let cartName = product.name;
         let qtyToAdd = qtyOverride || 1;
