@@ -191,7 +191,7 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
 
     // --- VISTA NORMAL (GRID PRINCIPAL) ---
     return (
-        <div className="flex flex-col h-[calc(100dvh-150px)] overflow-hidden justify-between py-2 animate-in fade-in slide-in-from-bottom-2 duration-500 relative">
+        <div className="flex flex-col h-[calc(100dvh-150px)] overflow-hidden justify-between py-2 relative">
 
             {/* HEADER */}
             <header className="flex items-center justify-between pt-[env(safe-area-inset-top)] pb-2 px-3 sm:px-4 shrink-0" style={{ paddingTop: 'max(env(safe-area-inset-top), 8px)' }}>

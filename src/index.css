@@ -19,12 +19,14 @@ body {
   background-color: rgb(var(--color-bg-light));
   color: #1e293b;
   font-family: 'Inter', system-ui, sans-serif;
+  color-scheme: light;
 }
 
-.dark html,
-.dark body {
+html.dark,
+html.dark body {
   background-color: rgb(var(--color-bg-dark));
   color: #f8fafc;
+  color-scheme: dark;
 }
 
 /* Custom Scrollbar */
@@ -47,22 +49,6 @@ body {
 }
 
 /* ── Tab Transition ── */
-@keyframes view-enter {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-view-enter {
-  animation: view-enter 0.2s ease-out;
-}
-
 /* ── Skeleton Loading ── */
 @keyframes shimmer {
   0% {

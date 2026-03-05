@@ -62,6 +62,10 @@ export default function App() {
     if (theme === 'dark') root.classList.add('dark');
     else root.classList.remove('dark');
     localStorage.setItem('theme', theme);
+
+    // Update theme-color meta for mobile browsers
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f172a' : '#f8fafc');
   }, [theme]);
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -203,7 +207,7 @@ export default function App() {
         ></div>
 
         {/* Eager views — always mounted, visibility toggled via CSS */}
-        <div className={`flex-1 min-h-0 flex flex-col ${activeTab === 'ventas' ? 'animate-view-enter' : 'hidden'}`}>
+        <div className={`flex-1 min-h-0 flex flex-col ${activeTab === 'ventas' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <PremiumGuard featureName="Punto de Venta" isShop={true}>
               <SalesView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} />
@@ -211,13 +215,13 @@ export default function App() {
           </ErrorBoundary>
         </div>
 
-        <div className={`flex-1 flex flex-col ${activeTab === 'catalogo' ? 'animate-view-enter' : 'hidden'}`}>
+        <div className={`flex-1 flex flex-col ${activeTab === 'catalogo' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <ProductsView rates={rates} triggerHaptic={triggerHaptic} />
           </ErrorBoundary>
         </div>
 
-        <div className={`flex-1 flex flex-col ${activeTab === 'inicio' ? 'animate-view-enter' : 'hidden'}`}>
+        <div className={`flex-1 flex flex-col ${activeTab === 'inicio' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} />
           </ErrorBoundary>
@@ -226,7 +230,7 @@ export default function App() {
         {/* Lazy views — mount on first access, then stay persistent */}
         <Suspense fallback={<div className="flex-1 p-4 space-y-4"><div className="skeleton h-10 w-40" /><div className="skeleton h-32" /><div className="skeleton h-48" /></div>}>
           {(activeTab === 'clientes' || document.querySelector('[data-view="clientes"]')) && (
-            <div data-view="clientes" className={`flex-1 flex flex-col ${activeTab === 'clientes' ? 'animate-view-enter' : 'hidden'}`}>
+            <div data-view="clientes" className={`flex-1 flex flex-col ${activeTab === 'clientes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
                 <PremiumGuard featureName="Gestión de Clientes">
                   <CustomersView triggerHaptic={triggerHaptic} />
@@ -235,7 +239,7 @@ export default function App() {
             </div>
           )}
           {(activeTab === 'reportes' || document.querySelector('[data-view="reportes"]')) && (
-            <div data-view="reportes" className={`flex-1 flex flex-col ${activeTab === 'reportes' ? 'animate-view-enter' : 'hidden'}`}>
+            <div data-view="reportes" className={`flex-1 flex flex-col ${activeTab === 'reportes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
                 <PremiumGuard featureName="Reportes Históricos">
                   <ReportsView rates={rates} triggerHaptic={triggerHaptic} />

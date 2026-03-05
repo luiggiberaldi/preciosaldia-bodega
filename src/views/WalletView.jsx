@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Send, CreditCard, Landmark, DollarSign, X, Bitcoin, Smartphone, QrCode, Pencil, Crown } from 'lucide-react';
 import { useSecurity } from '../hooks/useSecurity';
+import { storageService } from '../utils/storageService';
 
 // ✅ LISTA OFICIAL DE BANCOS VENEZOLANOS (2025)
 const VENEZUELA_BANKS = [
@@ -35,11 +36,21 @@ const VENEZUELA_BANKS = [
 export default function WalletView({ rates }) {
     const { isPremium } = useSecurity();
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-    // Estado de Cuentas
-    const [accounts, setAccounts] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('my_accounts_v2')) || []; }
-        catch { return []; }
-    });
+    // Estado de Cuentas — loaded async from storageService (IndexedDB)
+    const [accounts, setAccounts] = useState([]);
+    const isLoaded = useRef(false);
+
+    // Load accounts from storageService on mount
+    useEffect(() => {
+        let mounted = true;
+        storageService.getItem('my_accounts_v2', []).then(saved => {
+            if (mounted) {
+                setAccounts(saved || []);
+                isLoaded.current = true;
+            }
+        });
+        return () => { mounted = false; };
+    }, []);
 
     // Estados de Interfaz
     const [showForm, setShowForm] = useState(false);
@@ -71,8 +82,11 @@ export default function WalletView({ rates }) {
     const [amountBs, setAmountBs] = useState('');
     const [selectedRate, setSelectedRate] = useState('bcv');
 
+    // Save accounts to storageService (IndexedDB) whenever they change
     useEffect(() => {
-        localStorage.setItem('my_accounts_v2', JSON.stringify(accounts));
+        if (isLoaded.current) {
+            storageService.setItem('my_accounts_v2', accounts);
+        }
     }, [accounts]);
 
     // --- LÓGICA CRUD ---
@@ -189,7 +203,7 @@ export default function WalletView({ rates }) {
     const labelClass = "block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 ml-1 uppercase tracking-wide";
 
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pt-6">
+        <div className="space-y-6 pt-6">
 
             {/* CABECERA */}
             <div className="flex justify-between items-center mb-4 px-2">
