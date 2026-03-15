@@ -295,7 +295,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
         // Pre-calculate stock check BEFORE setCart to avoid React StrictMode double-firing
         if (!allowNegativeStock) {
-            // We need to read the current cart synchronously
             const currentCart = cart;
             const existingInCart = currentCart.find(i => i.id === cartId && i.priceUsd === priceToUse);
             const addingQty = existingInCart ? (qtyOverride || 1) : qtyToAdd;
@@ -303,7 +302,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             const newQty = existingQtyForThis + addingQty;
             const stockNeeded = forceMode === 'unit' ? newQty / (product.unitsPerPackage || 1) : newQty;
 
-            // Sum other cart items for this same original product
             const otherCartItems = currentCart.filter(i => (i._originalId || i.id) === product.id && i.id !== cartId);
             const otherStockUsed = otherCartItems.reduce((sum, item) => {
                 if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
@@ -314,6 +312,25 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                 playError();
                 showToast(`${product.name}: stock maximo alcanzado`, 'warning');
                 return;
+            }
+        }
+
+        // Soft warning when allowNegativeStock is ON but stock just ran out
+        if (allowNegativeStock && currentStock > 0) {
+            const currentCart = cart;
+            const existingInCart = currentCart.find(i => i.id === cartId && i.priceUsd === priceToUse);
+            const existingQtyForThis = existingInCart ? existingInCart.qty : 0;
+            const newQty = existingQtyForThis + (qtyOverride || 1);
+            const stockNeeded = forceMode === 'unit' ? newQty / (product.unitsPerPackage || 1) : newQty;
+
+            const otherCartItems = currentCart.filter(i => (i._originalId || i.id) === product.id && i.id !== cartId);
+            const otherStockUsed = otherCartItems.reduce((sum, item) => {
+                if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
+                return sum + item.qty;
+            }, 0);
+
+            if (stockNeeded + otherStockUsed > currentStock) {
+                showToast(`${product.name}: stock agotado, vendiendo sin inventario`, 'info');
             }
         }
 
