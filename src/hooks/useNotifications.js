@@ -29,8 +29,8 @@ export function useNotifications() {
         try {
             new Notification(title, {
                 body,
-                icon: '/logodark.png',
-                badge: '/logodark.png',
+                icon: '/apple-touch-icon.png',
+                badge: '/apple-touch-icon.png',
                 tag, // Evita duplicados con el mismo tag
                 vibrate: [100, 50, 100],
             });

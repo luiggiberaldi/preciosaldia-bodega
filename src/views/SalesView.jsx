@@ -403,7 +403,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         }
 
         setShowReceipt(sale); playCheckout(); setShowConfetti(true);
-        notifySaleComplete(sale.saleNumber, sale.totalUsd, sale.totalBs);
+        // Removed notifySaleComplete to only show low stock notifications
         notifyLowStock(updatedProducts);
         setCart([]); setShowCheckout(false); setSelectedCustomerId('');
     };
