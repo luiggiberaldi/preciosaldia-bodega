@@ -273,7 +273,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         const currentStock = parseFloat(product.stock) || 0;
         if (!allowNegativeStock && currentStock <= 0) {
             playError();
-            showToast(`Sin stock disponible para: ${product.name}`, 'error');
+            showToast(`${product.name}: sin stock`, 'warning');
             return;
         }
 
@@ -293,44 +293,34 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             cartName = product.name + ' (Ud.)';
         }
 
+        // Pre-calculate stock check BEFORE setCart to avoid React StrictMode double-firing
+        if (!allowNegativeStock) {
+            // We need to read the current cart synchronously
+            const currentCart = cart;
+            const existingInCart = currentCart.find(i => i.id === cartId && i.priceUsd === priceToUse);
+            const addingQty = existingInCart ? (qtyOverride || 1) : qtyToAdd;
+            const existingQtyForThis = existingInCart ? existingInCart.qty : 0;
+            const newQty = existingQtyForThis + addingQty;
+            const stockNeeded = forceMode === 'unit' ? newQty / (product.unitsPerPackage || 1) : newQty;
+
+            // Sum other cart items for this same original product
+            const otherCartItems = currentCart.filter(i => (i._originalId || i.id) === product.id && i.id !== cartId);
+            const otherStockUsed = otherCartItems.reduce((sum, item) => {
+                if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
+                return sum + item.qty;
+            }, 0);
+
+            if (stockNeeded + otherStockUsed > currentStock) {
+                playError();
+                showToast(`${product.name}: stock maximo alcanzado`, 'warning');
+                return;
+            }
+        }
+
         setCart(prev => {
             const existing = prev.find(i => i.id === cartId && i.priceUsd === priceToUse);
-
-            // Enforce stock limit when allow_negative_stock is disabled
-            if (!allowNegativeStock && existing) {
-                const newQty = existing.qty + (qtyOverride || 1);
-                // Calculate how much stock this would consume
-                const stockNeeded = forceMode === 'unit' ? newQty / (product.unitsPerPackage || 1) : newQty;
-                // Sum ALL cart items for this original product
-                const otherCartItems = prev.filter(i => (i._originalId || i.id) === product.id && i.id !== cartId);
-                const otherStockUsed = otherCartItems.reduce((sum, item) => {
-                    if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
-                    return sum + item.qty;
-                }, 0);
-                if (stockNeeded + otherStockUsed > currentStock) {
-                    playError();
-                    showToast(`Stock insuficiente para: ${product.name} (disponible: ${currentStock})`, 'error');
-                    return prev;
-                }
-            }
-
             if (existing && !qtyOverride) return prev.map(i => i.id === cartId ? { ...i, qty: i.qty + 1 } : i);
             if (existing && qtyOverride) return prev.map(i => i.id === cartId ? { ...i, qty: i.qty + qtyOverride } : i);
-
-            // Stock check for new item
-            if (!allowNegativeStock) {
-                const otherCartItems = prev.filter(i => (i._originalId || i.id) === product.id);
-                const otherStockUsed = otherCartItems.reduce((sum, item) => {
-                    if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
-                    return sum + item.qty;
-                }, 0);
-                const stockNeeded = forceMode === 'unit' ? qtyToAdd / (product.unitsPerPackage || 1) : qtyToAdd;
-                if (stockNeeded + otherStockUsed > currentStock) {
-                    playError();
-                    showToast(`Stock insuficiente para: ${product.name} (disponible: ${currentStock})`, 'error');
-                    return prev;
-                }
-            }
 
             const itemCostBs = product.costBs || (product.costUsd ? product.costUsd * effectiveRate : 0);
             return [{
@@ -345,7 +335,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         handleSetSearchTerm('');
         setHierarchyPending(null);
         searchInputRef.current?.focus();
-    }, [triggerHaptic, effectiveRate]);
+    }, [triggerHaptic, effectiveRate, cart]);
 
     const updateQty = (id, delta) => {
         triggerHaptic && triggerHaptic();
@@ -353,33 +343,35 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
         const allowNeg = localStorage.getItem('allow_negative_stock') !== 'false';
 
+        // Pre-check stock BEFORE setCart to avoid React StrictMode double toast
+        if (!allowNeg && delta > 0) {
+            const cartItem = cart.find(i => i.id === id);
+            if (cartItem) {
+                const originalId = cartItem._originalId || cartItem.id;
+                const productData = products.find(p => p.id === originalId);
+                if (productData) {
+                    const availableStock = parseFloat(productData.stock) || 0;
+                    const newQty = Math.round((cartItem.qty + delta) * 1000) / 1000;
+                    const totalUsed = cart.reduce((sum, item) => {
+                        if ((item._originalId || item.id) !== originalId) return sum;
+                        if (item.id === id) return sum;
+                        if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
+                        return sum + item.qty;
+                    }, 0);
+                    const thisItemStock = cartItem._mode === 'unit' ? newQty / (cartItem._unitsPerPackage || 1) : newQty;
+                    if (totalUsed + thisItemStock > availableStock) {
+                        playError();
+                        showToast(`${cartItem.name}: stock maximo alcanzado`, 'warning');
+                        return;
+                    }
+                }
+            }
+        }
+
         setCart(prev => prev.map(i => {
             if (i.id !== id) return i;
             let newQty = Math.round((i.qty + delta) * 1000) / 1000;
             if (newQty < 0) newQty = 0;
-
-            // Enforce stock limit on increment
-            if (!allowNeg && delta > 0) {
-                const originalId = i._originalId || i.id;
-                const productData = products.find(p => p.id === originalId);
-                if (productData) {
-                    const availableStock = parseFloat(productData.stock) || 0;
-                    // Sum all cart items for this product
-                    const totalUsed = prev.reduce((sum, item) => {
-                        if ((item._originalId || item.id) !== originalId) return sum;
-                        if (item.id === id) return sum; // Skip current item, we'll use newQty
-                        if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
-                        return sum + item.qty;
-                    }, 0);
-                    const thisItemStock = i._mode === 'unit' ? newQty / (i._unitsPerPackage || 1) : newQty;
-                    if (totalUsed + thisItemStock > availableStock) {
-                        playError();
-                        showToast(`Stock insuficiente para: ${i.name} (disponible: ${availableStock})`, 'error');
-                        return i; // Don't change qty
-                    }
-                }
-            }
-
             return newQty === 0 ? null : { ...i, qty: newQty };
         }).filter(Boolean));
         searchInputRef.current?.focus();
