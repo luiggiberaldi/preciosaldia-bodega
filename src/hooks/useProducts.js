@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { storageService } from '../utils/storageService';
 import { BODEGA_CATEGORIES } from '../config/categories';
 
@@ -6,6 +6,9 @@ export function useProducts(rates) {
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState(BODEGA_CATEGORIES);
     const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+
+    // Guard ref: prevents infinite loop when auto-save fires app_storage_update
+    const savingRef = useRef(false);
 
     // MARKET LOGIC - Street Rate
     const [streetRate, setStreetRate] = useState(() => {
@@ -51,12 +54,18 @@ export function useProducts(rates) {
     // Auto-save products and categories
     useEffect(() => {
         if (!isLoadingProducts) {
+            savingRef.current = true;
+            const savePromises = [];
             if (products.length > 0) {
-                storageService.setItem('bodega_products_v1', products);
+                savePromises.push(storageService.setItem('bodega_products_v1', products));
             } else {
-                storageService.removeItem('bodega_products_v1');
+                savePromises.push(storageService.removeItem('bodega_products_v1'));
             }
-            storageService.setItem('my_categories_v1', categories);
+            savePromises.push(storageService.setItem('my_categories_v1', categories));
+            Promise.all(savePromises).finally(() => {
+                // Reset guard after microtask queue flushes
+                setTimeout(() => { savingRef.current = false; }, 50);
+            });
         }
     }, [products, categories, isLoadingProducts]);
 
@@ -80,14 +89,17 @@ export function useProducts(rates) {
             }
         };
 
+        // Listen for same-tab storage updates (e.g., SalesView deducting stock)
         const handleAppStorageUpdate = async (e) => {
+            // Skip events triggered by our own auto-save
+            if (savingRef.current) return;
+
             if (e.detail?.key === 'bodega_products_v1') {
                 const updatedProducts = await storageService.getItem('bodega_products_v1', []);
-                // Update state but don't cause an infinite saving loop
                 setProducts(updatedProducts);
             }
             if (e.detail?.key === 'my_categories_v1') {
-                const updatedCategories = await storageService.getItem('my_categories_v1', []);
+                const updatedCategories = await storageService.getItem('my_categories_v1', BODEGA_CATEGORIES);
                 setCategories(updatedCategories);
             }
         };
