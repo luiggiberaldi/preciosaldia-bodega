@@ -76,11 +76,28 @@ export function useProducts(rates) {
                 setCustomRate(e.newValue);
             }
             if (e.key === 'bodega_use_auto_rate') {
-                setUseAutoRate(JSON.parse(e.newValue));
+                setUseAutoRate(!!JSON.parse(e.newValue));
             }
         };
+
+        const handleAppStorageUpdate = async (e) => {
+            if (e.detail?.key === 'bodega_products_v1') {
+                const updatedProducts = await storageService.getItem('bodega_products_v1', []);
+                // Update state but don't cause an infinite saving loop
+                setProducts(updatedProducts);
+            }
+            if (e.detail?.key === 'my_categories_v1') {
+                const updatedCategories = await storageService.getItem('my_categories_v1', []);
+                setCategories(updatedCategories);
+            }
+        };
+
         window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
+        window.addEventListener('app_storage_update', handleAppStorageUpdate);
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('app_storage_update', handleAppStorageUpdate);
+        };
     }, []);
 
     const adjustStock = (productId, delta) => {

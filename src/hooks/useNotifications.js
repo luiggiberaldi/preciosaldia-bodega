@@ -42,8 +42,8 @@ export function useNotifications() {
     /** Stock bajo: se llama tras completar una venta, pasando los productos actualizados */
     const notifyLowStock = useCallback((products) => {
         const lowItems = products.filter(p => {
-            const stock = p.stock ?? 0;
-            const threshold = p.lowStockAlert ?? 5;
+            const stock = parseFloat(p.stock) || 0;
+            const threshold = parseFloat(p.lowStockAlert) || 5;
             return stock > 0 && stock <= threshold;
         });
 
