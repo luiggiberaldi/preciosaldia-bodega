@@ -67,18 +67,28 @@ export function useRates() {
 
         log(isAutoUpdate ? "--- Auto-Update ---" : "--- Actualización Manual ---");
 
-        const fetchGeneric = async (url) => {
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), 8000);
-            try {
-                const res = await fetch(url, { signal: controller.signal });
-                clearTimeout(id);
-                if (!res.ok) return null;
-                return await res.json();
-            } catch (e) {
-                clearTimeout(id);
-                return null;
+        const fetchGeneric = async (url, retries = 1) => {
+            for (let i = 0; i <= retries; i++) {
+                const controller = new AbortController();
+                const id = setTimeout(() => controller.abort(), 8000);
+                try {
+                    const res = await fetch(url, { signal: controller.signal });
+                    clearTimeout(id);
+                    if (!res.ok) {
+                        if (i < retries) continue;
+                        return null;
+                    }
+                    return await res.json();
+                } catch (e) {
+                    clearTimeout(id);
+                    if (i < retries) {
+                        await new Promise(r => setTimeout(r, 1000)); // Esperar 1 segundo antes de reintentar
+                        continue;
+                    }
+                    return null;
+                }
             }
+            return null;
         };
 
         const getEuroFactorFallback = async () => {
