@@ -16,6 +16,7 @@ import ReceiptModal from '../components/Sales/ReceiptModal';
 import CheckoutModal from '../components/Sales/CheckoutModal';
 import CustomAmountModal from '../components/Sales/CustomAmountModal';
 import KeyboardHelpModal from '../components/Sales/KeyboardHelpModal';
+import { useProductContext } from '../context/ProductContext';
 
 import ConfirmModal from '../components/ConfirmModal';
 import Confetti from '../components/Confetti';
@@ -27,11 +28,14 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const { playAdd, playRemove, playCheckout, playError } = useSounds();
     const { notifySaleComplete, notifyLowStock } = useNotifications();
 
+    // ── Global Context ──────────────────────────────────────
+    const { products, setProducts, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate } = useProductContext();
+
     // ── State ──────────────────────────────────────
-    const [products, setProducts] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [paymentMethods, setPaymentMethods] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingLocal, setIsLoadingLocal] = useState(true);
+    const isLoading = isLoadingProducts || isLoadingLocal;
     const [showConfetti, setShowConfetti] = useState(false);
     const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
     const [showCustomAmountModal, setShowCustomAmountModal] = useState(false);
@@ -69,17 +73,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             setCartSelectedIndex(-1);
         }
     }, [cart.length]);
-    const [useAutoRate, setUseAutoRate] = useState(() => {
-        const saved = localStorage.getItem('bodega_use_auto_rate');
-        return saved !== null ? JSON.parse(saved) : true;
-    });
-    const [customRate, setCustomRate] = useState(() => {
-        const saved = localStorage.getItem('bodega_custom_rate');
-        return saved && parseFloat(saved) > 0 ? saved : '';
-    });
-
-    const bcvRate = rates.bcv?.price || 0;
-    const effectiveRate = useAutoRate ? bcvRate : (parseFloat(customRate) > 0 ? parseFloat(customRate) : bcvRate);
 
     // Voice
     const handleSetSearchTerm = (text) => { setSearchTerm(text); setSelectedIndex(0); };
@@ -188,13 +181,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
     const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
-    // ── Effects ───────────────────────────────────
-    // Persist rate config
-    useEffect(() => {
-        localStorage.setItem('bodega_use_auto_rate', JSON.stringify(useAutoRate));
-        localStorage.setItem('bodega_custom_rate', customRate.toString());
-    }, [useAutoRate, customRate]);
-
     // Persist cart
     useEffect(() => {
         if (cart === cartRef.current) return; // Prevent double-save on mount if empty
@@ -206,14 +192,12 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     useEffect(() => {
         let mounted = true;
         const load = async () => {
-            const [saved, savedCustomers, methods, savedCart] = await Promise.all([
-                storageService.getItem('bodega_products_v1', []),
+            const [savedCustomers, methods, savedCart] = await Promise.all([
                 storageService.getItem('bodega_customers_v1', []),
                 getActivePaymentMethods(),
                 storageService.getItem('bodega_pending_cart_v1', [])
             ]);
             if (mounted) {
-                setProducts(saved);
                 setCustomers(savedCustomers);
                 setPaymentMethods(methods);
                 
@@ -222,7 +206,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                     setCart(savedCart);
                 }
                 
-                setIsLoading(false);
+                setIsLoadingLocal(false);
 
                 const recycled = localStorage.getItem('recycled_cart');
                 if (recycled) {
@@ -514,8 +498,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             }
             return p;
         });
+        // ProductContext's setProducts automatically handles persisting to storage
         setProducts(updatedProducts);
-        await storageService.setItem('bodega_products_v1', updatedProducts);
 
         // Update customer debt
         const amount_favor_used = payments.filter(p => p.methodId === 'saldo_favor').reduce((sum, p) => sum + p.amountUsd, 0);

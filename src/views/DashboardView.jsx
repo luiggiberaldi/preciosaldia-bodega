@@ -11,15 +11,17 @@ import { generateTicketPDF } from '../utils/ticketGenerator';
 import { generateDailyClosePDF } from '../utils/dailyCloseGenerator';
 import { useNotifications } from '../hooks/useNotifications';
 import AnimatedCounter from '../components/AnimatedCounter';
+import { useProductContext } from '../context/ProductContext';
 
 const SALES_KEY = 'bodega_sales_v1';
 
 export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme, isActive }) {
     const { notifyCierrePendiente, requestPermission } = useNotifications();
     const [sales, setSales] = useState([]);
-    const [products, setProducts] = useState([]);
+    const { products, setProducts, isLoadingProducts } = useProductContext();
     const [customers, setCustomers] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingLocal, setIsLoadingLocal] = useState(true);
+    const isLoading = isLoadingProducts || isLoadingLocal;
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [voidSaleTarget, setVoidSaleTarget] = useState(null);
@@ -40,16 +42,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         if (!isActive) return;
         let mounted = true;
         const load = async () => {
-            const [savedSales, savedProducts, savedCustomers] = await Promise.all([
+            const [savedSales, savedCustomers] = await Promise.all([
                 storageService.getItem(SALES_KEY, []),
-                storageService.getItem('bodega_products_v1', []),
                 storageService.getItem('bodega_customers_v1', []),
             ]);
             if (mounted) {
                 setSales(savedSales);
-                setProducts(savedProducts);
                 setCustomers(savedCustomers);
-                setIsLoading(false);
+                setIsLoadingLocal(false);
             }
         };
         load();
@@ -78,14 +78,11 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             });
 
             // 2. Revertir Stock
-            const [savedProducts, savedCustomers] = await Promise.all([
-                storageService.getItem('bodega_products_v1', []),
-                storageService.getItem('bodega_customers_v1', [])
-            ]);
+            const savedCustomers = await storageService.getItem('bodega_customers_v1', []);
 
-            let updatedProducts = savedProducts;
+            let updatedProducts = products;
             if (sale.items && sale.items.length > 0) {
-                updatedProducts = savedProducts.map(p => {
+                updatedProducts = products.map(p => {
                     // Un producto puede estar múltiples veces (como unidad y paquete)
                     const itemsInSale = sale.items.filter(i => (i._originalId || i.id) === p.id);
                     if (itemsInSale.length > 0) {
@@ -117,7 +114,6 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
             // 4. Guardar todo
             await storageService.setItem(SALES_KEY, updatedSales);
-            await storageService.setItem('bodega_products_v1', updatedProducts);
             await storageService.setItem('bodega_customers_v1', finalCustomers);
 
             setSales(updatedSales);

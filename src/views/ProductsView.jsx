@@ -13,7 +13,7 @@ import ProductCard from '../components/Products/ProductCard';
 import ProductFormModal from '../components/Products/ProductFormModal';
 import ConfirmModal from '../components/ConfirmModal';
 import CategoryManagerModal from '../components/Products/CategoryManagerModal';
-import { useProducts } from '../hooks/useProducts';
+import { useProductContext } from '../context/ProductContext';
 
 export const ProductsView = ({ rates, triggerHaptic }) => {
     // ─── STATE DEL HOOK ─────────────────────────────────────
@@ -26,7 +26,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         customRate, setCustomRate,
         effectiveRate,
         adjustStock: baseAdjustStock
-    } = useProducts(rates);
+    } = useProductContext();
 
     // Envolver adjsutStock para incluir la respuesta háptica visual
     const adjustStock = (productId, delta) => {

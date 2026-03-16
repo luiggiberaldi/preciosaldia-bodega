@@ -3,7 +3,7 @@ import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Pac
 import { storageService } from '../utils/storageService';
 import { formatBs } from '../utils/calculatorUtils';
 import { getPaymentLabel, PAYMENT_ICONS } from '../config/paymentMethods';
-import { useProducts } from '../hooks/useProducts';
+import { useProductContext } from '../context/ProductContext';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -43,7 +43,7 @@ function getDateRange(rangeId) {
 }
 
 export default function ReportsView({ rates, triggerHaptic }) {
-    const { products } = useProducts(rates);
+    const { products } = useProductContext();
     const [allSales, setAllSales] = useState([]);
     const [selectedRange, setSelectedRange] = useState('week');
     const [customFrom, setCustomFrom] = useState('');

@@ -12,6 +12,7 @@ const TesterView = lazy(() => import('./views/TesterView').then(m => ({ default:
 
 import { useRates } from './hooks/useRates';
 import { useSecurity } from './hooks/useSecurity';
+import { ProductProvider } from './context/ProductContext';
 import PremiumGuard from './components/security/PremiumGuard';
 import TermsOverlay from './components/TermsOverlay';
 import OnboardingOverlay from './components/OnboardingOverlay';
@@ -203,9 +204,10 @@ export default function App() {
         </div>
       )}
 
-      <main className={`flex-1 min-h-0 w-full max-w-md md:max-w-3xl lg:max-w-7xl mx-auto relative ${isKeyboardOpen ? 'pb-4' : 'pb-24'} flex flex-col overflow-y-auto`}>
+      <ProductProvider rates={rates}>
+        <main className={`flex-1 min-h-0 w-full max-w-md md:max-w-3xl lg:max-w-7xl mx-auto relative ${isKeyboardOpen ? 'pb-4' : 'pb-24'} flex flex-col overflow-y-auto`}>
 
-        {/* Hidden Admin Trigger Area */}
+          {/* Hidden Admin Trigger Area */}
         <div
           className="absolute top-0 left-0 w-20 h-20 z-50 cursor-pointer opacity-0"
           onClick={handleLogoClick}
@@ -255,6 +257,7 @@ export default function App() {
           )}
         </Suspense>
       </main>
+      </ProductProvider>
 
       {/* Bottom Nav — hidden in POS mode for full-screen selling */}
       {!isKeyboardOpen && (

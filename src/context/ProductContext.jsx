@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { storageService } from '../utils/storageService';
 import { BODEGA_CATEGORIES } from '../config/categories';
 
-export function useProducts(rates) {
+const ProductContext = createContext();
+
+export function ProductProvider({ children, rates }) {
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState(BODEGA_CATEGORIES);
     const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -87,11 +89,18 @@ export function useProducts(rates) {
             if (e.key === 'bodega_use_auto_rate') {
                 setUseAutoRate(!!JSON.parse(e.newValue));
             }
+            if (e.key === 'bodega_products_v1') {
+                // If modified in another tab, fetch it
+                storageService.getItem('bodega_products_v1', []).then(updatedProducts => setProducts(updatedProducts));
+            }
+            if (e.key === 'my_categories_v1') {
+                storageService.getItem('my_categories_v1', BODEGA_CATEGORIES).then(updatedCategories => setCategories(updatedCategories));
+            }
         };
 
-        // Listen for same-tab storage updates (e.g., SalesView deducting stock)
+        // Mantener app_storage_update por si algún componente viejo sigue usándolo para sincronizar
+        // aunque ahora ProductContext centraliza todo.
         const handleAppStorageUpdate = async (e) => {
-            // Skip events triggered by our own auto-save
             if (savingRef.current) return;
 
             if (e.detail?.key === 'bodega_products_v1') {
@@ -113,7 +122,7 @@ export function useProducts(rates) {
     }, []);
 
     const adjustStock = (productId, delta) => {
-        setProducts(products.map(p => {
+        setProducts(prevProducts => prevProducts.map(p => {
             if (p.id === productId) {
                 const allowNeg = localStorage.getItem('allow_negative_stock') !== 'false';
                 const newStock = (p.stock ?? 0) + delta;
@@ -123,19 +132,31 @@ export function useProducts(rates) {
         }));
     };
 
-    return {
-        products,
-        setProducts,
-        categories,
-        setCategories,
-        isLoadingProducts,
-        streetRate,
-        setStreetRate,
-        useAutoRate,
-        setUseAutoRate,
-        customRate,
-        setCustomRate,
-        effectiveRate,
-        adjustStock
-    };
+    return (
+        <ProductContext.Provider value={{
+            products,
+            setProducts,
+            categories,
+            setCategories,
+            isLoadingProducts,
+            streetRate,
+            setStreetRate,
+            useAutoRate,
+            setUseAutoRate,
+            customRate,
+            setCustomRate,
+            effectiveRate,
+            adjustStock
+        }}>
+            {children}
+        </ProductContext.Provider>
+    );
 }
+
+export const useProductContext = () => {
+    const context = useContext(ProductContext);
+    if (!context) {
+        throw new Error("useProductContext must be used within a ProductProvider");
+    }
+    return context;
+};
