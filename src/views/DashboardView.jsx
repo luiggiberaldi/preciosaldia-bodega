@@ -86,9 +86,15 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             let updatedProducts = savedProducts;
             if (sale.items && sale.items.length > 0) {
                 updatedProducts = savedProducts.map(p => {
-                    const itemInSale = sale.items.find(i => i.id === p.id || i.id === p._originalId || i.id === p.id + '_unit');
-                    if (itemInSale) {
-                        return { ...p, stock: (p.stock || 0) + itemInSale.qty };
+                    // Un producto puede estar múltiples veces (como unidad y paquete)
+                    const itemsInSale = sale.items.filter(i => (i._originalId || i.id) === p.id);
+                    if (itemsInSale.length > 0) {
+                        const totalToRestore = itemsInSale.reduce((sum, item) => {
+                            if (item.isWeight) return sum + item.qty;
+                            if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
+                            return sum + item.qty;
+                        }, 0);
+                        return { ...p, stock: (p.stock || 0) + totalToRestore };
                     }
                     return p;
                 });
@@ -103,7 +109,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             if (sale.customerId && debtIncurred > 0) {
                 finalCustomers = finalCustomers.map(c => {
                     if (c.id === sale.customerId) {
-                        return { ...c, deuda: c.deuda - debtIncurred };
+                        return { ...c, deuda: Math.max(0, c.deuda - debtIncurred) };
                     }
                     return c;
                 });
@@ -116,6 +122,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
             setSales(updatedSales);
             setProducts(updatedProducts); // actualizar kpi
+            setCustomers(finalCustomers); // FIX: Update local customers state so KPIs refresh
 
             // Opcional: triggerHaptic()
             showToast('Venta anulada con éxito', 'success');

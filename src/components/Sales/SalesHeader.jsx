@@ -1,4 +1,4 @@
-import { RefreshCw, ShoppingCart } from 'lucide-react';
+import { RefreshCw, ShoppingCart, Keyboard } from 'lucide-react';
 
 const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
@@ -10,6 +10,7 @@ export default function SalesHeader({
     setCustomRate,
     showRateConfig,
     setShowRateConfig,
+    setShowKeyboardHelp,
     triggerHaptic
 }) {
     return (
@@ -31,8 +32,16 @@ export default function SalesHeader({
                     </div>
                 </div>
 
-                {/* Tasa Desktop (oculto en sm) */}
+                {/* Tasa Desktop y Botones (oculto en sm) */}
                 <div className="hidden sm:flex items-center gap-2">
+                    <button 
+                        onClick={() => setShowKeyboardHelp(true)}
+                        className="hidden md:flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl transition-colors hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+                    >
+                        <Keyboard size={14} />
+                        <span className="text-xs font-bold">Atajos (PC)</span>
+                    </button>
+
                     <button onClick={() => setShowRateConfig(!showRateConfig)} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 transition-colors group">
                         <span className="text-xs text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1">
                             <RefreshCw size={12} className={showRateConfig ? "text-emerald-500" : "group-hover:text-emerald-500"} />

@@ -15,6 +15,7 @@ import CartPanel from '../components/Sales/CartPanel';
 import ReceiptModal from '../components/Sales/ReceiptModal';
 import CheckoutModal from '../components/Sales/CheckoutModal';
 import CustomAmountModal from '../components/Sales/CustomAmountModal';
+import KeyboardHelpModal from '../components/Sales/KeyboardHelpModal';
 
 import ConfirmModal from '../components/ConfirmModal';
 import Confetti from '../components/Confetti';
@@ -34,12 +35,12 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const [showConfetti, setShowConfetti] = useState(false);
     const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
     const [showCustomAmountModal, setShowCustomAmountModal] = useState(false);
+    const [showKeyboardHelp, setShowKeyboardHelp] = useState(false); // Keyboard shortcuts modal state
 
     // Cart
-    const [cart, setCart] = useState(() => {
-        try { const saved = localStorage.getItem('pending_cart'); return saved ? JSON.parse(saved) : []; }
-        catch { return []; }
-    });
+    const [cart, setCart] = useState([]);
+    const cartRef = useRef(cart);
+    useEffect(() => { cartRef.current = cart; }, [cart]);
 
     // Search
     const searchInputRef = useRef(null);
@@ -56,6 +57,18 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
     // Rate config
     const [showRateConfig, setShowRateConfig] = useState(false);
+
+    // Cart Navigation State
+    const [cartSelectedIndex, setCartSelectedIndex] = useState(-1);
+
+    // Auto-select last item when cart length changes (if user was already interacting with the cart)
+    useEffect(() => {
+        if (cart.length > 0 && cartSelectedIndex !== -1) {
+            setCartSelectedIndex(Math.min(cartSelectedIndex, cart.length - 1));
+        } else if (cart.length === 0) {
+            setCartSelectedIndex(-1);
+        }
+    }, [cart.length]);
     const [useAutoRate, setUseAutoRate] = useState(() => {
         const saved = localStorage.getItem('bodega_use_auto_rate');
         return saved !== null ? JSON.parse(saved) : true;
@@ -184,23 +197,31 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
     // Persist cart
     useEffect(() => {
-        if (cart.length > 0) localStorage.setItem('pending_cart', JSON.stringify(cart));
-        else localStorage.removeItem('pending_cart');
+        if (cart === cartRef.current) return; // Prevent double-save on mount if empty
+        if (cart.length > 0) storageService.setItem('bodega_pending_cart_v1', cart);
+        else storageService.removeItem('bodega_pending_cart_v1');
     }, [cart]);
 
     // Load data
     useEffect(() => {
         let mounted = true;
         const load = async () => {
-            const [saved, savedCustomers, methods] = await Promise.all([
+            const [saved, savedCustomers, methods, savedCart] = await Promise.all([
                 storageService.getItem('bodega_products_v1', []),
                 storageService.getItem('bodega_customers_v1', []),
-                getActivePaymentMethods()
+                getActivePaymentMethods(),
+                storageService.getItem('bodega_pending_cart_v1', [])
             ]);
             if (mounted) {
                 setProducts(saved);
                 setCustomers(savedCustomers);
                 setPaymentMethods(methods);
+                
+                // Only set cart if it's currently empty (don't overwrite if user somehow added items before load)
+                if (savedCart && savedCart.length > 0 && cartRef.current.length === 0) {
+                    setCart(savedCart);
+                }
+                
                 setIsLoading(false);
 
                 const recycled = localStorage.getItem('recycled_cart');
@@ -225,14 +246,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     // Auto-focus search
     useEffect(() => { if (!isLoading && searchInputRef.current) searchInputRef.current.focus(); }, [isLoading]);
 
-    // Refresh products on window focus
-    useEffect(() => {
-        const handleFocus = async () => { setProducts(await storageService.getItem('bodega_products_v1', [])); };
-        window.addEventListener('focus', handleFocus);
-        return () => window.removeEventListener('focus', handleFocus);
-    }, []);
-
-    // Refresh products when tab becomes active (fix: both views always mounted)
+    // Refresh products when tab becomes active (consolidates window focus + isActive)
     useEffect(() => {
         if (isActive && !isLoading) {
             storageService.getItem('bodega_products_v1', []).then(saved => {
@@ -295,7 +309,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
         // Pre-calculate stock check BEFORE setCart to avoid React StrictMode double-firing
         if (!allowNegativeStock) {
-            const currentCart = cart;
+            const currentCart = cartRef.current;
             const existingInCart = currentCart.find(i => i.id === cartId && i.priceUsd === priceToUse);
             const addingQty = existingInCart ? (qtyOverride || 1) : qtyToAdd;
             const existingQtyForThis = existingInCart ? existingInCart.qty : 0;
@@ -317,7 +331,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
         // Soft warning when allowNegativeStock is ON but stock just ran out
         if (allowNegativeStock && currentStock > 0) {
-            const currentCart = cart;
+            const currentCart = cartRef.current;
             const existingInCart = currentCart.find(i => i.id === cartId && i.priceUsd === priceToUse);
             const existingQtyForThis = existingInCart ? existingInCart.qty : 0;
             const newQty = existingQtyForThis + (qtyOverride || 1);
@@ -351,8 +365,13 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         });
         handleSetSearchTerm('');
         setHierarchyPending(null);
-        searchInputRef.current?.focus();
-    }, [triggerHaptic, effectiveRate, cart]);
+        
+        // --- LISTO POS Flow: blur search to enter cart mode and auto-select ---
+        setTimeout(() => {
+            searchInputRef.current?.blur();
+            setCartSelectedIndex(0); // Ensure cart item is selected and ready for + / - 
+        }, 50);
+    }, [triggerHaptic, effectiveRate]);
 
     const updateQty = (id, delta) => {
         triggerHaptic && triggerHaptic();
@@ -362,14 +381,15 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
         // Pre-check stock BEFORE setCart to avoid React StrictMode double toast
         if (!allowNeg && delta > 0) {
-            const cartItem = cart.find(i => i.id === id);
+            const currentCart = cartRef.current;
+            const cartItem = currentCart.find(i => i.id === id);
             if (cartItem) {
                 const originalId = cartItem._originalId || cartItem.id;
                 const productData = products.find(p => p.id === originalId);
                 if (productData) {
                     const availableStock = parseFloat(productData.stock) || 0;
                     const newQty = Math.round((cartItem.qty + delta) * 1000) / 1000;
-                    const totalUsed = cart.reduce((sum, item) => {
+                    const totalUsed = currentCart.reduce((sum, item) => {
                         if ((item._originalId || item.id) !== originalId) return sum;
                         if (item.id === id) return sum;
                         if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
@@ -391,19 +411,24 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             if (newQty < 0) newQty = 0;
             return newQty === 0 ? null : { ...i, qty: newQty };
         }).filter(Boolean));
-        searchInputRef.current?.focus();
     };
 
     const removeFromCart = (id) => {
         triggerHaptic && triggerHaptic();
         playRemove();
         setCart(prev => prev.filter(i => i.id !== id));
-        searchInputRef.current?.focus();
     };
 
     const handleSearchKeyDown = (e) => {
         if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(prev => Math.min(prev + 1, searchResults.length - 1)); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(prev => Math.max(prev - 1, 0)); }
+        else if (e.key === 'ArrowRight') {
+            // Jump to cart navigation if items exist
+            if (cart.length > 0) {
+                e.preventDefault();
+                searchInputRef.current?.blur();
+            }
+        }
         else if (e.key === 'Enter') {
             e.preventDefault();
             // Barcode scanner (prefix 21)
@@ -422,7 +447,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         }
     };
 
-    const handleUseSaldoFavor = () => { /* Managed internally by CheckoutModal */ };
+
 
     const handleCheckout = async (payments, changeBreakdown) => {
         triggerHaptic && triggerHaptic();
@@ -438,6 +463,12 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         if (isNaN(cartTotalUsd) || cartTotalUsd < 0 || isNaN(totalPaidUsd) || totalPaidUsd < 0) {
             console.error('Abortando venta. Integridad matemática comprometida.');
             showToast('Error de integridad de datos. Revisa los montos.', 'error');
+            playError(); return;
+        }
+
+        // Bloquear checkouts en $0 total
+        if (cartTotalUsd <= 0.01) {
+            showToast('No se pueden generar ventas de $0.00', 'warning');
             playError(); return;
         }
 
@@ -498,7 +529,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         setShowReceipt(sale); playCheckout(); setShowConfetti(true);
         // Removed notifySaleComplete to only show low stock notifications
         notifyLowStock(updatedProducts);
-        setCart([]); setShowCheckout(false); setSelectedCustomerId('');
+        setCart([]); setShowCheckout(false); setSelectedCustomerId(''); setCartSelectedIndex(-1);
     };
 
     const handleCreateCustomer = async (name, documentId, phone) => {
@@ -529,6 +560,99 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         setShowCustomAmountModal(false);
     };
 
+    // ==========================================
+    // KEYBOARD SHORTCUTS (LISTO POS Port)
+    // ==========================================
+    useEffect(() => {
+        const handleGlobalKeys = (e) => {
+            // Block shortcuts if any modal is open
+            if (showCheckout || showReceipt || hierarchyPending || weightPending || showClearCartConfirm || showCustomAmountModal || showRateConfig || showKeyboardHelp) return;
+
+            const isTyping = document.activeElement === searchInputRef.current || document.activeElement?.tagName === 'INPUT';
+
+            // F2 or Enter (when not typing): Focus Search
+            if (e.key === 'F2' || (e.key === 'Enter' && !isTyping)) {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+                searchInputRef.current?.select();
+                setCartSelectedIndex(-1); // Resets cart focus
+                return;
+            }
+
+            // F4: Clear Cart
+            if (e.key === 'F4') {
+                e.preventDefault();
+                if (cartRef.current.length > 0) setShowClearCartConfirm(true);
+                return;
+            }
+
+            // F9: Process Checkout
+            if (e.key === 'F9') {
+                e.preventDefault();
+                if (cartRef.current.length > 0) setShowCheckout(true);
+                return;
+            }
+
+            // --- Cart Navigation and Modification ---
+            if (!isTyping && cartRef.current.length > 0) {
+                let currentCartIndices = cartRef.current.length - 1;
+                let activeIdx = cartSelectedIndex === -1 ? currentCartIndices : cartSelectedIndex; // Default to last item if none selected
+
+                const item = cartRef.current[activeIdx];
+                if (!item) return;
+
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setCartSelectedIndex(Math.max(0, activeIdx - 1));
+                    return;
+                }
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setCartSelectedIndex(Math.min(currentCartIndices, activeIdx + 1));
+                    return;
+                }
+
+                if (e.key === '+' || e.key === 'Add') {
+                    e.preventDefault();
+                    updateQty(item.id, item.isWeight ? 0.1 : 1);
+                    setCartSelectedIndex(activeIdx); // Ensure selection is active
+                    return;
+                }
+                
+                if (e.key === '-' || e.key === 'Subtract') {
+                    e.preventDefault();
+                    updateQty(item.id, item.isWeight ? -0.1 : -1);
+                    setCartSelectedIndex(activeIdx);
+                    return;
+                }
+
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    removeFromCart(item.id);
+                    if (cartRef.current.length <= 1) { // Will be 0 after update
+                        setCartSelectedIndex(-1);
+                        searchInputRef.current?.focus();
+                    } else {
+                        setCartSelectedIndex(Math.max(0, activeIdx - 1));
+                    }
+                    return;
+                }
+                
+                if (e.key === 'Enter' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    setCartSelectedIndex(-1);
+                    searchInputRef.current?.focus();
+                    searchInputRef.current?.select();
+                    return;
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeys);
+        return () => window.removeEventListener('keydown', handleGlobalKeys);
+    }, [showCheckout, showReceipt, hierarchyPending, weightPending, showClearCartConfirm, showCustomAmountModal, showRateConfig, showKeyboardHelp, cartSelectedIndex, updateQty, removeFromCart, cart.length]);
+
     // ── Loading ───────────────────────────────────
     if (isLoading) {
         return (
@@ -548,6 +672,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                 useAutoRate={useAutoRate} setUseAutoRate={setUseAutoRate}
                 customRate={customRate} setCustomRate={setCustomRate}
                 showRateConfig={showRateConfig} setShowRateConfig={setShowRateConfig}
+                setShowKeyboardHelp={setShowKeyboardHelp}
                 triggerHaptic={triggerHaptic}
             />
 
@@ -595,6 +720,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                             onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); }}
                             onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
                             triggerHaptic={triggerHaptic}
+                            cartSelectedIndex={cartSelectedIndex}
                         />
                     </div>
                 </div>
@@ -608,6 +734,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                         onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); }}
                         onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
                         triggerHaptic={triggerHaptic}
+                        cartSelectedIndex={cartSelectedIndex}
                     />
                 </div>
 
@@ -620,7 +747,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                     cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}
-                    onConfirmSale={handleCheckout} onUseSaldoFavor={handleUseSaldoFavor} onCreateCustomer={handleCreateCustomer}
+                    onConfirmSale={handleCheckout} onCreateCustomer={handleCreateCustomer}
                     triggerHaptic={triggerHaptic}
                 />
             )}
@@ -646,7 +773,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             <ConfirmModal
                 isOpen={showClearCartConfirm}
                 onClose={() => setShowClearCartConfirm(false)}
-                onConfirm={() => { setCart([]); setShowClearCartConfirm(false); }}
+                onConfirm={() => { setCart([]); setShowClearCartConfirm(false); setCartSelectedIndex(-1); }}
                 title="¿Vaciar toda la cesta?"
                 message="Todos los productos serán eliminados de la cesta actual. Esta acción no se puede deshacer."
                 confirmText="Sí, vaciar"
@@ -656,8 +783,11 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             {/* Confetti */}
             {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
 
-            {/* Mini Nav */}
-
+            {/* Keyboard Shortcuts Help Modal (Desktop Only) */}
+            <KeyboardHelpModal 
+                isOpen={showKeyboardHelp} 
+                onClose={() => setShowKeyboardHelp(false)} 
+            />
         </div>
     );
 }

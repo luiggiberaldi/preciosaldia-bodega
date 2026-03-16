@@ -44,7 +44,8 @@ export function useNotifications() {
         const lowItems = products.filter(p => {
             const stock = parseFloat(p.stock) || 0;
             const threshold = parseFloat(p.lowStockAlert) || 5;
-            return stock > 0 && stock <= threshold;
+            // Include 0 and negative stock as low stock too
+            return stock <= threshold;
         });
 
         if (lowItems.length === 0) return;

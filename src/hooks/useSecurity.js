@@ -8,6 +8,8 @@ const PRODUCT_ID = 'bodega';
 const DEMO_DURATION_MS = 168 * 60 * 60 * 1000; // 168 horas (7 días)
 
 // FIX 2: Ofuscación XOR + btoa para tokens en localStorage
+// WARNING: This is basic obfuscation to prevent casual tampering by employees.
+// It is NOT cryptographically secure from a determined attacker.
 const XOR_KEY = 'PDA_SEC_2026';
 
 const encodeToken = (str) => {

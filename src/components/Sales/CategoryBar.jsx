@@ -11,10 +11,11 @@ export default function CategoryBar({
     onOpenCustomAmount
 }) {
     return (
-        <div className={`${selectedCategory !== 'todos' && searchTerm.length === 0 ? 'lg:flex-1 lg:overflow-hidden lg:flex lg:flex-col lg:min-h-0' : ''}`}>
-            {/* Category Chips */}
-            <div className="shrink-0 flex gap-1.5 overflow-x-auto pb-2 pt-1 px-1 scrollbar-hide">
-                {/* Monto Libre Button */}
+        <div className={`relative ${selectedCategory !== 'todos' && searchTerm.length === 0 ? 'lg:flex-1 lg:overflow-hidden lg:flex lg:flex-col lg:min-h-0' : ''}`}>
+            {/* Category Chips Container with Mask */}
+            <div className="relative horizontal-scroll-mask">
+                <div className="shrink-0 flex gap-1.5 overflow-x-auto pb-2 pt-1 pl-1 pr-12 scrollbar-hide">
+                    {/* Monto Libre Button */}
                 <button
                     onClick={() => { triggerHaptic && triggerHaptic(); onOpenCustomAmount && onOpenCustomAmount(); }}
                     className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black transition-all active:scale-95 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 shadow-sm"
@@ -43,6 +44,7 @@ export default function CategoryBar({
                         </button>
                     );
                 })}
+                </div>
             </div>
 
             {/* Product Grid — solo cuando se filtra por categoría específica */}

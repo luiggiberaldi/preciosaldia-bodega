@@ -13,7 +13,30 @@ export default function CartPanel({
     onCheckout,
     onClearCart,
     triggerHaptic,
+    cartSelectedIndex,
 }) {
+    const [editingQtyId, setEditingQtyId] = React.useState(null);
+    const [tempQty, setTempQty] = React.useState('');
+    const inputRef = React.useRef(null);
+
+    const handleQtyClick = (item) => {
+        setEditingQtyId(item.id);
+        setTempQty(item.qty.toString());
+        setTimeout(() => inputRef.current?.focus(), 50);
+    };
+
+    const submitCustomQty = (item) => {
+        setEditingQtyId(null);
+        let parsed = parseFloat(tempQty.replace(',', '.'));
+        if (isNaN(parsed) || parsed <= 0) return; // Ignore invalid values
+        
+        // Calculate difference and call updateQty (+ delta)
+        const diff = parsed - item.qty;
+        if (diff !== 0) {
+            updateQty(item.id, diff);
+        }
+    };
+
     return (
         <div className="lg:flex-1 lg:min-h-0 flex flex-col bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
 
@@ -43,11 +66,18 @@ export default function CartPanel({
                     </div>
                 ) : (
                     <div className="space-y-2">
-                        {cart.map(item => {
+                        {cart.map((item, idx) => {
                             const qtyDisplay = item.isWeight ? `${item.qty.toFixed(3)} Kg` : item.qty;
                             const isCustomProduct = item.id.toString().startsWith('custom_') || item.name === 'Venta Libre';
+                            const isEditing = editingQtyId === item.id;
+                            const isSelected = cartSelectedIndex === idx;
+
                             return (
-                                <div key={item.id} className="group bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl p-2 pr-6 sm:p-3 sm:pr-10 border border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors relative">
+                                <div key={item.id} className={`group bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl p-2 pr-6 sm:p-3 sm:pr-10 border flex items-center justify-between gap-2 transition-colors relative ${
+                                    isSelected 
+                                        ? 'border-emerald-500 ring-2 ring-emerald-500/20 dark:border-emerald-400 dark:ring-emerald-400/20' 
+                                        : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-200 dark:hover:border-emerald-800'
+                                }`}>
                                     <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                                         <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 overflow-hidden ${isCustomProduct ? 'bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600' : 'bg-slate-50 dark:bg-slate-950'}`}>
                                             {item.image ? (
@@ -72,7 +102,27 @@ export default function CartPanel({
                                         <p className="text-sm sm:text-base font-black text-slate-800 dark:text-white">${(item.priceUsd * item.qty).toFixed(2)}</p>
                                         <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-100 dark:border-slate-700">
                                             <button onClick={() => updateQty(item.id, item.isWeight ? -0.1 : -1)} className="w-7 sm:w-8 h-7 sm:h-8 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors rounded-l-md active:bg-slate-200 dark:active:bg-slate-700"><Minus size={14} strokeWidth={3} /></button>
-                                            <span className="w-10 sm:w-12 text-center font-black text-slate-700 dark:text-white text-[11px] sm:text-xs">{qtyDisplay}</span>
+                                            
+                                            {isEditing ? (
+                                                <input
+                                                    ref={inputRef}
+                                                    type="number"
+                                                    value={tempQty}
+                                                    onChange={e => setTempQty(e.target.value)}
+                                                    onBlur={() => submitCustomQty(item)}
+                                                    onKeyDown={e => { if (e.key === 'Enter') submitCustomQty(item) }}
+                                                    className="w-12 sm:w-16 h-7 sm:h-8 text-center font-black text-slate-700 bg-white dark:bg-slate-900 dark:text-white border border-emerald-500 rounded text-xs outline-none"
+                                                    step={item.isWeight ? "0.01" : "1"}
+                                                />
+                                            ) : (
+                                                <span 
+                                                    onClick={() => handleQtyClick(item)} 
+                                                    className="w-10 sm:w-12 text-center font-black text-slate-700 dark:text-white text-[11px] sm:text-xs cursor-pointer hover:text-emerald-500 transition-colors"
+                                                >
+                                                    {qtyDisplay}
+                                                </span>
+                                            )}
+
                                             <button onClick={() => updateQty(item.id, item.isWeight ? 0.1 : 1)} className="w-7 sm:w-8 h-7 sm:h-8 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-colors rounded-r-md active:bg-slate-200 dark:active:bg-slate-700"><Plus size={14} strokeWidth={3} /></button>
                                         </div>
                                     </div>

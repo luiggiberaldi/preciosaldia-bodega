@@ -78,6 +78,11 @@ html.dark body {
   -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent);
 }
 
+.horizontal-scroll-mask {
+  mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 32px), transparent);
+}
+
 /* ── Pull to Refresh ── */
 @keyframes spin-slow {
   to {

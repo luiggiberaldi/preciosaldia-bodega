@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { Package, Plus, Trash2, X, Store, Tag, Pencil, Banknote, Search, ChevronLeft, ChevronRight, Settings, AlertTriangle, Box } from 'lucide-react';
@@ -49,7 +49,12 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('todos');
     const [currentPage, setCurrentPage] = useState(1);
-    const ITEMS_PER_PAGE = 8;
+    const [itemsPerPage, setItemsPerPage] = useState(window.innerWidth >= 1024 ? 12 : 8);
+    useEffect(() => {
+        const handleResize = () => setItemsPerPage(window.innerWidth >= 1024 ? 12 : 8);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Form State (Product Edit/Create)
     const [editingId, setEditingId] = useState(null);
@@ -94,10 +99,10 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         return matchesSearch && matchesCategory;
     });
 
-    const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
     const paginatedProducts = filteredProducts.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
     );
 
     // Auto-reset page when filter changes
