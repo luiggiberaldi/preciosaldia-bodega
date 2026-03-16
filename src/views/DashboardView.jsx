@@ -161,7 +161,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             text += `\n*SALDO PENDIENTE (FIADO): $${sale.fiadoUsd.toFixed(2)}*\n`;
         }
         text += `\n===================================\n`;
-        text += `*¡Gracias por su compra!*`;
+        text += `*¡Gracias por su compra!*\n\n`;
+        text += `_Este documento no constituye factura fiscal. Comprobante de control interno._`;
 
         const encoded = encodeURIComponent(text);
 

@@ -86,6 +86,8 @@ export function buildReceiptWhatsAppUrl(receipt) {
         fiadoLine,
         sep,
         `Gracias por su compra!`,
+        ``,
+        `_Este documento no constituye factura fiscal. Comprobante de control interno._`,
         `Precios Al Dia - Sistema POS`,
     ].filter(Boolean).join('\n');
 
