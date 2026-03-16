@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode } from 'lucide-react';
+import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode, CheckCircle } from 'lucide-react';
 import { Modal } from '../Modal';
 
 const PACKAGING_TYPES = [
@@ -33,6 +33,7 @@ export default function ProductFormModal({
     stockInLotes, setStockInLotes,
     granelUnit, setGranelUnit,
     effectiveRate,
+    isFormShaking,
 
     handleImageUpload,
     handleSave,
@@ -70,11 +71,15 @@ export default function ProductFormModal({
     // Unit label for granel
     const granelLabel = granelUnit === 'kg' ? 'Kilo' : 'Litro';
 
-    // Price label suffix
     const priceSuffix = isLote ? ' / Lote' : isGranel ? ` / ${granelLabel}` : '';
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? "Editar Producto" : "Nuevo Producto"}>
+        <Modal 
+            isOpen={isOpen} 
+            onClose={onClose} 
+            title={isEditing ? "Editar Producto" : "Nuevo Producto"}
+            className={isFormShaking ? 'animate-shake border-red-500 shadow-xl shadow-red-500/20' : ''}
+        >
             <div className="space-y-4">
                 {/* Upload */}
                 <div onClick={() => fileInputRef.current?.click()} className="h-28 bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500 transition-colors relative overflow-hidden">
@@ -90,10 +95,13 @@ export default function ProductFormModal({
 
                 <div className="space-y-3">
                     {/* Name */}
-                    <div>
+                    <div className="relative">
                         <label className="text-xs font-bold text-slate-400 ml-1 mb-1 block uppercase">Nombre</label>
                         <input value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="Ej: Harina PAN 1kg"
-                            className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 capitalize" />
+                            className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 pr-10 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 capitalize" />
+                        {name && name.trim().length >= 3 && (
+                            <CheckCircle size={18} className="absolute right-3 top-[38px] text-emerald-500 transition-all duration-300" />
+                        )}
                     </div>
 
                     {/* Barcode */}
@@ -220,19 +228,25 @@ export default function ProductFormModal({
 
                     {/* ─── PRICE SECTION ─── */}
                     <div className="grid grid-cols-2 gap-3">
-                        <div>
+                        <div className="relative">
                             <label className="text-[10px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400 ml-1 mb-1 block uppercase tracking-wider">
                                 Precio de Venta ($){priceSuffix}
                             </label>
                             <input type="number" inputMode="decimal" value={priceUsd} onChange={e => handlePriceUsdChange(e.target.value)} placeholder="1.50"
-                                className="w-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30 p-3.5 sm:p-4 rounded-xl font-black text-emerald-800 dark:text-emerald-400 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm sm:text-base" />
+                                className="w-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30 p-3.5 pr-10 sm:p-4 sm:pr-10 rounded-xl font-black text-emerald-800 dark:text-emerald-400 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm sm:text-base" />
+                            {parseFloat(priceUsd) > 0 && (
+                                <CheckCircle size={18} className="absolute right-3 top-[38px] sm:top-[42px] text-emerald-500 transition-all duration-300" />
+                            )}
                         </div>
-                        <div>
+                        <div className="relative">
                             <label className="text-[10px] sm:text-xs font-bold text-indigo-600 dark:text-indigo-400 ml-1 mb-1 block uppercase tracking-wider">
                                 Precio de Venta (Bs){priceSuffix}
                             </label>
                             <input type="number" inputMode="decimal" value={priceBs} onChange={e => handlePriceBsChange(e.target.value)} placeholder="0.00"
-                                className="w-full bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/30 p-3.5 sm:p-4 rounded-xl font-black text-indigo-800 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all text-sm sm:text-base" />
+                                className="w-full bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/30 p-3.5 pr-10 sm:p-4 sm:pr-10 rounded-xl font-black text-indigo-800 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all text-sm sm:text-base" />
+                            {parseFloat(priceBs) > 0 && (
+                                <CheckCircle size={18} className="absolute right-3 top-[38px] sm:top-[42px] text-indigo-500 transition-all duration-300" />
+                            )}
                         </div>
                     </div>
 

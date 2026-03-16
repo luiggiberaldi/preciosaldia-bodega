@@ -4,6 +4,7 @@ import { storageService } from '../utils/storageService';
 import { formatBs } from '../utils/calculatorUtils';
 import { getPaymentLabel, PAYMENT_ICONS } from '../config/paymentMethods';
 import { useProductContext } from '../context/ProductContext';
+import EmptyState from '../components/EmptyState';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -201,14 +202,14 @@ export default function ReportsView({ rates, triggerHaptic }) {
             </div>
 
             {/* Range Selector */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
                 {RANGE_OPTIONS.map(opt => (
                     <button
                         key={opt.id}
                         onClick={() => { triggerHaptic && triggerHaptic(); setSelectedRange(opt.id); }}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${selectedRange === opt.id
-                            ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20'
-                            : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-indigo-300'
+                        className={`px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors active:scale-95 ${selectedRange === opt.id
+                            ? 'bg-indigo-500 text-white shadow-sm shadow-indigo-500/30'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
                             }`}
                     >
                         {opt.label}
@@ -250,7 +251,7 @@ export default function ReportsView({ rates, triggerHaptic }) {
 
             {/* Mini bar chart per day */}
             {salesByDay.length > 1 && (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm mt-4">
                     <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
                         <Calendar size={12} /> Ventas por Día
                     </h3>
@@ -332,12 +333,12 @@ export default function ReportsView({ rates, triggerHaptic }) {
 
             {/* Empty state */}
             {filteredSales.length === 0 && (
-                <div className="text-center py-12">
-                    <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800">
-                        <BarChart3 size={32} className="text-slate-300 dark:text-slate-700" />
-                    </div>
-                    <p className="text-sm font-bold text-slate-400">Sin ventas en este período</p>
-                    <p className="text-xs text-slate-300 dark:text-slate-600 mt-1">Selecciona otro rango de fechas</p>
+                <div className="mt-8">
+                    <EmptyState
+                        icon={BarChart3}
+                        title="Sin ventas en este período"
+                        description="Selecciona otro rango de fechas o usa el botón Personalizado para buscar más atrás."
+                    />
                 </div>
             )}
         </div>

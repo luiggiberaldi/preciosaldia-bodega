@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tag, Banknote, AlertTriangle, Box, Minus, Plus, Pencil, Trash2, Package, Layers } from 'lucide-react';
+import { Tag, Banknote, AlertTriangle, Box, Minus, Plus, Pencil, Trash2, Package, Layers, Clock } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_ICONS, UNITS } from '../../config/categories';
 import { formatUsd, formatBs, smartCashRounding } from '../../utils/calculatorUtils';
 
@@ -9,6 +9,7 @@ export default function ProductCard({
     streetRate,
     categories,
     onAdjustStock,
+    daysRemaining,
 
     onEdit,
     onDelete
@@ -96,6 +97,23 @@ export default function ProductCard({
                             <Plus size={18} strokeWidth={2.5} />
                         </button>
                     </div>
+
+                    {/* Days Remaining Badge */}
+                    {daysRemaining !== null && daysRemaining !== undefined && (
+                        <div className={`flex items-center justify-center gap-1 mt-1.5 py-1 rounded-lg text-[10px] font-bold ${
+                            daysRemaining <= 3
+                                ? 'bg-red-50 dark:bg-red-900/20 text-red-500'
+                                : daysRemaining <= 7
+                                    ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-500'
+                                    : 'bg-blue-50 dark:bg-blue-900/20 text-blue-500'
+                        }`}>
+                            <Clock size={10} />
+                            {daysRemaining <= 3
+                                ? `Agotado en ~${daysRemaining}d`
+                                : `~${daysRemaining} dias de stock`
+                            }
+                        </div>
+                    )}
                 </div>
             </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { Package, Plus, Trash2, X, Store, Tag, Pencil, Banknote, Search, ChevronLeft, ChevronRight, Settings, AlertTriangle, Box } from 'lucide-react';
@@ -14,6 +14,9 @@ import ProductFormModal from '../components/Products/ProductFormModal';
 import ConfirmModal from '../components/ConfirmModal';
 import CategoryManagerModal from '../components/Products/CategoryManagerModal';
 import { useProductContext } from '../context/ProductContext';
+import EmptyState from '../components/EmptyState';
+import Skeleton from '../components/Skeleton';
+import SwipeableItem from '../components/SwipeableItem';
 
 export const ProductsView = ({ rates, triggerHaptic }) => {
     // ─── STATE DEL HOOK ─────────────────────────────────────
@@ -76,6 +79,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [packagingType, setPackagingType] = useState('suelto');
     const [stockInLotes, setStockInLotes] = useState('');
     const [granelUnit, setGranelUnit] = useState('kg');
+    
+    // UI states
+    const [isFormShaking, setIsFormShaking] = useState(false);
     const fileInputRef = useRef(null);
     const categoryScrollRef = useRef(null);
 
@@ -87,6 +93,42 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [deleteId, setDeleteId] = useState(null);
     const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
     const [deleteAllConfirmText, setDeleteAllConfirmText] = useState('');
+
+    // ─── SALES VELOCITY (Días de Inventario) ────────────────
+    const [salesVelocityMap, setSalesVelocityMap] = useState({});
+    useEffect(() => {
+        const computeVelocity = async () => {
+            try {
+                const allSales = await storageService.getItem('bodega_sales_v1', []);
+                if (!allSales.length) return;
+                // Últimos 14 días
+                const now = new Date();
+                const fourteenDaysAgo = new Date(now);
+                fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+                const recentSales = allSales.filter(s => 
+                    s.timestamp && new Date(s.timestamp) >= fourteenDaysAgo &&
+                    s.tipo !== 'COBRO_DEUDA' && s.status !== 'ANULADA'
+                );
+                // Contar ventas por producto
+                const velocityMap = {};
+                recentSales.forEach(sale => {
+                    (sale.items || []).forEach(item => {
+                        const key = item.id || item.name;
+                        if (!velocityMap[key]) velocityMap[key] = 0;
+                        velocityMap[key] += item.qty;
+                    });
+                });
+                // Dividir entre 14 para obtener promedio diario
+                Object.keys(velocityMap).forEach(k => {
+                    velocityMap[k] = velocityMap[k] / 14;
+                });
+                setSalesVelocityMap(velocityMap);
+            } catch (e) {
+                // Silenciar errores
+            }
+        };
+        computeVelocity();
+    }, [products.length]); // Recalcular cuando cambian los productos
 
     // ─── FILTERING & PAGINATION ─────────────────────────────
 
@@ -173,7 +215,11 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     const handleSave = () => {
         triggerHaptic && triggerHaptic();
-        if (!name || (!priceUsd && !priceBs)) return showToast('Nombre y precio requeridos', 'warning');
+        if (!name || (!priceUsd && !priceBs)) {
+            setIsFormShaking(true);
+            setTimeout(() => setIsFormShaking(false), 500);
+            return showToast('Nombre y precio requeridos', 'warning');
+        }
 
         const formattedName = name.replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase());
         const finalPriceUsd = priceUsd ? parseFloat(priceUsd) : (priceBs ? parseFloat(priceBs) / effectiveRate : 0);
@@ -426,20 +472,45 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
             {/* Product Grid */}
             {isLoadingProducts ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 space-y-4">
-                    <div className="w-8 h-8 rounded-full border-4 border-slate-200 dark:border-slate-800 border-t-emerald-500 animate-spin" />
-                    <p className="text-sm font-medium">Cargando inventario...</p>
+                <div className="flex-1 overflow-y-auto pb-4 scrollbar-hide">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        {[1,2,3,4,5,6,7,8,9,10].map(i => (
+                            <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-3 h-56 flex flex-col justify-between">
+                                <div>
+                                    <Skeleton className="w-12 h-12 rounded-xl mb-3" />
+                                    <Skeleton className="w-3/4 h-4 rounded mb-2" />
+                                    <Skeleton className="w-1/2 h-3 rounded" />
+                                </div>
+                                <div>
+                                    <Skeleton className="w-full h-8 rounded-lg mb-2" />
+                                    <div className="flex justify-between">
+                                        <Skeleton className="w-1/3 h-6 rounded-lg" />
+                                        <Skeleton className="w-1/3 h-6 rounded-lg" />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             ) : products.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 space-y-4">
-                    <Package size={64} strokeWidth={1} />
-                    <p className="text-sm font-medium">No has agregado productos</p>
-                    <p className="text-xs text-slate-400">Toca el botón + para empezar</p>
+                <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full">
+                    <EmptyState
+                        icon={Package}
+                        title="Inventario Vacío"
+                        description="Aún no tienes productos registrados. Empieza a llenar tus anaqueles para poder vender."
+                        actionLabel="NUEVO PRODUCTO"
+                        onAction={() => { triggerHaptic && triggerHaptic(); setIsModalOpen(true); }}
+                    />
                 </div>
             ) : filteredProducts.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-2">
-                    <Search size={48} className="opacity-20" />
-                    <p className="text-sm">No se encontraron productos</p>
+                <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full">
+                    <EmptyState
+                        icon={Search}
+                        title="Sin resultados"
+                        description={`No encontramos productos para "${searchTerm || activeCategory}".`}
+                        secondaryActionLabel="Limpiar Filtros"
+                        onSecondaryAction={() => { handleSetSearchTerm(''); handleSetActiveCategory('todos'); triggerHaptic && triggerHaptic(); }}
+                    />
                 </div>
             ) : (
                 <>
@@ -455,17 +526,28 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                     <div className="flex-1 overflow-y-auto pb-4 scrollbar-hide">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                             {paginatedProducts.map(p => (
-                                <ProductCard
+                                <SwipeableItem 
                                     key={p.id}
-                                    product={p}
-                                    effectiveRate={effectiveRate}
-                                    streetRate={streetRate}
-                                    categories={categories}
-                                    onAdjustStock={adjustStock}
-                                    onShare={setShareProduct}
-                                    onEdit={handleEdit}
-                                    onDelete={handleDelete}
-                                />
+                                    onEdit={() => handleEdit(p)}
+                                    onDelete={() => handleDelete(p.id)}
+                                    triggerHaptic={triggerHaptic}
+                                >
+                                    <ProductCard
+                                        product={p}
+                                        effectiveRate={effectiveRate}
+                                        streetRate={streetRate}
+                                        categories={categories}
+                                        onAdjustStock={adjustStock}
+                                        onShare={setShareProduct}
+                                        onEdit={handleEdit}
+                                        onDelete={handleDelete}
+                                        daysRemaining={
+                                            salesVelocityMap[p.id] > 0 && (p.stock ?? 0) > 0
+                                                ? Math.round((p.stock ?? 0) / salesVelocityMap[p.id])
+                                                : null
+                                        }
+                                    />
+                                </SwipeableItem>
                             ))}
                         </div>
 
@@ -508,6 +590,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 stockInLotes={stockInLotes} setStockInLotes={setStockInLotes}
                 granelUnit={granelUnit} setGranelUnit={setGranelUnit}
                 effectiveRate={effectiveRate}
+                isFormShaking={isFormShaking}
                 handleImageUpload={handleImageUpload}
                 handleSave={handleSave}
                 categories={categories}

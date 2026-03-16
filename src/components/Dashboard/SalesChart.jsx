@@ -5,7 +5,7 @@ import { BarChart3 } from 'lucide-react';
  * Gráfica de barras: Ventas de los últimos 7 días.
  * Pure CSS — cero dependencias externas.
  */
-function SalesChart({ weekData }) {
+function SalesChart({ weekData, onDayClick, selectedDate }) {
     if (!weekData || weekData.length === 0) return null;
 
     const maxVal = Math.max(...weekData.map(d => d.total), 1);
@@ -24,8 +24,14 @@ function SalesChart({ weekData }) {
                     const isToday = i === weekData.length - 1;
                     const dayName = DAYS[new Date(day.date).getDay()];
 
+                    const isSelected = selectedDate === day.date;
+                    
                     return (
-                        <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
+                        <div 
+                            key={day.date} 
+                            onClick={() => onDayClick && onDayClick(day.date)}
+                            className={`flex-1 flex flex-col items-center gap-1 cursor-pointer group ${isSelected ? 'scale-110 transform transition-transform' : ''}`}
+                        >
                             {/* Amount label */}
                             <span className={`text-[9px] font-bold ${day.total > 0 ? 'text-slate-500 dark:text-slate-400' : 'text-transparent'}`}>
                                 ${day.total.toFixed(0)}
@@ -34,12 +40,15 @@ function SalesChart({ weekData }) {
                             {/* Bar */}
                             <div className="w-full flex justify-center">
                                 <div
-                                    className={`w-full max-w-[28px] rounded-t-lg transition-all duration-700 ease-out ${isToday
-                                        ? 'bg-gradient-to-t from-emerald-500 to-emerald-400 shadow-md shadow-emerald-500/20'
+                                    className={`w-full max-w-[28px] rounded-t-lg transition-all duration-300 ease-out group-hover:opacity-80 ${
+                                        isSelected 
+                                            ? 'bg-gradient-to-t from-blue-500 to-blue-400 shadow-md shadow-blue-500/30'
+                                        : isToday
+                                            ? 'bg-gradient-to-t from-emerald-500 to-emerald-400 shadow-md shadow-emerald-500/20'
                                         : day.total > 0
                                             ? 'bg-gradient-to-t from-slate-300 to-slate-200 dark:from-slate-700 dark:to-slate-600'
                                             : 'bg-slate-100 dark:bg-slate-800'
-                                        }`}
+                                    }`}
                                     style={{
                                         height: `${Math.max(pct, 4)}%`,
                                         minHeight: '4px',
@@ -48,8 +57,11 @@ function SalesChart({ weekData }) {
                             </div>
 
                             {/* Day label */}
-                            <span className={`text-[10px] font-bold ${isToday ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'
-                                }`}>
+                            <span className={`text-[10px] font-bold ${
+                                isSelected ? 'text-blue-600 dark:text-blue-400' 
+                                : isToday ? 'text-emerald-600 dark:text-emerald-400' 
+                                : 'text-slate-400'
+                            }`}>
                                 {isToday ? 'Hoy' : dayName}
                             </span>
                         </div>

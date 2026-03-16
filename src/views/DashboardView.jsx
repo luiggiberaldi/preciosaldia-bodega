@@ -1,26 +1,30 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, Moon, Sun, UserPlus, Phone, FileText, Recycle } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, Moon, Sun, UserPlus, Phone, FileText, Recycle, Key, Settings } from 'lucide-react';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import SalesChart from '../components/Dashboard/SalesChart';
 import ConfirmModal from '../components/ConfirmModal';
-import { generateTicketPDF } from '../utils/ticketGenerator';
+import { generateTicketPDF, printThermalTicket } from '../utils/ticketGenerator';
 import { generateDailyClosePDF } from '../utils/dailyCloseGenerator';
 import { useNotifications } from '../hooks/useNotifications';
 import AnimatedCounter from '../components/AnimatedCounter';
 import { useProductContext } from '../context/ProductContext';
+import { useSecurity } from '../hooks/useSecurity';
+import SettingsModal from '../components/SettingsModal';
+import Skeleton from '../components/Skeleton';
 
 const SALES_KEY = 'bodega_sales_v1';
-
-export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme, isActive }) {
+export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme, isActive, isDemo, demoTimeLeft }) {
     const { notifyCierrePendiente, requestPermission } = useNotifications();
+    const { deviceId } = useSecurity();
     const [sales, setSales] = useState([]);
     const { products, setProducts, isLoadingProducts } = useProductContext();
     const [customers, setCustomers] = useState([]);
     const [isLoadingLocal, setIsLoadingLocal] = useState(true);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isLoading = isLoadingProducts || isLoadingLocal;
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -33,6 +37,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const [recycleOffer, setRecycleOffer] = useState(null);
     const [pullDistance, setPullDistance] = useState(0);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [selectedChartDate, setSelectedChartDate] = useState(null);
     const touchStartY = useRef(0);
     const scrollRef = useRef(null);
 
@@ -176,6 +181,11 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         generateTicketPDF(sale, bcvRate);
     };
 
+    const handlePrintTicket = (sale) => {
+        triggerHaptic();
+        printThermalTicket(sale, bcvRate);
+    };
+
     // ── Registrar cliente para ticket ──
     const handleRegisterClientForTicket = async () => {
         if (!ticketClientName.trim() || !ticketPendingSale) return;
@@ -256,8 +266,13 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         [todaySales, bcvRate, products]
     );
 
-    // Últimas 7 ventas
-    const recentSales = useMemo(() => sales.slice(0, 7), [sales]);
+    // Últimas ventas (por defecto las últimas 7, o las del día seleccionado en la gráfica)
+    const recentSales = useMemo(() => {
+        if (selectedChartDate) {
+            return sales.filter(s => s.timestamp?.startsWith(selectedChartDate));
+        }
+        return sales.slice(0, 7);
+    }, [sales, selectedChartDate]);
 
     // Datos últimos 7 días (para gráfica)
     const weekData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
@@ -356,18 +371,18 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     if (isLoading) {
         return (
             <div className="flex-1 p-3 sm:p-6 space-y-4">
-                <div className="skeleton h-14 w-40" />
+                <Skeleton className="h-14 w-40 rounded-2xl" />
                 <div className="grid grid-cols-3 gap-3">
-                    <div className="skeleton h-20" />
-                    <div className="skeleton h-20" />
-                    <div className="skeleton h-20" />
+                    <Skeleton className="h-24 rounded-2xl" />
+                    <Skeleton className="h-24 rounded-2xl" />
+                    <Skeleton className="h-24 rounded-2xl" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                    <div className="skeleton h-32" />
-                    <div className="skeleton h-32" />
+                    <Skeleton className="h-32 rounded-3xl" />
+                    <Skeleton className="h-32 rounded-3xl" />
                 </div>
-                <div className="skeleton h-48" />
-                <div className="skeleton h-24" />
+                <Skeleton className="h-48 rounded-3xl" />
+                <Skeleton className="h-24 rounded-2xl" />
             </div>
         );
     }
@@ -430,6 +445,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         </button>
                     </div>
                 </div>
+                {/* NEW GEAR ICON FOR SETTINGS */}
+                <button 
+                    onClick={() => { triggerHaptic(); setIsSettingsOpen(true); }}
+                    className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-300 rounded-full shadow-sm hover:shadow active:scale-95 transition-all outline-none" 
+                    title="Configuración"
+                >
+                    <Settings size={22} className="text-slate-700 dark:text-slate-200" />
+                </button>
             </div>
 
             {/* Acciones Rápidas */}
@@ -450,6 +473,27 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
             {/* Stats Cards */}
             <div className="grid grid-cols-2 gap-3 mb-5">
+                {/* Licencia Demo (solo visible en modo demo) */}
+                {isDemo && demoTimeLeft && (
+                    <div className="col-span-2 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-4 shadow-sm relative overflow-hidden text-white flex items-center justify-between">
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                        <div className="flex items-center gap-3 relative z-10">
+                            <div className="w-10 h-10 bg-black/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                <Key size={20} className="text-amber-100" />
+                            </div>
+                            <div>
+                                <h3 className="text-[13px] font-bold text-amber-50 leading-tight">Licencia de Prueba</h3>
+                                <p className="text-xl font-black mt-0.5">{demoTimeLeft}</p>
+                            </div>
+                        </div>
+                        <div className="relative z-10 text-right">
+                            <button className="text-[10px] font-bold bg-white/20 hover:bg-white/30 transition-colors px-3 py-1.5 rounded-lg active:scale-95" onClick={() => window.open(`https://wa.me/584124051793?text=Hola! Quiero adquirir la licencia Premium de PreciosAlDía Bodega. Mi ID de instalación es: ${deviceId || 'N/A'}`.replace(/\s+/g, '%20'), '_blank')}>
+                                ADQUIRIR
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Ventas Hoy */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
                     <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-50 dark:bg-emerald-900/10 rounded-full blur-2xl"></div>
@@ -551,7 +595,18 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* Gráfica semanal */}
-            <SalesChart weekData={weekData} />
+            <SalesChart 
+                weekData={weekData} 
+                selectedDate={selectedChartDate}
+                onDayClick={(date) => {
+                    triggerHaptic();
+                    setSelectedChartDate(prev => prev === date ? null : date);
+                    // Scroll down to history a bit smoothly if selecting
+                    setTimeout(() => {
+                        window.scrollBy({ top: 150, behavior: 'smooth' });
+                    }, 50);
+                }}
+            />
 
             {/* Bajo Stock */}
             {lowStockProducts.length > 0 && (
@@ -619,6 +674,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     localStorage.setItem('recycled_cart', JSON.stringify(sale.items));
                     if (onNavigate) onNavigate('ventas');
                 }}
+                onPrintTicket={handlePrintTicket}
             />
 
             {/* Empty state */}
@@ -833,6 +889,12 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 message="Se generará un PDF con el reporte del día y se borrarán las ventas de hoy.\n\nEsta acción no se puede deshacer."
                 confirmText="Cerrar Caja"
                 confirmClassName="bg-indigo-500 hover:bg-indigo-600 text-white"
+            />
+
+            <SettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                triggerHaptic={triggerHaptic}
             />
         </div>
     );

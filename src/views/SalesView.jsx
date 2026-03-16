@@ -6,6 +6,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { getActivePaymentMethods } from '../config/paymentMethods';
 import { showToast } from '../components/Toast';
+import { ShoppingCart, X } from 'lucide-react';
 
 // Components
 import SalesHeader from '../components/Sales/SalesHeader';
@@ -61,6 +62,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
     // Rate config
     const [showRateConfig, setShowRateConfig] = useState(false);
+
+    const [isCartSheetOpen, setIsCartSheetOpen] = useState(false);
 
     // Cart Navigation State
     const [cartSelectedIndex, setCartSelectedIndex] = useState(-1);
@@ -694,19 +697,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                             onOpenCustomAmount={() => setShowCustomAmountModal(true)}
                         />
                     )}
-
-                    {/* Cart — visible on mobile only (below products) */}
-                    <div className="lg:hidden pb-20">
-                        <CartPanel
-                            cart={cart} effectiveRate={effectiveRate}
-                            cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
-                            updateQty={updateQty} removeFromCart={removeFromCart}
-                            onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); }}
-                            onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
-                            triggerHaptic={triggerHaptic}
-                            cartSelectedIndex={cartSelectedIndex}
-                        />
-                    </div>
                 </div>
 
                 {/* ── Right Column: Cart Sidebar — desktop only ── */}
@@ -722,6 +712,63 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                     />
                 </div>
 
+            </div>
+
+            {/* ── Mobile Cart FAB & Bottom Sheet (lg:hidden) ── */}
+            <div className="lg:hidden">
+                {/* Floating Action Button */}
+                {cart.length > 0 && !isCartSheetOpen && !showCheckout && !showReceipt && (
+                    <button 
+                        onClick={() => { triggerHaptic && triggerHaptic(); setIsCartSheetOpen(true); }}
+                        className="fixed bottom-[max(5rem,env(safe-area-inset-bottom)+4.5rem)] left-4 right-4 bg-emerald-500 hover:bg-emerald-600 text-white p-4 rounded-2xl shadow-xl shadow-emerald-500/30 flex items-center justify-between z-40 active:scale-95 transition-all animate-in slide-in-from-bottom"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="bg-white/20 p-2 rounded-xl">
+                                <ShoppingCart size={20} />
+                            </div>
+                            <div className="text-left">
+                                <div className="text-xs font-bold text-emerald-100 uppercase tracking-wider">Ver Cesta</div>
+                                <div className="font-black leading-none">{cartItemCount} artículo{cartItemCount !== 1 && 's'}</div>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-2xl font-black leading-none">${cartTotalUsd.toFixed(2)}</div>
+                            <div className="text-xs font-bold text-emerald-100 mt-1">Bs {formatBs(cartTotalBs)}</div>
+                        </div>
+                    </button>
+                )}
+
+                {/* Bottom Sheet Overlay */}
+                {isCartSheetOpen && !showCheckout && !showReceipt && (
+                    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 pb-[max(0px,env(safe-area-inset-bottom))]"
+                         onClick={() => setIsCartSheetOpen(false)}>
+                        <div className="bg-slate-50 dark:bg-slate-950 w-full rounded-t-3xl shadow-2xl flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-full duration-300"
+                             onClick={e => e.stopPropagation()}>
+                            <div className="shrink-0 flex justify-center pt-3 pb-2" onClick={() => setIsCartSheetOpen(false)}>
+                                <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full cursor-pointer" />
+                            </div>
+                            <div className="shrink-0 px-4 pb-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+                                <h3 className="font-black text-slate-800 dark:text-white text-lg flex items-center gap-2">
+                                    <ShoppingCart size={20} className="text-emerald-500" /> Cesta Actual
+                                </h3>
+                                <button onClick={() => setIsCartSheetOpen(false)} className="p-2 -mr-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto">
+                                <CartPanel
+                                    cart={cart} effectiveRate={effectiveRate}
+                                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
+                                    updateQty={updateQty} removeFromCart={removeFromCart}
+                                    onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); setIsCartSheetOpen(false); }}
+                                    onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
+                                    triggerHaptic={triggerHaptic}
+                                    cartSelectedIndex={cartSelectedIndex}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Checkout Modal */}

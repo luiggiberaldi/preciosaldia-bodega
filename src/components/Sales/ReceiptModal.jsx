@@ -1,6 +1,7 @@
 import React from 'react';
-import { CheckCircle, Wallet, Send, X } from 'lucide-react';
+import { CheckCircle, Wallet, Send, X, Printer } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
+import { printThermalTicket } from '../../utils/ticketGenerator';
 
 export default function ReceiptModal({ receipt, onClose, onShareWhatsApp }) {
     if (!receipt) return null;
@@ -93,13 +94,17 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp }) {
                 </div>
 
                 {/* Botones sticky en la parte inferior */}
-                <div className="p-4 bg-slate-50 flex gap-2 relative z-20 shrink-0 border-t border-slate-200/50">
+                <div className="p-4 bg-slate-50 flex flex-wrap gap-2 relative z-20 shrink-0 border-t border-slate-200/50">
+                    <button onClick={() => printThermalTicket(receipt, receipt.rate)}
+                        className="flex-1 min-w-[30%] py-4 bg-violet-100 text-violet-700 font-black rounded-xl hover:bg-violet-200 transition-colors uppercase tracking-widest text-xs sm:text-sm flex items-center justify-center gap-1.5 focus:outline-none active:scale-95">
+                        <Printer size={16} /> Imprimir
+                    </button>
                     <button onClick={() => onShareWhatsApp(receipt)}
                         className="flex-1 py-4 bg-emerald-100 text-emerald-700 font-black rounded-xl hover:bg-emerald-200 transition-colors uppercase tracking-widest text-xs sm:text-sm flex items-center justify-center gap-1.5 focus:outline-none active:scale-95">
                         <Send size={16} /> WhatsApp
                     </button>
                     <button onClick={onClose}
-                        className="flex-1 sm:flex-[1.5] py-4 bg-slate-200 text-slate-700 font-black rounded-xl hover:bg-slate-300 transition-colors uppercase tracking-widest text-xs sm:text-sm focus:outline-none active:scale-95">
+                        className="w-full sm:flex-1 py-4 bg-slate-200 text-slate-700 font-black rounded-xl hover:bg-slate-300 transition-colors uppercase tracking-widest text-xs sm:text-sm focus:outline-none active:scale-95">
                         Nueva Venta
                     </button>
                 </div>

@@ -6,10 +6,13 @@ import { formatBs, formatUsd } from '../utils/calculatorUtils';
 import { procesarImpactoCliente } from '../utils/financialLogic';
 import { DEFAULT_PAYMENT_METHODS } from '../config/paymentMethods';
 import ConfirmModal from '../components/ConfirmModal';
+import EmptyState from '../components/EmptyState';
+import SwipeableItem from '../components/SwipeableItem';
 
 export default function CustomersView({ triggerHaptic }) {
     const [customers, setCustomers] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterType, setFilterType] = useState('all'); // 'all' | 'deuda' | 'favor'
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     // Modal de Abono / Crédito
@@ -45,10 +48,13 @@ export default function CustomersView({ triggerHaptic }) {
         await storageService.setItem('bodega_customers_v1', updatedCustomers);
     };
 
-    const filteredCustomers = customers.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.phone && c.phone.includes(searchTerm))
-    );
+    const filteredCustomers = customers.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || (c.phone && c.phone.includes(searchTerm));
+        if (!matchesSearch) return false;
+        if (filterType === 'deuda') return c.deuda > 0.01;
+        if (filterType === 'favor') return c.deuda < -0.01;
+        return true;
+    });
 
     const toggleHistory = async (customerId) => {
         triggerHaptic && triggerHaptic();
@@ -152,37 +158,78 @@ export default function CustomersView({ triggerHaptic }) {
                 </button>
             </div>
 
-            {/* Búsqueda */}
-            <div className="relative mb-5 shrink-0">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                <input
-                    type="text"
-                    placeholder="Buscar cliente..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-3.5 pl-11 pr-4 text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm"
-                />
+            {/* Búsqueda y Filtros */}
+            <div className="mb-5 shrink-0 flex flex-col gap-3">
+                <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                    <input
+                        type="text"
+                        placeholder="Buscar cliente..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-3.5 pl-11 pr-4 text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm"
+                    />
+                </div>
+                {/* Filtros tipo Chips */}
+                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+                    <button 
+                        onClick={() => { setFilterType('all'); triggerHaptic && triggerHaptic(); }}
+                        className={`px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${filterType === 'all' ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/30' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'}`}
+                    >
+                        Todos
+                    </button>
+                    <button 
+                        onClick={() => { setFilterType('deuda'); triggerHaptic && triggerHaptic(); }}
+                        className={`px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 ${filterType === 'deuda' ? 'bg-red-500 text-white shadow-sm shadow-red-500/30' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'}`}
+                    >
+                        <div className={`w-2 h-2 rounded-full ${filterType === 'deuda' ? 'bg-white' : 'bg-red-500'}`}></div>
+                        Con Deuda
+                    </button>
+                    <button 
+                        onClick={() => { setFilterType('favor'); triggerHaptic && triggerHaptic(); }}
+                        className={`px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 ${filterType === 'favor' ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'}`}
+                    >
+                        <div className={`w-2 h-2 rounded-full ${filterType === 'favor' ? 'bg-white' : 'bg-emerald-500'}`}></div>
+                        Saldo a Favor
+                    </button>
+                </div>
             </div>
 
             {/* Listado de Clientes */}
             <div className="flex-1 space-y-3 pb-20">
-                {filteredCustomers.length === 0 ? (
-                    <div className="text-center py-10">
-                        <User size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
-                        <p className="text-slate-500 dark:text-slate-400">No se encontraron clientes.</p>
-                    </div>
+                {customers.length === 0 ? (
+                    <EmptyState
+                        icon={Users}
+                        title="Sin Clientes"
+                        description="Registra a tus clientes habituales para llevar un control de sus fiados y saldos a favor."
+                        actionLabel="NUEVO CLIENTE"
+                        onAction={() => { triggerHaptic && triggerHaptic(); setIsAddModalOpen(true); }}
+                    />
+                ) : filteredCustomers.length === 0 ? (
+                    <EmptyState
+                        icon={Search}
+                        title="Sin resultados"
+                        description={`No encontramos ningún cliente con el término "${searchTerm}".`}
+                        secondaryActionLabel="Limpiar Búsqueda"
+                        onSecondaryAction={() => { setSearchTerm(''); triggerHaptic && triggerHaptic(); }}
+                    />
                 ) : (
                     filteredCustomers.map(customer => (
-                        <CustomerCard
+                        <SwipeableItem
                             key={customer.id}
-                            customer={customer}
-                            bcvRate={bcvRate}
-                            onClick={() => {
-                                setSelectedCustomer(customer);
-                                toggleHistory(customer.id);
-                            }}
                             onDelete={() => setDeleteCustomerTarget(customer)}
-                        />
+                            triggerHaptic={triggerHaptic}
+                        >
+                            <CustomerCard
+                                customer={customer}
+                                bcvRate={bcvRate}
+                                onClick={() => {
+                                    setSelectedCustomer(customer);
+                                    toggleHistory(customer.id);
+                                }}
+                                onDelete={() => setDeleteCustomerTarget(customer)}
+                            />
+                        </SwipeableItem>
                     ))
                 )}
             </div>

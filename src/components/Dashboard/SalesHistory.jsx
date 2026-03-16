@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Clock, Send, Ban, ChevronDown, ChevronUp, Trash2, Shuffle, Recycle } from 'lucide-react';
+import { Clock, Send, Ban, ChevronDown, ChevronUp, Trash2, Shuffle, Recycle, Receipt, Printer } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS } from '../../config/paymentMethods';
+import EmptyState from '../EmptyState';
 
 export default function SalesHistory({
     sales,
@@ -13,11 +14,22 @@ export default function SalesHistory({
     onDownloadPDF,
     onOpenDeleteModal,
     onRequestClientForTicket,
-    onRecycleSale
+    onRecycleSale,
+    onPrintTicket
 }) {
     const [expandedSaleId, setExpandedSaleId] = useState(null);
 
-    if (recentSales.length === 0) return null;
+    if (recentSales.length === 0) {
+        return (
+            <div className="mb-20 mt-4">
+                <EmptyState
+                    icon={Receipt}
+                    title="Aún no hay ventas"
+                    description="Las ventas recientes aparecerán aquí una vez que comiences a facturar."
+                />
+            </div>
+        );
+    }
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm mb-20">
@@ -126,6 +138,15 @@ export default function SalesHistory({
                                                 onClick={(e) => { e.stopPropagation(); onDownloadPDF(s); }}
                                                 className="py-2 px-3 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 hover:dark:bg-blue-900/50 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm">
                                                 PDF
+                                            </button>
+                                        )}
+                                        {onPrintTicket && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onPrintTicket(s); }}
+                                                className="py-2 px-3 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 hover:bg-violet-200 hover:dark:bg-violet-900/50 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm active:scale-95"
+                                                title="Imprimir ticket"
+                                            >
+                                                <Printer size={14} />
                                             </button>
                                         )}
 

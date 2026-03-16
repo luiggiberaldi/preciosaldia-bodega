@@ -18,6 +18,8 @@ import TermsOverlay from './components/TermsOverlay';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useOfflineQueue } from './hooks/useOfflineQueue';
+import CommandPalette from './components/CommandPalette';
+import SpotlightTour from './components/SpotlightTour';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
@@ -33,6 +35,8 @@ export default function App() {
   const [adminClicks, setAdminClicks] = useState(0);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showTester, setShowTester] = useState(false);
+  
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   const { rates, loading, isOffline, updateData } = useRates();
   const { isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg } = useSecurity();
@@ -53,6 +57,16 @@ export default function App() {
     const { outcome } = await installPrompt.userChoice;
     if (outcome === 'accepted') setInstallPrompt(null);
   };
+
+  const [tourDone, setTourDone] = useState(
+    () => localStorage.getItem('pda_spotlight_done') === 'true'
+  );
+  
+  const SPOTLIGHT_STEPS = [
+    { target: '[data-tour="tab-ventas"]', title: 'Empieza a vender', text: 'Toca aquí para ir al Punto de Venta. Podrás cobrar en Bolívares o Dólares fácilmente.' },
+    { target: '[data-tour="tab-catalogo"]', title: 'Tu Inventario', text: 'Aquí podrás agregar y gestionar todos tus productos. Configura precios y cantidades.' },
+    { target: null, title: 'Búsqueda Global', text: 'Usa el atajo (Ctrl + K) o presiona ESC en cualquier momento para abrir el buscador rápido.' }
+  ];
 
   // Theme
   const [theme, setTheme] = useState(() => {
@@ -155,16 +169,17 @@ export default function App() {
         </div>
       )}
 
-      {/* Demo Banner (discreto — bottom, above nav) */}
-      {isDemo && demoTimeLeft && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 fade-in duration-500 pointer-events-none">
-          <div className="px-3 py-1.5 bg-slate-900/90 dark:bg-white/10 backdrop-blur-md rounded-full border border-white/10 shadow-xl flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
-            <p className="text-[10px] font-semibold text-white tracking-wide">
-              Licencia: <span className="text-amber-400 font-bold">{demoTimeLeft}</span>
-            </p>
-          </div>
-        </div>
+
+
+      {/* Tour Spotlight */}
+      {!tourDone && (
+         <SpotlightTour 
+            steps={SPOTLIGHT_STEPS} 
+            onComplete={() => {
+                localStorage.setItem('pda_spotlight_done', 'true');
+                setTourDone(true);
+            }} 
+         />
       )}
 
       {/* Demo Expired Modal */}
@@ -231,7 +246,7 @@ export default function App() {
 
         <div className={`flex-1 flex flex-col ${activeTab === 'inicio' ? '' : 'hidden'}`}>
           <ErrorBoundary>
-            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} />
+            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} isDemo={isDemo} demoTimeLeft={demoTimeLeft} />
           </ErrorBoundary>
         </div>
 
@@ -258,6 +273,13 @@ export default function App() {
         </Suspense>
       </main>
       </ProductProvider>
+      
+      <CommandPalette 
+          isOpen={isCommandPaletteOpen} 
+          onClose={() => setIsCommandPaletteOpen(false)} 
+          onToggle={() => setIsCommandPaletteOpen(p => !p)} 
+          navigateTo={setActiveTab} 
+      />
 
       {/* Bottom Nav — hidden in POS mode for full-screen selling */}
       {!isKeyboardOpen && (
@@ -270,6 +292,7 @@ export default function App() {
                 label={tab.label}
                 isActive={activeTab === tab.id}
                 onClick={() => { triggerHaptic(); setActiveTab(tab.id); }}
+                data-tour={`tab-${tab.id}`}
               />
             ))}
 
@@ -348,9 +371,9 @@ export default function App() {
   );
 }
 
-function TabButton({ icon, label, isActive, onClick }) {
+function TabButton({ icon, label, isActive, onClick, 'data-tour': dataTour }) {
   return (
-    <button onClick={onClick} className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 ${isActive ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+    <button data-tour={dataTour} onClick={onClick} className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 ${isActive ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
       {icon}
       {isActive && <span className="text-[9px] font-extrabold animate-in zoom-in duration-200">{label}</span>}
     </button>

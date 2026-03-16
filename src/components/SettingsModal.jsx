@@ -17,6 +17,7 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
     // Configuración del negocio (Ticket WhatsApp)
     const [businessName, setBusinessName] = useState(() => localStorage.getItem('business_name') || '');
     const [businessRif, setBusinessRif] = useState(() => localStorage.getItem('business_rif') || '');
+    const [paperWidth, setPaperWidth] = useState(() => localStorage.getItem('printer_paper_width') || '58');
 
     const handleNameChange = (e) => {
         setBusinessName(e.target.value);
@@ -29,6 +30,7 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
     const handleSaveBusinessData = () => {
         localStorage.setItem('business_name', businessName);
         localStorage.setItem('business_rif', businessRif);
+        localStorage.setItem('printer_paper_width', paperWidth);
         forceHeartbeat();
         showToast("Datos del negocio guardados correctamente", "success");
         if (triggerHaptic) triggerHaptic();
@@ -150,7 +152,7 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 space-y-3">
                         <div className="flex items-center gap-2 mb-1">
                             <Store size={14} className="text-slate-500" />
-                            <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">Datos para Ticket WhatsApp</h4>
+                            <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">Personalización de Tickets</h4>
                         </div>
                         
                         <div>
@@ -174,6 +176,25 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                             />
                         </div>
+
+                        <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Ancho de Impresora Térmica</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={() => setPaperWidth('58')}
+                                    className={`py-2 px-3 text-xs font-bold rounded-lg transition-colors border ${paperWidth === '58' ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-700 dark:text-indigo-300' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                >
+                                    58 mm (Pequeña)
+                                </button>
+                                <button
+                                    onClick={() => setPaperWidth('80')}
+                                    className={`py-2 px-3 text-xs font-bold rounded-lg transition-colors border ${paperWidth === '80' ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-700 dark:text-indigo-300' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                >
+                                    80 mm (Estándar)
+                                </button>
+                            </div>
+                        </div>
+
                         <button
                             onClick={handleSaveBusinessData}
                             className="w-full flex items-center justify-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors mt-2"
