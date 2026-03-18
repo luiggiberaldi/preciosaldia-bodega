@@ -28,8 +28,17 @@ export default function CommandPalette({ isOpen, onClose, onToggle, navigateTo }
                 e.preventDefault();
                 onToggle ? onToggle() : onClose();
             }
-            if (e.key === 'Escape' && isOpen) {
-                onClose();
+            if (e.key === 'Escape') {
+                if (isOpen) {
+                    onClose();
+                } else {
+                    // Abrir solo si no hay un input/textarea/modal enfocado
+                    const tag = document.activeElement?.tagName;
+                    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+                        e.preventDefault();
+                        onToggle && onToggle();
+                    }
+                }
             }
         };
         window.addEventListener('keydown', handleKeyDown);
