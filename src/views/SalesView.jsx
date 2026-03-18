@@ -185,8 +185,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
     // Persist cart
+    const isCartInitialized = useRef(false);
     useEffect(() => {
-        if (cart === cartRef.current) return; // Prevent double-save on mount if empty
+        if (!isCartInitialized.current) { isCartInitialized.current = true; return; }
         if (cart.length > 0) storageService.setItem('bodega_pending_cart_v1', cart);
         else storageService.removeItem('bodega_pending_cart_v1');
     }, [cart]);
