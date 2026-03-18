@@ -74,7 +74,7 @@ export default function ReportsView({ rates, triggerHaptic }) {
 
     const filteredSales = useMemo(() => {
         return allSales.filter(s => {
-            if (s.status === 'ANULADA' || s.tipo === 'COBRO_DEUDA') return false;
+            if (s.status === 'ANULADA' || s.tipo === 'COBRO_DEUDA' || s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA' || s.tipo === 'VENTA_FIADA') return false;
             const dateStr = s.timestamp?.split('T')[0];
             return dateStr >= from && dateStr <= to;
         });
