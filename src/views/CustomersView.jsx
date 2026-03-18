@@ -9,7 +9,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import EmptyState from '../components/EmptyState';
 import SwipeableItem from '../components/SwipeableItem';
 
-export default function CustomersView({ triggerHaptic }) {
+export default function CustomersView({ triggerHaptic, rates }) {
     const [customers, setCustomers] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('all'); // 'all' | 'deuda' | 'favor'
@@ -29,9 +29,11 @@ export default function CustomersView({ triggerHaptic }) {
     const [deleteCustomerTarget, setDeleteCustomerTarget] = useState(null);
 
     useEffect(() => {
-        // Leer tasa BCV del storage para conversión
-        storageService.getItem('bcv_rate_v1', 0).then(r => setBcvRate(Number(r) || 0));
-    }, []);
+        // Leer tasa BCV del rates prop (viene de useRates en App.jsx)
+        if (rates?.bcv?.price) {
+            setBcvRate(Number(rates.bcv.price) || 0);
+        }
+    }, [rates]);
 
     const loadCustomers = async () => {
         const saved = await storageService.getItem('bodega_customers_v1', []);
