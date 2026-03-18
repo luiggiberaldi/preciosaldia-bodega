@@ -18,6 +18,7 @@ import TermsOverlay from './components/TermsOverlay';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useOfflineQueue } from './hooks/useOfflineQueue';
+import { useAutoBackup } from './hooks/useAutoBackup';
 import CommandPalette from './components/CommandPalette';
 import SpotlightTour from './components/SpotlightTour';
 
@@ -41,6 +42,7 @@ export default function App() {
   const { rates, loading, isOffline, updateData } = useRates();
   const { isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg } = useSecurity();
   const { isOnline, cacheRates } = useOfflineQueue();
+  useAutoBackup();
 
   // Cache rates whenever they update
   useEffect(() => { if (rates) cacheRates(rates); }, [rates, cacheRates]);

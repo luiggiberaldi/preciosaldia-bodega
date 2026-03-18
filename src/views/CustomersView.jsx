@@ -109,18 +109,18 @@ export default function CustomersView({ triggerHaptic, rates }) {
         const newCustomers = customers.map(c => c.id === customer.id ? updatedCustomer : c);
         await saveCustomers(newCustomers);
 
-        // 3. Registrar "COBRO_DEUDA" en Ventas/Caja si es un Abono
+        // 3. Registrar en Ventas/Caja
+        const sales = await storageService.getItem('bodega_sales_v1', []);
+
+        // Calculamos Bs y Usd para el registro
+        const totalEnBs = currencyMode === 'BS' ? rawAmount : (rawAmount * bcvRate);
+        const totalEnUsd = currencyMode === 'USD' ? rawAmount : (bcvRate > 0 ? rawAmount / bcvRate : 0);
+
         if (type === 'ABONO') {
-            const sales = await storageService.getItem('bodega_sales_v1', []);
-
-            // Calculamos Bs y Usd para el registro
-            const totalEnBs = currencyMode === 'BS' ? rawAmount : (rawAmount * bcvRate);
-            const totalEnUsd = currencyMode === 'USD' ? rawAmount : (bcvRate > 0 ? rawAmount / bcvRate : 0);
-
             const cobroRecord = {
                 id: crypto.randomUUID(),
                 timestamp: new Date().toISOString(),
-                tipo: 'COBRO_DEUDA', // Etiqueta clave Anti-Duplicados
+                tipo: 'COBRO_DEUDA',
                 clienteId: customer.id,
                 clienteName: customer.name,
                 totalBs: totalEnBs,
@@ -129,8 +129,22 @@ export default function CustomersView({ triggerHaptic, rates }) {
                 items: [{ name: `Abono de deuda: ${customer.name}`, qty: 1, priceUsd: totalEnUsd, costBs: 0 }]
             };
             sales.push(cobroRecord);
-            await storageService.setItem('bodega_sales_v1', sales);
+        } else if (type === 'CREDITO') {
+            const fiadoRecord = {
+                id: crypto.randomUUID(),
+                timestamp: new Date().toISOString(),
+                tipo: 'VENTA_FIADA',
+                clienteId: customer.id,
+                clienteName: customer.name,
+                totalBs: totalEnBs,
+                totalUsd: totalEnUsd,
+                fiadoUsd: totalEnUsd,
+                items: [{ name: `Credito manual: ${customer.name}`, qty: 1, priceUsd: totalEnUsd, costBs: 0 }]
+            };
+            sales.push(fiadoRecord);
         }
+
+        await storageService.setItem('bodega_sales_v1', sales);
 
         // Cerrar modal
         setTransactionModal({ isOpen: false, type: null, customer: null });
