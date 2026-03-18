@@ -31,10 +31,27 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         adjustStock: baseAdjustStock
     } = useProductContext();
 
-    // Envolver adjsutStock para incluir la respuesta háptica visual
-    const adjustStock = (productId, delta) => {
+    // Envolver adjustStock para incluir registro de movimiento + haptic
+    const adjustStock = async (productId, delta) => {
         baseAdjustStock(productId, delta);
         triggerHaptic && triggerHaptic();
+
+        // Registro silencioso del ajuste de inventario
+        try {
+            const product = products.find(p => p.id === productId);
+            const record = {
+                id: `adj_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                timestamp: new Date().toISOString(),
+                tipo: delta > 0 ? 'AJUSTE_ENTRADA' : 'AJUSTE_SALIDA',
+                items: [{ id: productId, name: product?.name || 'Producto', qty: Math.abs(delta) }],
+                totalUsd: 0,
+                totalBs: 0,
+                status: 'COMPLETADA',
+            };
+            const sales = await storageService.getItem('bodega_sales_v1', []);
+            sales.push(record);
+            await storageService.setItem('bodega_sales_v1', sales);
+        } catch (e) { /* silencioso */ }
     }
 
     // Modal UI States

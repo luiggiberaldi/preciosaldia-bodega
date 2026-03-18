@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode, CheckCircle, Clock, ShoppingBag, CreditCard, ArrowUpRight } from 'lucide-react';
+import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode, CheckCircle, Clock, ShoppingBag, CreditCard, ArrowUpRight, Plus, Minus } from 'lucide-react';
 import { Modal } from '../Modal';
 
 const PACKAGING_TYPES = [
@@ -415,21 +415,28 @@ export default function ProductFormModal({
                                             const timeStr = date.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
                                             const isCobro = mov.tipo === 'COBRO_DEUDA';
                                             const isFiada = mov.tipo === 'VENTA_FIADA';
+                                            const isEntrada = mov.tipo === 'AJUSTE_ENTRADA';
+                                            const isSalida = mov.tipo === 'AJUSTE_SALIDA';
+                                            const isAjuste = isEntrada || isSalida;
                                             return (
                                                 <div key={mov.id} className="flex items-center gap-2.5 px-3 py-2">
                                                     <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                                                        isCobro ? 'bg-emerald-100 dark:bg-emerald-900/30' 
+                                                        isEntrada ? 'bg-emerald-100 dark:bg-emerald-900/30'
+                                                        : isSalida ? 'bg-rose-100 dark:bg-rose-900/30'
+                                                        : isCobro ? 'bg-emerald-100 dark:bg-emerald-900/30' 
                                                         : isFiada ? 'bg-amber-100 dark:bg-amber-900/30' 
                                                         : 'bg-blue-100 dark:bg-blue-900/30'}`}>
-                                                        {isCobro ? <ArrowUpRight size={12} className="text-emerald-500" /> 
+                                                        {isEntrada ? <Plus size={12} className="text-emerald-500" />
+                                                        : isSalida ? <Minus size={12} className="text-rose-500" />
+                                                        : isCobro ? <ArrowUpRight size={12} className="text-emerald-500" /> 
                                                         : isFiada ? <CreditCard size={12} className="text-amber-500" /> 
                                                         : <ShoppingBag size={12} className="text-blue-500" />}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex justify-between items-center">
                                                             <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                                                                {isFiada ? 'Fiado' : isCobro ? 'Cobro' : 'Venta'}
-                                                                {mov.qty && <span className="text-slate-400 font-medium"> x{mov.qty}</span>}
+                                                                {isEntrada ? 'Entrada manual' : isSalida ? 'Salida manual' : isFiada ? 'Fiado' : isCobro ? 'Cobro' : 'Venta'}
+                                                                {mov.qty && <span className="text-slate-400 font-medium"> {isAjuste ? (isEntrada ? '+' : '-') : 'x'}{mov.qty}</span>}
                                                             </span>
                                                             <span className="text-[10px] text-slate-400">{dateStr} {timeStr}</span>
                                                         </div>
