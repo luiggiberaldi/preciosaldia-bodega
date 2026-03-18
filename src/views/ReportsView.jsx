@@ -245,7 +245,7 @@ export default function ReportsView({ rates, triggerHaptic }) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatCard icon={ShoppingBag} label="Ventas" value={filteredSales.length} color="emerald" />
                 <StatCard icon={DollarSign} label="Ingresos" value={`$${totalUsd.toFixed(2)}`} sub={`${formatBs(totalBs)} Bs`} color="blue" />
-                <StatCard icon={TrendingUp} label="Ganancia" value={`${formatBs(profit)} Bs`} sub={bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : ''} color="indigo" />
+                <StatCard icon={TrendingUp} label="Ganancia" value={bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00'} sub={`${formatBs(profit)} Bs`} color="indigo" />
                 <StatCard icon={Package} label="Artículos" value={totalItems} color="amber" />
             </div>
 
