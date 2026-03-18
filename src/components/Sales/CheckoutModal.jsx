@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { X, Users, Receipt, ChevronDown, Wallet, Zap, UserPlus, Check, ArrowLeftRight } from 'lucide-react';
+import { X, Users, Receipt, ChevronDown, Wallet, Zap, UserPlus, Check, ArrowLeftRight, AlertTriangle } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { PAYMENT_ICONS, ICON_COMPONENTS } from '../../config/paymentMethods';
 
@@ -31,6 +31,7 @@ export default function CheckoutModal({
     const [savingClient, setSavingClient] = useState(false);
     const [changeUsdGiven, setChangeUsdGiven] = useState('');
     const [changeBsGiven, setChangeBsGiven] = useState('');
+    const [confirmFiar, setConfirmFiar] = useState(false);
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
@@ -483,7 +484,14 @@ export default function CheckoutModal({
             {/* ═══ BOTÓN CTA FIJO ═══ */}
             <div className="shrink-0 px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <button
-                    onClick={handleConfirm}
+                    onClick={() => {
+                        if (!isPaid && selectedCustomerId && remainingUsd > 0.01) {
+                            triggerHaptic && triggerHaptic();
+                            setConfirmFiar(true);
+                        } else {
+                            handleConfirm();
+                        }
+                    }}
                     disabled={!selectedCustomerId && remainingUsd > 0.01}
                     className={`w-full py-4 text-white font-black text-base rounded-2xl shadow-lg transition-all tracking-wide flex items-center justify-center gap-2 ${isPaid
                         ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/25 active:scale-[0.98]'
@@ -501,6 +509,53 @@ export default function CheckoutModal({
                     )}
                 </button>
             </div>
+
+            {/* ═══ MODAL CONFIRMACIÓN FIAR ═══ */}
+            {confirmFiar && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setConfirmFiar(false)}>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-2xl border border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
+                                <AlertTriangle size={20} className="text-amber-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-black text-slate-800 dark:text-white">Confirmar Fiado</h3>
+                                <p className="text-[11px] text-slate-400">Revisa antes de continuar</p>
+                            </div>
+                        </div>
+                        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 rounded-xl p-3 mb-4 space-y-2">
+                            <p className="text-xs text-slate-600 dark:text-slate-300">
+                                <span className="font-bold">Se le fiara</span> <span className="font-black text-amber-600">${remainingUsd.toFixed(2)}</span> ({formatBs(remainingBs)} Bs) a <span className="font-black text-slate-800 dark:text-white">{selectedCustomer?.name}</span>.
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                {totalPaidUsd > 0.01
+                                    ? `El cliente paga $${totalPaidUsd.toFixed(2)} ahora y el resto queda como deuda.`
+                                    : 'El monto total quedara como deuda del cliente.'
+                                }
+                            </p>
+                            {selectedCustomer && (selectedCustomer.deuda || 0) > 0.01 && (
+                                <p className="text-[10px] font-bold text-red-500">
+                                    Este cliente ya debe ${(selectedCustomer.deuda || 0).toFixed(2)}. Deuda total sera: ${((selectedCustomer.deuda || 0) + remainingUsd).toFixed(2)}
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setConfirmFiar(false)}
+                                className="flex-1 py-3 font-bold text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 active:scale-95 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => { setConfirmFiar(false); handleConfirm(); }}
+                                className="flex-1 py-3 font-black text-sm text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-lg shadow-amber-500/25 active:scale-95 transition-all"
+                            >
+                                Si, fiar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
