@@ -76,6 +76,12 @@ export default function SalesHeader({
                             className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-bold text-indigo-600 dark:text-indigo-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                             placeholder="Ingresa Tasa Manual (Bs por $)" autoFocus />
                     )}
+                    <button
+                        onClick={() => { triggerHaptic && triggerHaptic(); setShowRateConfig(false); }}
+                        className="w-full mt-2 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm rounded-xl shadow-sm shadow-emerald-500/20 active:scale-95 transition-all"
+                    >
+                        Aceptar
+                    </button>
                 </div>
             )}
         </div>
