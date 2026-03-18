@@ -349,6 +349,27 @@ export default function CustomersView({ triggerHaptic, rates }) {
                                             autoFocus
                                         />
                                     </div>
+                                    {/* Boton Pagar Total — solo cuando hay deuda y es ABONO */}
+                                    {transactionModal.type === 'ABONO' && (currentCustomer.deuda || 0) > 0.01 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const deudaUsd = currentCustomer.deuda;
+                                                if (currencyMode === 'BS' && bcvRate > 0) {
+                                                    setTransactionAmount((deudaUsd * bcvRate).toFixed(2));
+                                                } else {
+                                                    setTransactionAmount(deudaUsd.toFixed(2));
+                                                }
+                                            }}
+                                            className="mt-2 w-full py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                                        >
+                                            <CheckCircle2 size={14} />
+                                            Pagar Total: {currencyMode === 'BS' && bcvRate > 0
+                                                ? `Bs ${formatBs(currentCustomer.deuda * bcvRate)}`
+                                                : `$${formatUsd(currentCustomer.deuda)}`
+                                            }
+                                        </button>
+                                    )}
                                     {/* Conversion info */}
                                     {currencyMode === 'BS' && transactionAmount && bcvRate > 0 && (
                                         <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-lg p-2 mt-3 flex items-center justify-between">
