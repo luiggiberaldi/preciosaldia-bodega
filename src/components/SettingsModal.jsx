@@ -108,6 +108,9 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                 if (json.data.bodega_accounts_v2) {
                     await storageService.setItem('bodega_accounts_v2', typeof json.data.bodega_accounts_v2 === 'string' ? JSON.parse(json.data.bodega_accounts_v2) : json.data.bodega_accounts_v2);
                 }
+                if (json.data.my_categories_v1) {
+                    await storageService.setItem('my_categories_v1', typeof json.data.my_categories_v1 === 'string' ? JSON.parse(json.data.my_categories_v1) : json.data.my_categories_v1);
+                }
 
                 if (json.data.street_rate_bs) localStorage.setItem('street_rate_bs', json.data.street_rate_bs);
                 if (json.data.catalog_use_auto_usdt) localStorage.setItem('catalog_use_auto_usdt', json.data.catalog_use_auto_usdt);
