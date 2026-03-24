@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, CreditCard, Banknote, Smartphone, DollarSign, Store, ShoppingCart, Package, Coins, Key, Fingerprint } from 'lucide-react';
-import { getActivePaymentMethods, savePaymentMethods, FACTORY_PAYMENT_METHODS, PAYMENT_ICONS, ICON_COMPONENTS, toTitleCase } from '../../config/paymentMethods';
+import { getAllPaymentMethods, savePaymentMethods, togglePaymentMethodEnabled, FACTORY_PAYMENT_METHODS, PAYMENT_ICONS, ICON_COMPONENTS, toTitleCase } from '../../config/paymentMethods';
 import { showToast } from '../Toast';
 
 const ICON_OPTIONS = [
@@ -23,8 +23,10 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
     const [newCurrency, setNewCurrency] = useState('BS');
     const [newIcon, setNewIcon] = useState('Banknote');
 
+    const copEnabled = localStorage.getItem('cop_enabled') === 'true';
+
     useEffect(() => {
-        getActivePaymentMethods().then(setMethods);
+        getAllPaymentMethods().then(setMethods);
     }, []);
 
     const handleAdd = async () => {
@@ -42,7 +44,7 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
         }];
         await savePaymentMethods(updated);
         // Rehidratar para el estado local del componente
-        const hydrated = await getActivePaymentMethods();
+        const hydrated = await getAllPaymentMethods();
         setMethods(hydrated);
         setNewLabel('');
         setShowAdd(false);
@@ -53,33 +55,57 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
         triggerHaptic && triggerHaptic();
         const updated = methods.filter(m => m.id !== id);
         await savePaymentMethods(updated);
-        const hydrated = await getActivePaymentMethods();
+        const hydrated = await getAllPaymentMethods();
         setMethods(hydrated);
         showToast('Método eliminado', 'success');
     };
 
+    const handleToggleState = async (id) => {
+        triggerHaptic && triggerHaptic();
+        const updated = await togglePaymentMethodEnabled(id);
+        setMethods(updated);
+    };
+
     const methodsBs = methods.filter(m => m.currency === 'BS');
     const methodsUsd = methods.filter(m => m.currency === 'USD');
+    const methodsCop = methods.filter(m => m.currency === 'COP');
 
-    const renderMethod = (m) => (
-        <div key={m.id} className="flex items-center justify-between py-2.5 px-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 mb-2">
-            <div className="flex items-center gap-2.5">
-                {(() => { const MIcon = m.Icon || PAYMENT_ICONS[m.id] || ICON_COMPONENTS[m.icon]; return MIcon ? <MIcon size={18} className="text-slate-500" /> : <span className="text-lg">{m.icon}</span>; })()}
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{m.label}</span>
-                {m.isFactory && (
-                    <span className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">Predeterminado</span>
-                )}
+    const renderMethod = (m) => {
+        const isEnabled = m.isEnabled !== false;
+        return (
+            <div key={m.id} className={`flex items-center justify-between py-2.5 px-3 bg-white dark:bg-slate-900 rounded-xl border mb-2 transition-colors ${isEnabled ? 'border-emerald-200 dark:border-emerald-800 ring-1 ring-emerald-500/10' : 'border-slate-100 dark:border-slate-800 opacity-60'}`}>
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    {(() => { const MIcon = m.Icon || PAYMENT_ICONS[m.id] || ICON_COMPONENTS[m.icon]; return MIcon ? <MIcon size={18} className={isEnabled ? "text-emerald-500" : "text-slate-400"} /> : <span className="text-lg grayscale opacity-50">{m.icon}</span>; })()}
+                    <span className={`text-sm font-bold truncate ${isEnabled ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 line-through decoration-slate-300 dark:decoration-slate-600'}`}>
+                        {m.label}
+                    </span>
+                    {m.isFactory && (
+                        <span className="text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded shrink-0">Nat</span>
+                    )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <button
+                        onClick={() => handleToggleState(m.id)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                            isEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+                        }`}
+                    >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            isEnabled ? 'translate-x-4.5' : 'translate-x-1'
+                        } ${isEnabled ? '' : 'translate-x-1'}`} style={{ transform: isEnabled ? 'translateX(18px)' : 'translateX(4px)' }} />
+                    </button>
+                    {!m.isFactory && (
+                        <button
+                            onClick={() => handleRemove(m.id)}
+                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors ml-1"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    )}
+                </div>
             </div>
-            {!m.isFactory && (
-                <button
-                    onClick={() => handleRemove(m.id)}
-                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                >
-                    <Trash2 size={16} />
-                </button>
-            )}
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="space-y-4">
@@ -118,6 +144,14 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
                         >
                             Dólares ($)
                         </button>
+                        {copEnabled && (
+                            <button
+                                onClick={() => setNewCurrency('COP')}
+                                className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${newCurrency === 'COP' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'}`}
+                            >
+                                Pesos (COP)
+                            </button>
+                        )}
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {ICON_OPTIONS.map(({ key, Icon }) => (
@@ -152,6 +186,14 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
                 <div>
                     <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Bolívares (Bs)</p>
                     {methodsBs.map(renderMethod)}
+                </div>
+            )}
+
+            {/* Sección COP */}
+            {copEnabled && methodsCop.length > 0 && (
+                <div>
+                    <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-2 mt-4">Pesos Colombianos (COP)</p>
+                    {methodsCop.map(renderMethod)}
                 </div>
             )}
         </div>

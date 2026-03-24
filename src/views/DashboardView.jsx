@@ -7,11 +7,14 @@ import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, getPaymentIcon, toTit
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import SalesChart from '../components/Dashboard/SalesChart';
 import ConfirmModal from '../components/ConfirmModal';
+import CashReconciliationModal from '../components/Dashboard/CashReconciliationModal';
 import { generateTicketPDF, printThermalTicket } from '../utils/ticketGenerator';
 import { generateDailyClosePDF } from '../utils/dailyCloseGenerator';
 import { useNotifications } from '../hooks/useNotifications';
 import AnimatedCounter from '../components/AnimatedCounter';
+import SyncStatus from '../components/SyncStatus';
 import { useProductContext } from '../context/ProductContext';
+import { useCart } from '../context/CartContext';
 import { useSecurity } from '../hooks/useSecurity';
 import SettingsModal from '../components/SettingsModal';
 import Skeleton from '../components/Skeleton';
@@ -22,6 +25,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const { deviceId } = useSecurity();
     const [sales, setSales] = useState([]);
     const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate } = useProductContext();
+    const { loadCart } = useCart();
     const [customers, setCustomers] = useState([]);
     const [isLoadingLocal, setIsLoadingLocal] = useState(true);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -29,7 +33,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [voidSaleTarget, setVoidSaleTarget] = useState(null);
-    const [isResetTodayOpen, setIsResetTodayOpen] = useState(false);
+    const [isCashReconOpen, setIsCashReconOpen] = useState(false);
     const [ticketPendingSale, setTicketPendingSale] = useState(null);
     const [ticketClientName, setTicketClientName] = useState('');
     const [ticketClientPhone, setTicketClientPhone] = useState('');
@@ -231,10 +235,23 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     };
 
     // ── Métricas del Día (memoized) ──
-    const today = new Date().toISOString().split('T')[0];
+    const getLocalISODate = (d = new Date()) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    const today = getLocalISODate();
 
     const todaySales = useMemo(() =>
-        sales.filter(s => s.timestamp?.startsWith(today) && s.tipo !== 'COBRO_DEUDA' && s.tipo !== 'AJUSTE_ENTRADA' && s.tipo !== 'AJUSTE_SALIDA' && s.tipo !== 'VENTA_FIADA' && s.status !== 'ANULADA'),
+        sales.filter(s => {
+            if (s.tipo === 'COBRO_DEUDA' || s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA' || s.tipo === 'VENTA_FIADA' || s.tipo === 'PAGO_PROVEEDOR' || s.status === 'ANULADA') return false;
+            // Ocultar ventas que ya fueron cerradas previamente
+            if (s.cajaCerrada === true) return false;
+            
+            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
+            return saleLocalDay === today;
+        }),
         [sales, today]
     );
     const todayTotalBs = useMemo(() => todaySales.reduce((sum, s) => sum + (s.totalBs || 0), 0), [todaySales]);
@@ -245,6 +262,17 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     useEffect(() => {
         if (todaySales.length > 0) notifyCierrePendiente(todaySales.length);
     }, [todaySales.length, notifyCierrePendiente]);
+
+    // Egresos del día (pagos a proveedores)
+    const todayExpenses = useMemo(() => {
+        return sales.filter(s => {
+            if (s.tipo !== 'PAGO_PROVEEDOR') return false;
+            if (s.cajaCerrada === true) return false;
+            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
+            return saleLocalDay === today;
+        });
+    }, [sales, today]);
+    const todayExpensesUsd = useMemo(() => todayExpenses.reduce((sum, s) => sum + Math.abs(s.totalUsd || 0), 0), [todayExpenses]);
 
     const todayProfit = useMemo(() =>
         todaySales.reduce((sum, s) => sum + s.items.reduce((is, item) => {
@@ -281,8 +309,12 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const weekData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - (6 - i));
-        const dateStr = d.toISOString().split('T')[0];
-        const daySales = sales.filter(s => s.timestamp?.startsWith(dateStr) && s.tipo !== 'COBRO_DEUDA' && s.tipo !== 'AJUSTE_ENTRADA' && s.tipo !== 'AJUSTE_SALIDA' && s.tipo !== 'VENTA_FIADA' && s.status !== 'ANULADA');
+        const dateStr = getLocalISODate(d);
+        const daySales = sales.filter(s => {
+            if (s.tipo === 'COBRO_DEUDA' || s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA' || s.tipo === 'VENTA_FIADA' || s.status === 'ANULADA') return false;
+            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
+            return saleLocalDay === dateStr;
+        });
         return { date: dateStr, total: daySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0), count: daySales.length };
     }), [sales]);
 
@@ -316,8 +348,9 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
     // Payment method breakdown (today)
     const paymentBreakdown = useMemo(() => {
-        const allTodayTransactions = sales.filter(s => s.timestamp?.startsWith(today) && s.status !== 'ANULADA');
-        return allTodayTransactions.reduce((acc, s) => {
+        // use todaySales to reuse the correct local timezone filtering done previously
+        const allTodayTransactions = todaySales.filter(s => s.status !== 'ANULADA');
+        const acc = allTodayTransactions.reduce((acc, s) => {
             if (s.payments && s.payments.length > 0) {
                 s.payments.forEach(p => {
                     if (!acc[p.methodId]) acc[p.methodId] = { total: 0, currency: p.currency || 'BS', label: p.methodLabel };
@@ -330,7 +363,19 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             }
             return acc;
         }, {});
-    }, [sales, today]);
+
+        // Restar el cambio dado en efectivo para no inflar los montos de caja bruta
+        allTodayTransactions.forEach(s => {
+            if (s.changeUsd > 0 && acc['efectivo_usd']) {
+                acc['efectivo_usd'].total -= s.changeUsd;
+            }
+            if (s.changeBs > 0 && acc['efectivo_bs']) {
+                acc['efectivo_bs'].total -= s.changeBs;
+            }
+        });
+
+        return acc;
+    }, [todaySales]);
 
     // Top productos vendidos HOY (para cierre del día)
     const todayTopProducts = useMemo(() => {
@@ -345,20 +390,26 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         return Object.values(todayProductMap).sort((a, b) => b.qty - a.qty).slice(0, 10);
     }, [todaySales, bcvRate]);
 
-    // Handler: Cierre de Caja (abre modal de confirmación)
+    // Handler: Cierre de Caja (abre modal de confirmación y cuadre)
     const handleDailyClose = () => {
         triggerHaptic && triggerHaptic();
         if (todaySales.length === 0) {
             showToast('No hay ventas hoy para cerrar caja', 'error');
             return;
         }
-        setIsResetTodayOpen(true);
+        setIsCashReconOpen(true);
     };
 
-    const handleResetToday = async () => {
-        // 1. Generar PDF del cierre ANTES de borrar
+    const handleConfirmCashRecon = async (reconData) => {
+        const { declaredUsd, declaredBs, diffUsd, diffBs } = reconData;
+
+        // 1. Generar PDF del cierre pasando los datos de reconciliación
         if (todaySales.length > 0) {
-            const allTodayForReport = sales.filter(s => s.timestamp?.startsWith(today));
+            const allTodayForReport = sales.filter(s => {
+                const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
+                return saleLocalDay === today && !s.cajaCerrada;
+            });
+
             await generateDailyClosePDF({
                 sales: todaySales,
                 allSales: allTodayForReport,
@@ -369,14 +420,24 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 todayTotalBs,
                 todayProfit,
                 todayItemsSold,
+                reconData // Pasamos los datos del cuadre al PDF
             });
         }
-        // 2. Resetear ventas del día
-        const remaining = sales.filter(s => !s.timestamp?.startsWith(today));
-        await storageService.setItem(SALES_KEY, remaining);
-        setSales(remaining);
-        setIsResetTodayOpen(false);
-        showToast('Cierre de caja completado', 'success');
+
+        // 2. Marcar cajaCerrada en vez de borrar las ventas localmente
+        const updatedSales = sales.map(s => {
+            // Evaluamos si es una de las ventas que estamos cerrando
+            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
+            if (saleLocalDay === today && !s.cajaCerrada) {
+                return { ...s, cajaCerrada: true, cierreId: new Date().getTime() };
+            }
+            return s;
+        });
+
+        await storageService.setItem(SALES_KEY, updatedSales);
+        setSales(updatedSales);
+        setIsCashReconOpen(false);
+        showToast('Cierre de caja completado (Historial conservado)', 'success');
     };
 
     if (isLoading) {
@@ -436,7 +497,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             {/* Pull-to-refresh indicator */}
             {(pullDistance > 0 || isRefreshing) && (
                 <div className="flex justify-center pb-3 transition-all" style={{ height: pullDistance > 0 ? pullDistance : 40 }}>
-                    <div className={`w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-700 border-t-emerald-500 ${isRefreshing || pullDistance > 60 ? 'animate-spin-slow' : ''}`}
+                    <div className={`w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-700 border-t-brand ${isRefreshing || pullDistance > 60 ? 'animate-spin-slow' : ''}`}
                         style={{ opacity: Math.min(pullDistance / 60, 1), transform: `rotate(${pullDistance * 4}deg)` }}
                     />
                 </div>
@@ -456,19 +517,22 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         </button>
                     </div>
                 </div>
-                {/* NEW GEAR ICON FOR SETTINGS */}
-                <button
-                    onClick={() => { triggerHaptic(); setIsSettingsOpen(true); }}
-                    className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-300 rounded-full shadow-sm hover:shadow active:scale-95 transition-all outline-none"
-                    title="Configuración"
-                >
-                    <Settings size={22} className="text-slate-700 dark:text-slate-200" />
-                </button>
+                <div className="flex items-center gap-2">
+                    <SyncStatus />
+                    {/* GEAR ICON FOR SETTINGS */}
+                    <button
+                        onClick={() => { triggerHaptic(); setIsSettingsOpen(true); }}
+                        className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-300 rounded-full shadow-sm hover:shadow active:scale-95 transition-all outline-none"
+                        title="Configuración"
+                    >
+                        <Settings size={22} className="text-slate-700 dark:text-slate-200" />
+                    </button>
+                </div>
             </div>
 
             {/* Acciones Rápidas */}
             <div className="grid grid-cols-3 gap-3 mb-5">
-                <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('ventas'); } }} className="bg-emerald-500 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-2 shadow-sm hover:scale-[1.02] active:scale-95 transition-all">
+                <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('ventas'); } }} className="bg-brand hover:bg-brand-dark text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-2 shadow-sm shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all">
                     <ShoppingCart size={22} />
                     <span className="text-xs font-bold">Vender</span>
                 </button>
@@ -542,6 +606,25 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     <p className="text-xl font-black text-slate-800 dark:text-white leading-none"><AnimatedCounter value={todaySales.length} /> <span className="text-xs font-bold text-slate-400">{todaySales.length === 1 ? 'venta' : 'ventas'}</span></p>
                     <p className="text-[11px] text-slate-400 mt-1"><AnimatedCounter value={todayItemsSold} /> {todayItemsSold === 1 ? 'artículo vendido' : 'artículos vendidos'}</p>
                 </div>
+
+                {/* Egresos del Día (solo si hay pagos a proveedores) */}
+                {todayExpensesUsd > 0 && (
+                    <div className="col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-orange-200 dark:border-orange-800/30 shadow-sm relative overflow-hidden">
+                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-orange-50 dark:bg-orange-900/10 rounded-full blur-2xl"></div>
+                        <div className="flex items-center justify-between relative z-10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center shadow-inner">
+                                    <Package size={20} className="text-orange-500" />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] font-medium text-slate-400">Egresos del dia (Proveedores)</p>
+                                    <p className="text-lg font-black text-orange-600 dark:text-orange-400">-$<AnimatedCounter value={todayExpensesUsd} /></p>
+                                </div>
+                            </div>
+                            <span className="text-xs font-bold text-orange-500 bg-orange-50 dark:bg-orange-900/20 px-2.5 py-1 rounded-lg">{todayExpenses.length} {todayExpenses.length === 1 ? 'pago' : 'pagos'}</span>
+                        </div>
+                    </div>
+                )}
 
                 {/* Ganancia Estimada */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
@@ -758,7 +841,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 }}
                 onRecycleSale={(sale) => {
                     triggerHaptic && triggerHaptic();
-                    localStorage.setItem('recycled_cart', JSON.stringify(sale.items));
+                    loadCart(sale.items);
                     if (onNavigate) onNavigate('ventas');
                 }}
                 onPrintTicket={handlePrintTicket}
@@ -785,7 +868,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     >
                         <div className="p-5">
                             <div className="flex justify-center mb-4">
-                                <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 rounded-full flex items-center justify-center">
+                                <div className="w-14 h-14 bg-brand-light/30 dark:bg-brand-dark/30 text-brand rounded-full flex items-center justify-center">
                                     <UserPlus size={28} />
                                 </div>
                             </div>
@@ -805,7 +888,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                         onChange={(e) => setTicketClientName(e.target.value)}
                                         placeholder="Ej: María García"
                                         autoFocus
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
                                     />
                                 </div>
                                 <div>
@@ -817,7 +900,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                         value={ticketClientDocument}
                                         onChange={(e) => setTicketClientDocument(e.target.value.toUpperCase())}
                                         placeholder="Ej: V-12345678"
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all uppercase"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all uppercase"
                                     />
                                 </div>
                                 <div>
@@ -829,7 +912,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                         value={ticketClientPhone}
                                         onChange={(e) => setTicketClientPhone(e.target.value)}
                                         placeholder="Ej: 0414-1234567"
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
                                     />
                                 </div>
                             </div>
@@ -844,7 +927,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                             <button
                                 onClick={handleRegisterClientForTicket}
                                 disabled={!ticketClientName.trim()}
-                                className="flex-1 py-3 bg-emerald-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 hover:bg-emerald-600 text-white font-bold rounded-xl active:scale-[0.98] transition-all flex justify-center items-center gap-2 shadow-md shadow-emerald-500/20"
+                                className="flex-1 py-3 bg-brand disabled:bg-slate-300 dark:disabled:bg-slate-700 hover:bg-brand-dark text-white font-bold rounded-xl active:scale-[0.98] transition-all flex justify-center items-center gap-2 shadow-md shadow-brand/20"
                             >
                                 <Send size={16} /> Registrar y Enviar
                             </button>
@@ -944,8 +1027,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                             </button>
                             <button
                                 onClick={() => {
-                                    // Guardar items reciclados en localStorage como señal
-                                    localStorage.setItem('recycled_cart', JSON.stringify(recycleOffer.items));
+                                    loadCart(recycleOffer.items);
                                     setRecycleOffer(null);
                                     if (onNavigate) onNavigate('ventas');
                                 }}
@@ -968,14 +1050,13 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 confirmText="Sí, anular"
                 variant="danger"
             />
-            <ConfirmModal
-                isOpen={isResetTodayOpen}
-                onClose={() => setIsResetTodayOpen(false)}
-                onConfirm={handleResetToday}
-                title="Cierre de Caja"
-                message="Se generará un PDF con el reporte del día y se borrarán las ventas de hoy.\n\nEsta acción no se puede deshacer."
-                confirmText="Cerrar Caja"
-                confirmClassName="bg-indigo-500 hover:bg-indigo-600 text-white"
+            <CashReconciliationModal
+                isOpen={isCashReconOpen}
+                onClose={() => setIsCashReconOpen(false)}
+                onConfirm={handleConfirmCashRecon}
+                expectedUsd={paymentBreakdown['efectivo_usd']?.total || 0}
+                expectedBs={paymentBreakdown['efectivo_bs']?.total || 0}
+                bcvRate={bcvRate}
             />
 
             <SettingsModal

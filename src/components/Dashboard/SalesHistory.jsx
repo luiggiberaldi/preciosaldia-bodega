@@ -116,11 +116,14 @@ export default function SalesHistory({
                                     )}
 
                                     <div className="flex justify-between text-[10px] font-medium text-slate-400 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg p-2 mb-3">
-                                        <div>Ref: {formatBs(s.totalBs)} Bs @ {formatBs(s.rate || bcvRate)}</div>
-                                        {s.changeUsd > 0 && <div className="text-emerald-500">Vuelto: ${s.changeUsd.toFixed(2)}</div>}
+                                        <div className="flex flex-col gap-0.5">
+                                            <span>Ref: {formatBs(s.totalBs)} Bs @ {formatBs(s.rate || bcvRate)}</span>
+                                            {s.tasaCop > 0 && <span>COP: {(s.totalCop || (s.totalUsd * s.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} @ {s.tasaCop}</span>}
+                                        </div>
+                                        {s.changeUsd > 0 && <div className="text-emerald-500 font-bold self-start mt-0.5">Vuelto: ${s.changeUsd.toFixed(2)}</div>}
                                     </div>
 
-                                    <div className="flex items-center justify-between gap-2 mt-2">
+                                    <div className="flex flex-wrap items-center gap-2 mt-2">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -130,7 +133,7 @@ export default function SalesHistory({
                                                     onShareWhatsApp(s);
                                                 }
                                             }}
-                                            className="flex-1 py-2 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 hover:dark:bg-emerald-900/50 active:scale-95">
+                                            className="flex-1 min-w-[120px] whitespace-nowrap py-2 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 hover:dark:bg-emerald-900/50 active:scale-95">
                                             <Send size={14} /> Enviar Ticket
                                         </button>
                                         {onDownloadPDF && (

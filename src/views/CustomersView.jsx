@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Search, User, X, Trash2, Pencil, Phone, RefreshCw, Save, ArrowDownRight, ArrowUpRight, Clock, CheckCircle2, CreditCard, ShoppingBag } from 'lucide-react';
+import { Users, Plus, Search, User, X, Trash2, Pencil, Phone, RefreshCw, Save, ArrowDownRight, ArrowUpRight, Clock, CheckCircle2, CreditCard, ShoppingBag, Truck } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { formatBs, formatUsd } from '../utils/calculatorUtils';
@@ -9,6 +9,10 @@ import ConfirmModal from '../components/ConfirmModal';
 import EmptyState from '../components/EmptyState';
 import SwipeableItem from '../components/SwipeableItem';
 import { useProductContext } from '../context/ProductContext';
+
+// Importaciones de Proveedores
+import SuppliersList from '../components/Suppliers/SuppliersList';
+import { AddSupplierModal, AddInvoiceModal, PayInvoiceModal, SupplierDetailsSheet } from '../components/Suppliers/SupplierModals';
 
 export default function CustomersView({ triggerHaptic, rates }) {
     const [customers, setCustomers] = useState([]);
@@ -22,26 +26,153 @@ export default function CustomersView({ triggerHaptic, rates }) {
     const [currencyMode, setCurrencyMode] = useState('BS'); // 'BS' | 'USD'
     const [paymentMethod, setPaymentMethod] = useState('efectivo_bs');
     const [resetBalanceCustomer, setResetBalanceCustomer] = useState(null);
-    const { effectiveRate: bcvRate } = useProductContext();
+    const { effectiveRate: bcvRate, tasaCop, copEnabled } = useProductContext();
     const [expandedHistory, setExpandedHistory] = useState(null);
     const [historyData, setHistoryData] = useState([]);
+    // Modales de Clientes
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [deleteCustomerTarget, setDeleteCustomerTarget] = useState(null);
 
-    const loadCustomers = async () => {
-        const saved = await storageService.getItem('bodega_customers_v1', []);
-        setCustomers(saved);
+    // ── ESTADOS DE PROVEEDORES ──
+    const [activeTab, setActiveTab] = useState('clientes'); // 'clientes' | 'proveedores'
+    const [suppliers, setSuppliers] = useState([]);
+    const [invoices, setInvoices] = useState([]); // bodega_supplier_invoices_v1
+    const [selectedSupplier, setSelectedSupplier] = useState(null);
+    
+    // Modales de Proveedores
+    const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
+    const [editingSupplier, setEditingSupplier] = useState(null);
+    const [isAddInvoiceModalOpen, setIsAddInvoiceModalOpen] = useState(false);
+    const [isPayInvoiceModalOpen, setIsPayInvoiceModalOpen] = useState(false);
+    const [deleteSupplierTarget, setDeleteSupplierTarget] = useState(null);
+    const [supplierHistoryData, setSupplierHistoryData] = useState([]);
+
+    const loadData = async () => {
+        const [savedCustomers, savedSuppliers, savedInvoices] = await Promise.all([
+            storageService.getItem('bodega_customers_v1', []),
+            storageService.getItem('bodega_suppliers_v1', []),
+            storageService.getItem('bodega_supplier_invoices_v1', [])
+        ]);
+        setCustomers(savedCustomers);
+        setSuppliers(savedSuppliers);
+        setInvoices(savedInvoices);
     };
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        loadCustomers();
+        loadData();
     }, []);
 
     const saveCustomers = async (updatedCustomers) => {
         setCustomers(updatedCustomers);
         await storageService.setItem('bodega_customers_v1', updatedCustomers);
+    };
+
+    const saveSuppliers = async (updatedSuppliers) => {
+        setSuppliers(updatedSuppliers);
+        await storageService.setItem('bodega_suppliers_v1', updatedSuppliers);
+    };
+
+    const saveInvoices = async (updatedInvoices) => {
+        setInvoices(updatedInvoices);
+        await storageService.setItem('bodega_supplier_invoices_v1', updatedInvoices);
+    };
+
+    // ── LOGICA DE PROVEEDORES ──
+    const handleSaveSupplier = async (supplierData) => {
+        triggerHaptic && triggerHaptic();
+        let updated;
+        if (editingSupplier) {
+            updated = suppliers.map(s => s.id === supplierData.id ? supplierData : s);
+            showToast('Proveedor actualizado', 'success');
+        } else {
+            updated = [...suppliers, supplierData];
+            showToast('Proveedor agregado', 'success');
+        }
+        await saveSuppliers(updated);
+        setIsAddSupplierModalOpen(false);
+        setEditingSupplier(null);
+        if (selectedSupplier && selectedSupplier.id === supplierData.id) setSelectedSupplier(supplierData);
+    };
+
+    const refreshSupplierHistory = async (supplierId) => {
+        const allSales = await storageService.getItem('bodega_sales_v1', []);
+        const supplierInvoices = invoices.filter(i => i.supplierId === supplierId);
+        const supplierPayments = allSales.filter(s => s.tipo === 'PAGO_PROVEEDOR' && s.supplierId === supplierId);
+        
+        const combined = [...supplierInvoices, ...supplierPayments]
+            .sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp));
+            
+        setSupplierHistoryData(combined);
+    };
+
+    const handleSelectSupplier = (supplier) => {
+        triggerHaptic && triggerHaptic();
+        setSelectedSupplier(supplier);
+        refreshSupplierHistory(supplier.id);
+    };
+
+    const handleAddInvoice = async (invoiceData) => {
+        triggerHaptic && triggerHaptic();
+        const updatedInvoices = [...invoices, invoiceData];
+        await saveInvoices(updatedInvoices);
+
+        // Actualizar deuda del proveedor
+        const supplier = suppliers.find(s => s.id === invoiceData.supplierId);
+        if (supplier) {
+            const updatedSupplier = { ...supplier, deuda: (supplier.deuda || 0) + invoiceData.amountUsd };
+            const updatedSuppliers = suppliers.map(s => s.id === supplier.id ? updatedSupplier : s);
+            await saveSuppliers(updatedSuppliers);
+            setSelectedSupplier(updatedSupplier);
+        }
+        setIsAddInvoiceModalOpen(false);
+        showToast('Factura registrada', 'success');
+        refreshSupplierHistory(invoiceData.supplierId);
+    };
+
+    const handlePayInvoice = async (amountUsd, amountBs, methodId, currency) => {
+        triggerHaptic && triggerHaptic();
+        const supplier = selectedSupplier;
+        if (!supplier) return;
+
+        // 1. Descontar deuda
+        const updatedSupplier = { ...supplier, deuda: Math.max(0, (supplier.deuda || 0) - amountUsd) };
+        const updatedSuppliers = suppliers.map(s => s.id === supplier.id ? updatedSupplier : s);
+        await saveSuppliers(updatedSuppliers);
+        setSelectedSupplier(updatedSupplier);
+
+        // 2. Registrar en Caja como Egreso
+        const sales = await storageService.getItem('bodega_sales_v1', []);
+        const totalEnBs = currency === 'BS' ? amountBs : (amountUsd * bcvRate);
+        const totalEnUsd = currency === 'USD' ? amountUsd : (bcvRate > 0 ? amountBs / bcvRate : 0);
+        const totalEnCop = currency === 'COP' ? amountBs : (amountUsd * tasaCop);
+
+        const pagoRecord = {
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            tipo: 'PAGO_PROVEEDOR',
+            supplierId: supplier.id,
+            supplierName: supplier.name,
+            totalBs: -totalEnBs,
+            totalUsd: -totalEnUsd,
+            ...(copEnabled && { totalCop: -totalEnCop }),
+            paymentMethod: methodId,
+            payments: [{
+                methodId: methodId,
+                amountUsd: currency === 'USD' ? -totalEnUsd : 0,
+                amountBs: currency === 'BS' ? -totalEnBs : 0,
+                ...(copEnabled && { amountCop: currency === 'COP' ? -totalEnCop : 0 }),
+                currency: currency,
+                methodLabel: 'Pago a Proveedor'
+            }],
+            items: [{ name: `Pago a proveedor: ${supplier.name}`, qty: 1, priceUsd: -totalEnUsd, costBs: 0 }]
+        };
+        sales.push(pagoRecord);
+        await storageService.setItem('bodega_sales_v1', sales);
+
+        setIsPayInvoiceModalOpen(false);
+        showToast('Pago registrado correctamente', 'success');
+        refreshSupplierHistory(supplier.id);
     };
 
     const filteredCustomers = customers.filter(c => {
@@ -84,9 +215,12 @@ export default function CustomersView({ triggerHaptic, rates }) {
 
         triggerHaptic();
 
-        // El sistema almacena todo en USD. Si el usuario ingresa Bs, lo convertimos a USD.
+        // El sistema almacena todo en USD. Convertir de BS o COP a USD
         const rawAmount = parseFloat(transactionAmount);
-        const amountUsd = currencyMode === 'BS' && bcvRate > 0 ? rawAmount / bcvRate : rawAmount;
+        let amountUsd = rawAmount;
+        if (currencyMode === 'BS' && bcvRate > 0) amountUsd = rawAmount / bcvRate;
+        if (currencyMode === 'COP' && tasaCop > 0) amountUsd = rawAmount / tasaCop;
+
         const { type, customer } = transactionModal;
 
         // 1. Aplicar la Lógica Financiera de los Cuadrantes SIEMPRE EN USD
@@ -106,9 +240,10 @@ export default function CustomersView({ triggerHaptic, rates }) {
         // 3. Registrar en Ventas/Caja
         const sales = await storageService.getItem('bodega_sales_v1', []);
 
-        // Calculamos Bs y Usd para el registro
+        // Calculamos Bs, Usd y COP para el registro
         const totalEnBs = currencyMode === 'BS' ? rawAmount : (rawAmount * bcvRate);
-        const totalEnUsd = currencyMode === 'USD' ? rawAmount : (bcvRate > 0 ? rawAmount / bcvRate : 0);
+        const totalEnUsd = amountUsd;
+        const totalEnCop = currencyMode === 'COP' ? rawAmount : (amountUsd * tasaCop);
 
         if (type === 'ABONO') {
             const cobroRecord = {
@@ -119,6 +254,7 @@ export default function CustomersView({ triggerHaptic, rates }) {
                 clienteName: customer.name,
                 totalBs: totalEnBs,
                 totalUsd: totalEnUsd,
+                ...(copEnabled && { totalCop: totalEnCop }),
                 paymentMethod: paymentMethod,
                 items: [{ name: `Abono de deuda: ${customer.name}`, qty: 1, priceUsd: totalEnUsd, costBs: 0 }]
             };
@@ -132,6 +268,7 @@ export default function CustomersView({ triggerHaptic, rates }) {
                 clienteName: customer.name,
                 totalBs: totalEnBs,
                 totalUsd: totalEnUsd,
+                ...(copEnabled && { totalCop: totalEnCop }),
                 fiadoUsd: totalEnUsd,
                 items: [{ name: `Credito manual: ${customer.name}`, qty: 1, priceUsd: totalEnUsd, costBs: 0 }]
             };
@@ -147,13 +284,121 @@ export default function CustomersView({ triggerHaptic, rates }) {
         setPaymentMethod('efectivo_bs');
     };
 
+    if (activeTab === 'proveedores') {
+        return (
+            <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
+                {/* Segmented Control Premium */}
+                <div className="px-3 sm:px-6 pt-3 sm:pt-6 shrink-0 z-10 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl">
+                    <div className="flex bg-slate-200/50 dark:bg-slate-800/80 p-1.5 rounded-2xl shadow-inner">
+                        <button
+                            onClick={() => { setActiveTab('clientes'); triggerHaptic && triggerHaptic(); }}
+                            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'clientes' ? 'bg-white dark:bg-slate-900 shadow-sm text-blue-600 dark:text-blue-400 scale-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                        >
+                            <Users size={18} /> Clientes
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab('proveedores'); triggerHaptic && triggerHaptic(); }}
+                            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'proveedores' ? 'bg-white dark:bg-slate-900 shadow-sm text-purple-600 dark:text-purple-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                        >
+                            <Truck size={18} /> Proveedores
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto scrollbar-hide">
+                    <SuppliersList 
+                        suppliers={suppliers} 
+                        bcvRate={bcvRate} 
+                        tasaCop={tasaCop}
+                        copEnabled={copEnabled}
+                        triggerHaptic={triggerHaptic}
+                        onAddSupplier={() => setIsAddSupplierModalOpen(true)}
+                        onSelectSupplier={handleSelectSupplier}
+                        onDeleteSupplier={(s) => setDeleteSupplierTarget(s)}
+                    />
+                </div>
+
+                {isAddSupplierModalOpen && (
+                    <AddSupplierModal 
+                        editingSupplier={editingSupplier}
+                        onClose={() => { setIsAddSupplierModalOpen(false); setEditingSupplier(null); }} 
+                        onSave={handleSaveSupplier} 
+                    />
+                )}
+                {isAddInvoiceModalOpen && selectedSupplier && (
+                    <AddInvoiceModal 
+                        supplier={selectedSupplier}
+                        bcvRate={bcvRate}
+                        onClose={() => setIsAddInvoiceModalOpen(false)}
+                        onSave={handleAddInvoice}
+                    />
+                )}
+                {isPayInvoiceModalOpen && selectedSupplier && (
+                    <PayInvoiceModal 
+                        supplier={selectedSupplier}
+                        bcvRate={bcvRate}
+                        onClose={() => setIsPayInvoiceModalOpen(false)}
+                        onSave={handlePayInvoice}
+                    />
+                )}
+                <SupplierDetailsSheet 
+                    supplier={selectedSupplier}
+                    isOpen={!!selectedSupplier}
+                    bcvRate={bcvRate}
+                    tasaCop={tasaCop}
+                    copEnabled={copEnabled}
+                    historyData={supplierHistoryData}
+                    onClose={() => setSelectedSupplier(null)}
+                    onAddInvoice={() => setIsAddInvoiceModalOpen(true)}
+                    onPayInvoice={() => setIsPayInvoiceModalOpen(true)}
+                    onEdit={() => { setEditingSupplier(selectedSupplier); setIsAddSupplierModalOpen(true); }}
+                    onDelete={() => setDeleteSupplierTarget(selectedSupplier)}
+                />
+                <ConfirmModal
+                    isOpen={!!deleteSupplierTarget}
+                    onClose={() => setDeleteSupplierTarget(null)}
+                    onConfirm={async () => {
+                        const updated = suppliers.filter(s => s.id !== deleteSupplierTarget.id);
+                        await saveSuppliers(updated);
+                        showToast(`Proveedor ${deleteSupplierTarget.name} eliminado`, 'success');
+                        setSelectedSupplier(null);
+                        setDeleteSupplierTarget(null);
+                    }}
+                    title="Eliminar Proveedor"
+                    message={deleteSupplierTarget ? `¿Eliminar a ${deleteSupplierTarget.name}? Esta acción no se puede deshacer.` : ''}
+                    confirmText="Sí, eliminar"
+                    variant="danger"
+                />
+            </div>
+        );
+    }
+
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-3 sm:p-6 overflow-y-auto scrollbar-hide">
-            {/* Header */}
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
+            {/* Segmented Control Premium */}
+            <div className="px-3 sm:px-6 pt-3 sm:pt-6 shrink-0 z-10 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl">
+                <div className="flex bg-slate-200/50 dark:bg-slate-800/80 p-1.5 rounded-2xl shadow-inner">
+                    <button
+                        onClick={() => { setActiveTab('clientes'); triggerHaptic && triggerHaptic(); }}
+                        className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'clientes' ? 'bg-white dark:bg-slate-900 shadow-sm text-blue-600 dark:text-blue-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                    >
+                        <Users size={18} /> Clientes
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab('proveedores'); triggerHaptic && triggerHaptic(); }}
+                        className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'proveedores' ? 'bg-white dark:bg-slate-900 shadow-sm text-purple-600 dark:text-purple-400 scale-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                    >
+                        <Truck size={18} /> Proveedores
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto scrollbar-hide p-3 sm:p-6 pb-20">
+                {/* Header Clientes */}
             <div className="shrink-0 mb-5 flex justify-between items-start">
                 <div>
                     <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
-                        <Users size={26} className="text-blue-500" /> Clientes
+                        <Users size={26} className="text-blue-500" /> Contactos
                     </h2>
                     <p className="text-sm text-slate-400 font-medium ml-1">
                         Deudas y Saldos a Favor
@@ -164,7 +409,7 @@ export default function CustomersView({ triggerHaptic, rates }) {
                     className="p-3 bg-blue-500 text-white rounded-2xl shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                 >
                     <Plus size={20} className="shrink-0" />
-                    <span className="text-sm font-bold hidden sm:inline">Nuevo Cliente</span>
+                    <span className="text-sm font-bold hidden sm:inline">Nuevo Contacto</span>
                 </button>
             </div>
 
@@ -233,6 +478,8 @@ export default function CustomersView({ triggerHaptic, rates }) {
                             <CustomerCard
                                 customer={customer}
                                 bcvRate={bcvRate}
+                                tasaCop={tasaCop}
+                                copEnabled={copEnabled}
                                 onClick={() => {
                                     setSelectedCustomer(customer);
                                     toggleHistory(customer.id);
@@ -243,6 +490,7 @@ export default function CustomersView({ triggerHaptic, rates }) {
                     ))
                 )}
             </div>
+        </div>
 
             {/* Modal para Agregar Cliente */}
             {
@@ -263,7 +511,9 @@ export default function CustomersView({ triggerHaptic, rates }) {
                 transactionModal.isOpen && (() => {
                     // Calcular preview del saldo resultante en tiempo real
                     const rawAmt = parseFloat(transactionAmount) || 0;
-                    const amtUsd = currencyMode === 'BS' && bcvRate > 0 ? rawAmt / bcvRate : rawAmt;
+                    let amtUsd = rawAmt;
+                    if (currencyMode === 'BS' && bcvRate > 0) amtUsd = rawAmt / bcvRate;
+                    if (currencyMode === 'COP' && tasaCop > 0) amtUsd = rawAmt / tasaCop;
                     const currentCustomer = transactionModal.customer;
 
                     let previewCustomer = null;
@@ -331,15 +581,24 @@ export default function CustomersView({ triggerHaptic, rates }) {
                                         onClick={() => { setCurrencyMode('BS'); setTransactionAmount(''); setPaymentMethod('efectivo_bs'); }}
                                         className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${currencyMode === 'BS' ? 'bg-white dark:bg-slate-900 shadow-sm text-blue-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                                     >
-                                        Bolivares (Bs)
+                                        Bs
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => { setCurrencyMode('USD'); setTransactionAmount(''); setPaymentMethod('efectivo_usd'); }}
                                         className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${currencyMode === 'USD' ? 'bg-white dark:bg-slate-900 shadow-sm text-emerald-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                                     >
-                                        Dolares ($)
+                                        USD
                                     </button>
+                                    {copEnabled && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setCurrencyMode('COP'); setTransactionAmount(''); setPaymentMethod('efectivo_cop'); }}
+                                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${currencyMode === 'COP' ? 'bg-white dark:bg-slate-900 shadow-sm text-amber-500' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                        >
+                                            COP
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Input de monto */}
@@ -365,6 +624,8 @@ export default function CustomersView({ triggerHaptic, rates }) {
                                                 const deudaUsd = currentCustomer.deuda;
                                                 if (currencyMode === 'BS' && bcvRate > 0) {
                                                     setTransactionAmount((deudaUsd * bcvRate).toFixed(2));
+                                                } else if (currencyMode === 'COP' && tasaCop > 0) {
+                                                    setTransactionAmount((deudaUsd * tasaCop).toFixed(2));
                                                 } else {
                                                     setTransactionAmount(deudaUsd.toFixed(2));
                                                 }
@@ -374,6 +635,8 @@ export default function CustomersView({ triggerHaptic, rates }) {
                                             <CheckCircle2 size={14} />
                                             Pagar Total: {currencyMode === 'BS' && bcvRate > 0
                                                 ? `Bs ${formatBs(currentCustomer.deuda * bcvRate)}`
+                                                : currencyMode === 'COP' && tasaCop > 0
+                                                ? `${formatBs(currentCustomer.deuda * tasaCop)} COP`
                                                 : `$${formatUsd(currentCustomer.deuda)}`
                                             }
                                         </button>
@@ -392,12 +655,30 @@ export default function CustomersView({ triggerHaptic, rates }) {
                                             <span className="text-xs font-bold text-slate-500">Equivale a:</span>
                                             <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
                                                 {formatBs(parseFloat(transactionAmount) * bcvRate)} Bs
+                                                {copEnabled && ` • ${(parseFloat(transactionAmount) * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP`}
                                             </span>
                                         </div>
                                     )}
-                                    {bcvRate > 0 && (
-                                        <p className="text-[10px] font-medium text-slate-400 mt-2 text-center">Tasa BCV: {formatBs(bcvRate)} Bs/$</p>
+                                    {currencyMode === 'COP' && transactionAmount && tasaCop > 0 && (
+                                        <div className="bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg p-2 mt-3 flex flex-col gap-1">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold text-slate-500">Equivale a:</span>
+                                                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                                                    ${(parseFloat(transactionAmount) / tasaCop).toFixed(2)} USD
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold text-slate-500">Ref local:</span>
+                                                <span className="text-xs font-black text-blue-600 dark:text-blue-400">
+                                                    {formatBs((parseFloat(transactionAmount) / tasaCop) * bcvRate)} Bs
+                                                </span>
+                                            </div>
+                                        </div>
                                     )}
+                                    <p className="text-[10px] font-medium text-slate-400 mt-2 text-center flex items-center justify-center gap-2">
+                                        <span>Tasa BCV: {formatBs(bcvRate)} Bs/$</span>
+                                        {copEnabled && <span>• Tasa COP: {formatBs(tasaCop)} COP/$</span>}
+                                    </p>
                                 </div>
 
                                 {/* Metodo de pago (solo para abonos) */}
@@ -437,6 +718,7 @@ export default function CustomersView({ triggerHaptic, rates }) {
                                         {bcvRate > 0 && (
                                             <p className="text-[10px] font-bold text-slate-400 mt-1 text-right">
                                                 {saldoPreviewUsd >= 0 ? '+' : '-'}{formatBs(Math.abs(saldoPreviewUsd) * bcvRate)} Bs
+                                                {copEnabled && ` • ${(Math.abs(saldoPreviewUsd) * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP`}
                                             </p>
                                         )}
                                     </div>
@@ -455,8 +737,8 @@ export default function CustomersView({ triggerHaptic, rates }) {
                                 >
                                     <Save size={18} />
                                     {transactionModal.type === 'ABONO'
-                                        ? `Abonar ${currencyMode === 'BS' ? 'Bs' : '$'}${transactionAmount || '0.00'}`
-                                        : `Cargar Deuda ${currencyMode === 'BS' ? 'Bs' : '$'}${transactionAmount || '0.00'}`
+                                        ? `Abonar ${currencyMode === 'BS' ? 'Bs' : currencyMode === 'COP' ? 'COP' : '$'}${transactionAmount || '0.00'}`
+                                        : `Cargar Deuda ${currencyMode === 'BS' ? 'Bs' : currencyMode === 'COP' ? 'COP' : '$'}${transactionAmount || '0.00'}`
                                     }
                                 </button>
                             </div>
@@ -540,7 +822,7 @@ export default function CustomersView({ triggerHaptic, rates }) {
 }
 
 // ─── Sub-componente: Tarjeta Compacta ───────────────────────
-function CustomerCard({ customer, bcvRate, onClick, onDelete }) {
+function CustomerCard({ customer, bcvRate, tasaCop, copEnabled, onClick, onDelete }) {
     return (
         <div className="bg-white dark:bg-slate-900 rounded-2xl px-4 py-3 border border-slate-100 dark:border-slate-800 shadow-sm transition-all active:scale-[0.98] flex items-center gap-2 relative">
             <div 
@@ -572,11 +854,13 @@ function CustomerCard({ customer, bcvRate, onClick, onDelete }) {
                         <>
                             <p className="text-sm font-black text-red-500 leading-tight">-${formatUsd(customer.deuda)}</p>
                             {bcvRate > 0 && <p className="text-[10px] font-bold text-red-400/70">-{formatBs(customer.deuda * bcvRate)} Bs</p>}
+                            {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-red-400/90">-{(customer.deuda * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
                         </>
                     ) : customer.favor > 0 ? (
                         <>
                             <p className="text-sm font-black text-emerald-500 leading-tight">+${formatUsd(customer.favor)}</p>
                             {bcvRate > 0 && <p className="text-[10px] font-bold text-emerald-400/70">+{formatBs(customer.favor * bcvRate)} Bs</p>}
+                            {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-emerald-400/90">+{(customer.favor * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
                         </>
                     ) : (
                         <p className="text-xs font-bold text-slate-400 flex items-center gap-1">
@@ -601,7 +885,7 @@ function CustomerCard({ customer, bcvRate, onClick, onDelete }) {
 }
 
 // ─── Sub-componente: Bottom Sheet de Detalle ────────────────
-function CustomerDetailSheet({ customer, isOpen, onClose, onAjustar, onReset, onEdit, onDelete, bcvRate, sales }) {
+function CustomerDetailSheet({ customer, isOpen, onClose, onAjustar, onReset, onEdit, onDelete, bcvRate, tasaCop, copEnabled, sales }) {
     if (!isOpen || !customer) return null;
 
     const createdDate = customer.createdAt
@@ -658,12 +942,14 @@ function CustomerDetailSheet({ customer, isOpen, onClose, onAjustar, onReset, on
                                 <p className="text-[10px] font-bold text-red-400 uppercase">Debe</p>
                                 <p className="text-lg font-black text-red-500">-${formatUsd(customer.deuda)}</p>
                                 {bcvRate > 0 && <p className="text-[10px] font-bold text-red-400/70">-{formatBs(customer.deuda * bcvRate)} Bs</p>}
+                                {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-red-500/90">-{(customer.deuda * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
                             </div>
                         ) : customer.favor > 0 ? (
                             <div className="flex-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-xl px-3 py-2.5 text-center">
                                 <p className="text-[10px] font-bold text-emerald-400 uppercase">A favor</p>
                                 <p className="text-lg font-black text-emerald-500">+${formatUsd(customer.favor)}</p>
                                 {bcvRate > 0 && <p className="text-[10px] font-bold text-emerald-400/70">+{formatBs(customer.favor * bcvRate)} Bs</p>}
+                                {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-emerald-500/90">+{(customer.favor * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
                             </div>
                         ) : (
                             <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-center">

@@ -7,6 +7,7 @@ import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { getActivePaymentMethods } from '../config/paymentMethods';
 import { showToast } from '../components/Toast';
 import { ShoppingCart, X } from 'lucide-react';
+import { useCart } from '../context/CartContext';
 
 // Components
 import SalesHeader from '../components/Sales/SalesHeader';
@@ -31,7 +32,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const { notifySaleComplete, notifyLowStock } = useNotifications();
 
     // ── Global Context ──────────────────────────────────────
-    const { products, setProducts, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate } = useProductContext();
+    const { products, setProducts, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
 
     // ── State ──────────────────────────────────────
     const [customers, setCustomers] = useState([]);
@@ -43,10 +44,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const [showCustomAmountModal, setShowCustomAmountModal] = useState(false);
     const [showKeyboardHelp, setShowKeyboardHelp] = useState(false); // Keyboard shortcuts modal state
 
-    // Cart
-    const [cart, setCart] = useState([]);
-    const cartRef = useRef(cart);
-    useEffect(() => { cartRef.current = cart; }, [cart]);
+    // Cart (from global context)
+    const { cart, setCart, cartRef, pendingNavigate, setPendingNavigate } = useCart();
 
     // Search
     const searchInputRef = useRef(null);
@@ -213,33 +212,31 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                 
                 setIsLoadingLocal(false);
 
-                const recycled = localStorage.getItem('recycled_cart');
-                if (recycled) {
-                    try {
-                        const items = JSON.parse(recycled);
-                        if (Array.isArray(items) && items.length > 0) {
-                            setCart(items.map(item => ({
-                                id: item.id, name: item.name, qty: item.qty,
-                                priceUsd: item.priceUsd, costBs: item.costBs || 0, costUsd: item.costUsd || 0, isWeight: item.isWeight || false,
-                            })));
-                        }
-                    } catch (_) { /* ignore */ }
-                    localStorage.removeItem('recycled_cart');
-                }
             }
         };
         load();
         return () => { mounted = false; };
     }, []);
 
+    // Handle pending navigation from recycled cart (replaces old localStorage approach)
+    useEffect(() => {
+        if (pendingNavigate && cart.length > 0 && isActive) {
+            setPendingNavigate(null);
+        }
+    }, [pendingNavigate, cart, isActive, setPendingNavigate]);
+
     // Auto-focus search
     useEffect(() => { if (!isLoading && searchInputRef.current) searchInputRef.current.focus(); }, [isLoading]);
 
-    // Refresh products when tab becomes active (consolidates window focus + isActive)
+    // Refresh products and payment methods when tab becomes active (consolidates window focus + isActive)
     useEffect(() => {
         if (isActive && !isLoading) {
-            storageService.getItem('bodega_products_v1', []).then(saved => {
-                setProducts(saved);
+            Promise.all([
+                storageService.getItem('bodega_products_v1', []),
+                getActivePaymentMethods()
+            ]).then(([savedProducts, methods]) => {
+                setProducts(savedProducts);
+                setPaymentMethods(methods);
             });
         }
     }, [isActive]);
@@ -467,11 +464,17 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             tipo: fiadoAmountUsd > 0 ? 'VENTA_FIADA' : 'VENTA',
             status: 'COMPLETADA',
             items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, costUsd: i.costUsd || 0, isWeight: i.isWeight })),
-            totalUsd: cartTotalUsd, totalBs: cartTotalBs, payments, rate: effectiveRate,
+            totalUsd: cartTotalUsd, 
+            totalBs: cartTotalBs, 
+            totalCop: copEnabled && tasaCop > 0 ? cartTotalUsd * tasaCop : 0,
+            payments, 
+            rate: effectiveRate,
+            tasaCop: copEnabled ? tasaCop : 0,
+            copEnabled: copEnabled,
             rateSource: useAutoRate ? 'BCV Auto' : 'Manual',
             timestamp: new Date().toISOString(),
-            changeUsd: fiadoAmountUsd > 0 ? 0 : changeUsd,
-            changeBs: fiadoAmountUsd > 0 ? 0 : changeBs,
+            changeUsd: fiadoAmountUsd > 0 ? 0 : (changeBreakdown?.changeUsdGiven || 0),
+            changeBs: fiadoAmountUsd > 0 ? 0 : (changeBreakdown?.changeBsGiven || 0),
             customerId: selectedCustomerId || null,
             customerName: selectedCustomer ? selectedCustomer.name : 'Consumidor Final',
             customerDocument: selectedCustomer?.documentId || null,
@@ -539,15 +542,30 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         return newCustomer;
     };
 
-    const handleAddCustomAmount = (amountBs) => {
-        const amountUsd = parseFloat((amountBs / effectiveRate).toFixed(2));
+    const handleAddCustomAmount = (amount, currency) => {
+        let amountUsd = 0;
+        let exactBsToStore = null;
+        
+        if (currency === 'USD') {
+            amountUsd = parseFloat(amount.toFixed(2));
+            // exactBsToStore remains null to float with effectiveRate
+        } else if (currency === 'COP') {
+            const tasaCopVal = typeof tasaCop !== 'undefined' ? tasaCop : (parseFloat(localStorage.getItem('tasa_cop')) || 4150);
+            amountUsd = parseFloat((amount / tasaCopVal).toFixed(2));
+            // exactBsToStore remains null to float with effectiveRate
+        } else {
+            // Default BS
+            amountUsd = parseFloat((amount / effectiveRate).toFixed(2));
+            exactBsToStore = parseFloat(amount);
+        }
+
         if (amountUsd <= 0) return;
         
         const customProduct = {
             id: `custom_${Date.now()}`,
             name: 'Venta Libre',
             priceUsdt: amountUsd, // Usamos priceUsdt para que la validación temprana lo acepte
-            exactBs: parseFloat(amountBs), // Monto exacto original en Bs
+            exactBs: exactBsToStore, // Monto exacto original en Bs, o null si debe flotar
             costBs: 0,
             costUsd: 0,
             unit: 'unidad',
@@ -722,6 +740,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                         onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
                         triggerHaptic={triggerHaptic}
                         cartSelectedIndex={cartSelectedIndex}
+                        copEnabled={copEnabled}
+                        tasaCop={tasaCop}
                     />
                 </div>
 
@@ -777,6 +797,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                                     onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
                                     triggerHaptic={triggerHaptic}
                                     cartSelectedIndex={cartSelectedIndex}
+                                    copEnabled={copEnabled}
+                                    tasaCop={tasaCop}
                                 />
                             </div>
                         </div>
@@ -793,6 +815,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                     paymentMethods={paymentMethods}
                     onConfirmSale={handleCheckout} onCreateCustomer={handleCreateCustomer}
                     triggerHaptic={triggerHaptic}
+                    copEnabled={copEnabled}
+                    tasaCop={tasaCop}
                 />
             )}
 

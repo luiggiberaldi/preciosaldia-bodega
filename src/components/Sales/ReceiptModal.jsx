@@ -38,6 +38,9 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                         )}
                         <p className="text-4xl font-black text-slate-900 mb-1 tracking-tighter">${receipt.totalUsd.toFixed(2)}</p>
                         <p className="text-lg font-bold text-slate-500 mb-2">{formatBs(receipt.totalBs)} Bs</p>
+                        {receipt.copEnabled && receipt.tasaCop > 0 && (
+                            <p className="text-base font-bold text-amber-500 mb-2">{(receipt.totalCop || (receipt.totalUsd * receipt.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>
+                        )}
 
                         <div className="inline-flex items-center flex-wrap justify-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600 mt-2">
                             {receipt.payments && receipt.payments.map((p, i) => (
@@ -88,8 +91,19 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                             </div>
                         )}
 
-                        <p className="text-center text-[10px] text-slate-400 mt-6 uppercase tracking-wider font-bold">Tasa BCV Aplicada: {formatBs(receipt.rate)} Bs/$</p>
-                        <p className="text-center text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">{new Date(receipt.timestamp).toLocaleString()}</p>
+                        <div className="mt-6 flex flex-col items-center gap-1">
+                            <p className="text-center text-[10px] text-slate-400 uppercase tracking-wider font-bold">
+                                Tasa BCV Aplicada: {formatBs(receipt.rate)} Bs/$
+                            </p>
+                            {receipt.tasaCop > 0 && (
+                                <p className="text-center text-[10px] text-slate-400 uppercase tracking-wider font-bold">
+                                    Tasa COP Aplicada: {receipt.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP/$
+                                </p>
+                            )}
+                            <p className="text-center text-[10px] text-slate-400 uppercase tracking-wider font-bold">
+                                {new Date(receipt.timestamp).toLocaleString()}
+                            </p>
+                        </div>
                     </div>
                 </div>
 

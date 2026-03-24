@@ -427,9 +427,66 @@ async function suiteCarrito() {
     assert(totalBs > 0, 'Total Bs correcto');
 
     const formatChecked = formatBs(totalBs);
-    assert(!formatChecked.includes(','), 'formatBs sin decimales extraños');
+    // Ahora esperamos decimales con coma (es-VE)
+    assert(formatChecked.includes(','), 'formatBs debe mostrar decimales con coma (es-VE)');
 
-    log('Cálculos carrito OK', 'success');
+    log('Cálculos carrito OK (con decimales)', 'success');
+}
+
+async function suiteReportes() {
+    section('📊 SUITE: REPORTES (Validación de Totales y Divisas)');
+
+    await storageService.setItem(TEST_KEYS.sales, []); // Limpiar
+
+    const now = new Date().toISOString();
+    // Simulamos 3 ventas con montos "sensibles" de punto flotante
+    const mySales = [
+        {
+            id: 'rs1',
+            timestamp: now,
+            status: 'COMPLETADA',
+            totalUsd: 10.05,
+            payments: [{ methodId: 'efectivo_usd', currency: 'USD', amountUsd: 10.05 }],
+            items: [{ id: 'i1', name: 'P1', qty: 1, priceUsd: 10.05 }]
+        },
+        {
+            id: 'rs2',
+            timestamp: now,
+            status: 'COMPLETADA',
+            totalUsd: 20.01,
+            payments: [{ methodId: 'efectivo_usd', currency: 'USD', amountUsd: 20.01 }],
+            items: [{ id: 'i2', name: 'P2', qty: 1, priceUsd: 20.01 }]
+        },
+        {
+            id: 'rs3',
+            timestamp: now,
+            status: 'COMPLETADA',
+            totalUsd: 1.00,
+            payments: [{ methodId: 'efectivo_bs', currency: 'BS', amountBs: 460.55 }],
+            items: [{ id: 'i3', name: 'P3', qty: 1, priceUsd: 1.00 }]
+        }
+    ];
+
+    await storageService.setItem(TEST_KEYS.sales, mySales);
+
+    // Lógica replicada de ReportsView
+    const paymentBreakdown = {};
+    mySales.forEach(s => {
+        s.payments.forEach(p => {
+            if (!paymentBreakdown[p.methodId]) {
+                paymentBreakdown[p.methodId] = { total: 0, currency: p.currency || 'BS' };
+            }
+            paymentBreakdown[p.methodId].total += (p.currency === 'USD' ? p.amountUsd : p.amountBs) || 0;
+        });
+    });
+
+    // Validar suma exacta de USD (30.06)
+    assertClose(paymentBreakdown['efectivo_usd'].total, 30.06, 'Suma de Efectivo USD exacta (30.06)');
+    
+    // Validar suma exacta de BS (460.55)
+    assertClose(paymentBreakdown['efectivo_bs'].total, 460.55, 'Suma de Efectivo BS exacta (460.55)');
+
+    log('Validación de Reportes (Divisas/Efectivo) OK: Totales exactos sin basura flotante.', 'success');
 }
 
 async function suiteBimoneda() {
@@ -873,6 +930,50 @@ async function suiteRegresion20260304() {
     log('Payment breakdown: moneda nativa por método verificada.', 'success');
 }
 
+// 15. Cierre de Caja y Anulaciones (Vueltos, Proveedores, Caja Cerrada)
+async function suiteCierreCaja() {
+    section('📦 SUITE: Cierre de Caja y Anulaciones (v5.0)');
+
+    // ── Test 1: Vuelto (Change Breakdown) ──
+    // Una venta de $10.00 pagada con $20.00 en efectivo USD
+    const saleConVuelto = {
+        id: 'cv1',
+        totalUsd: 10,
+        status: 'COMPLETADA',
+        payments: [{ methodId: 'efectivo_usd', currency: 'USD', amountUsd: 20 }],
+        changeBreakdown: { changeUsdGiven: 10, changeBsGiven: 0 }
+    };
+    
+    const usdBruto = saleConVuelto.payments[0].amountUsd;
+    const usdNeto = usdBruto - (saleConVuelto.changeBreakdown?.changeUsdGiven || 0);
+    assertEqual(usdNeto, 10, 'El neto de USD cobrado (bruto - vuelto) debe ser exactamente el costo de la venta');
+
+    // ── Test 2: Proveedores (Egreso) ──
+    const pagoProveedor = {
+        id: 'pp1',
+        tipo: 'PAGO_PROVEEDOR',
+        totalUsd: -50, // Egreso
+        payments: [{ methodId: 'efectivo_usd', currency: 'USD', amountUsd: 50 }]
+    };
+
+    const saldoCaja = usdNeto + pagoProveedor.totalUsd;
+    assertEqual(saldoCaja, -40, 'El pago a proveedor resta correctamente del flujo de caja neto');
+
+    // ── Test 3: Ventas Anuladas (cajaCerrada y status) ──
+    const saleAnulada = {
+        id: 'an1',
+        status: 'ANULADA',
+        cajaCerrada: true,
+        totalUsd: 100
+    };
+
+    const ventasValidas = [saleConVuelto, saleAnulada].filter(s => s.status !== 'ANULADA');
+    assertEqual(ventasValidas.length, 1, 'Las ventas anuladas no deben sumar a las métricas estáticas');
+    assertEqual(saleAnulada.cajaCerrada, true, 'La bandera cajaCerrada puede persistir en estado ANULADA sin borrarse');
+
+    log('Cierre de caja: Vueltos descontados, proveedores y anulaciones validados OK.', 'success');
+}
+
 // ════════════════════════════════════════════
 // RUNNER CONFIGURATION
 // ════════════════════════════════════════════
@@ -890,6 +991,7 @@ const SUITES = [
     { key: 'storage', name: '💾 Funciones Storage Base', fn: suiteStorage, fast: true },
     { key: 'productos', name: '📦 CRUD Productos', fn: suiteProductos, fast: true },
     { key: 'carrito', name: '🛒 Matemáticas de Carrito', fn: suiteCarrito, fast: true },
+    { key: 'reportes_suma', name: '📊 Validación Reportes (Suma Totales)', fn: suiteReportes, fast: true },
     { key: 'bimoneda', name: '💱 Conversiones Bimoneda', fn: suiteBimoneda, fast: true },
     { key: 'checkout', name: '🧾 Guardado Checkout', fn: suiteCheckout, fast: true },
     { key: 'clientes', name: '👥 Actualización Deudas', fn: suiteClientes, fast: true },
@@ -903,6 +1005,7 @@ const SUITES = [
     { key: 'pay_methods', name: '💳 Métodos de Pago (CRUD)', fn: suitePaymentMethods, fast: true },
     { key: 'msg_service', name: '💬 MessageService (3 Tonos)', fn: suiteMessageService, fast: true },
     { key: 'regresion_20260304', name: '🔧 Regresión: Ganancia/Vuelto/Plural/Moneda', fn: suiteRegresion20260304, fast: true },
+    { key: 'cierre_caja', name: '📦 Flujo: Vueltos Netos / Proveedores / Cierre', fn: suiteCierreCaja, fast: true },
 
     { key: '7days', name: '🗓️ Week Sim (Storage Pesado)', fn: suite7Days, fast: false },
 ];

@@ -35,6 +35,7 @@ export function buildReceiptWhatsAppUrl(receipt, currentRate) {
     const totalBs = r.totalBs ?? (r.totalUsd * r.rate);
     const totalUsdStr = `$${parseFloat(r.totalUsd).toFixed(2)}`;
     const totalBsStr = `Bs ${Math.ceil(totalBs)}`;
+    const totalCopStr = r.copEnabled && r.tasaCop > 0 ? `  /  COP ${(r.totalCop || (r.totalUsd * r.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
 
     // Vuelto
     const changeLines = r.changeUsd > 0.005
@@ -81,11 +82,12 @@ export function buildReceiptWhatsAppUrl(receipt, currentRate) {
         itemsLines,
         ``,
         sep,
-        `TOTAL: ${totalUsdStr}  /  ${totalBsStr}`,
+        `TOTAL: ${totalUsdStr}  /  ${totalBsStr}${totalCopStr}`,
         paymentsLines ? `\nPAGOS:\n${paymentsLines}` : '',
         changeLines,
         fiadoLine,
         sep,
+        r.tasaCop > 0 ? `Tasa COP: ${r.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : '',
         `Gracias por su compra!`,
         ``,
         `_Este documento no constituye factura fiscal. Comprobante de control interno._`,

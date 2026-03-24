@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode, CheckCircle, Clock, ShoppingBag, CreditCard, ArrowUpRight, Plus, Minus } from 'lucide-react';
+import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode, Banknote, CheckCircle, Clock, ShoppingBag, CreditCard, ArrowUpRight, Plus, Minus } from 'lucide-react';
 import { Modal } from '../Modal';
 
 const PACKAGING_TYPES = [
@@ -33,6 +33,8 @@ export default function ProductFormModal({
     stockInLotes, setStockInLotes,
     granelUnit, setGranelUnit,
     effectiveRate,
+    copEnabled,
+    tasaCop,
     isFormShaking,
 
     handleImageUpload,
@@ -251,6 +253,21 @@ export default function ProductFormModal({
                             )}
                         </div>
                     </div>
+                    
+                    {/* ─── COP PREVIEW ─── */}
+                    {copEnabled && parsedPrice > 0 && (
+                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200/50 dark:border-amber-800/30 p-2.5 rounded-xl flex items-center justify-between text-sm animate-in fade-in slide-in-from-top-1">
+                            <span className="text-amber-800 dark:text-amber-500 font-bold flex items-center gap-1.5 text-xs uppercase tracking-wider hidden sm:flex">
+                                <Banknote size={16} /> Equivalente en COP
+                            </span>
+                            <span className="text-amber-800 dark:text-amber-500 font-bold flex items-center gap-1.5 text-xs uppercase tracking-wider sm:hidden">
+                                <Banknote size={16} /> COP
+                            </span>
+                            <span className="font-black text-amber-600 dark:text-amber-400 text-lg">
+                                {(parsedPrice * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                        </div>
+                    )}
 
                     {/* ─── LOTE: Unit Price (Bimoneda) ─── */}
                     {isLote && sellByUnit && parsedUnits > 1 && (
@@ -281,6 +298,16 @@ export default function ProductFormModal({
                                         <span className="text-[8px] bg-blue-100 dark:bg-blue-900/30 text-blue-500 px-1.5 py-0.5 rounded font-black">Bs</span>
                                     </div>
                                 </div>
+                                {copEnabled && (
+                                    <div className="col-span-2 mt-0.5">
+                                        <div className="w-full bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 p-2.5 rounded-xl text-xs flex items-center justify-between">
+                                            <span className="text-amber-700/70 dark:text-amber-500/70 font-bold">Unidad Suelta COP:</span>
+                                            <span className="font-black text-amber-600 dark:text-amber-400">
+                                                 {(effectiveUnitPrice * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <p className="text-[9px] text-slate-400 italic">Déjalo vacío para usar el precio auto-calculado (lote ÷ unidades)</p>
                         </div>
@@ -378,7 +405,8 @@ export default function ProductFormModal({
                                     <div className="flex justify-between"><span className="text-slate-400">Nombre:</span><span className="font-bold text-slate-700 dark:text-white">{name}</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">Categoría:</span><span className="font-bold text-slate-700 dark:text-white">{categories.find(c => c.id === category)?.label || category}</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">Tipo:</span><span className="font-bold text-slate-700 dark:text-white">{PACKAGING_TYPES.find(p => p.id === packagingType)?.label}</span></div>
-                                    <div className="flex justify-between"><span className="text-slate-400">Precio:</span><span className="font-bold text-emerald-600">${parsedPrice.toFixed(2)}{priceSuffix}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Precio USD/BS:</span><span className="font-bold text-emerald-600">${parsedPrice.toFixed(2)}{priceSuffix} / {(parsedPrice * effectiveRate).toFixed(2)} Bs</span></div>
+                                    {copEnabled && <div className="flex justify-between"><span className="text-amber-500/80">Precio COP:</span><span className="font-bold text-amber-600">{(parsedPrice * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP{priceSuffix}</span></div>}
                                     {parsedCost > 0 && <div className="flex justify-between"><span className="text-slate-400">Costo:</span><span className="font-bold text-slate-600">${parsedCost.toFixed(2)}{priceSuffix}</span></div>}
                                     {mainMarginPct !== null && <div className="flex justify-between"><span className="text-slate-400">Margen:</span><span className={`font-black ${mainMarginPct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{mainMarginPct.toFixed(1)}%</span></div>}
                                     {isLote && <div className="flex justify-between"><span className="text-slate-400">Uds/Lote:</span><span className="font-bold text-indigo-500">{parsedUnits}</span></div>}

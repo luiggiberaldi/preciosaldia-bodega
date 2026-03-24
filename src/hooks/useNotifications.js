@@ -87,7 +87,13 @@ export function useNotifications() {
 
         // Evitar notificar más de una vez por día
         const lastNotified = localStorage.getItem('cierre_notified_date');
-        const todayStr = now.toISOString().split('T')[0];
+        const getLocalISODate = (d = new Date()) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        const todayStr = getLocalISODate(now);
         if (lastNotified === todayStr) return;
 
         localStorage.setItem('cierre_notified_date', todayStr);

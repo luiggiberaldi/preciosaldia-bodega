@@ -14,6 +14,8 @@ export default function CartPanel({
     onClearCart,
     triggerHaptic,
     cartSelectedIndex,
+    copEnabled,
+    tasaCop
 }) {
     const [editingQtyId, setEditingQtyId] = React.useState(null);
     const [tempQty, setTempQty] = React.useState('');
@@ -153,6 +155,13 @@ export default function CartPanel({
                     <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-500 tracking-widest uppercase">Bolívares</span>
                     <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">{formatBs(cartTotalBs)} Bs</span>
                 </div>
+
+                {copEnabled && (
+                    <div className="hidden sm:flex justify-between items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 rounded-xl">
+                        <span className="text-[11px] font-black text-amber-600 dark:text-amber-500 tracking-widest uppercase">Pesos (COP)</span>
+                        <span className="text-xl font-black text-amber-600 dark:text-amber-400">{(cartTotalUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                )}
 
                 <button
                     disabled={cart.length === 0}

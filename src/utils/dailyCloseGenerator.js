@@ -16,6 +16,7 @@ export async function generateDailyClosePDF({
     todayTotalBs,
     todayProfit,
     todayItemsSold,
+    reconData, // Datos del cuadre físico
 }) {
     const WIDTH = 80;
     const M = 5;
@@ -153,6 +154,43 @@ export async function generateDailyClosePDF({
     }
 
     // ════════════════════════════════════
+    //  RECONCILIACIÓN DE CAJA (CUADRE)
+    // ════════════════════════════════════
+    if (reconData) {
+        y = sectionTitle('CUADRE DE CAJA FISICA', y);
+
+        const reconRows = [
+            ['Declarado (USD)', `$${reconData.declaredUsd.toFixed(2)}`],
+            ['Declarado (Bs)', `Bs ${formatBs(reconData.declaredBs)}`],
+            ['Diferencia USD', `$${reconData.diffUsd.toFixed(2)}`],
+            ['Diferencia Bs', `Bs ${formatBs(reconData.diffBs)}`]
+        ];
+
+        reconRows.forEach(([label, value], i) => {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(...BODY);
+            doc.text(label, M, y);
+            
+            doc.setFont('helvetica', 'bold');
+            if (i >= 2) {
+                // Color code differences
+                const numVal = parseFloat(value.replace(/[^0-9.-]+/g,""));
+                if (numVal > 0) doc.setTextColor(...GREEN);
+                else if (numVal < 0) doc.setTextColor(...RED);
+                else doc.setTextColor(...MUTED);
+            } else {
+                doc.setTextColor(...INK);
+            }
+            doc.text(value, RIGHT, y, { align: 'right' });
+            y += 5;
+        });
+
+        y += 2;
+        dash(y); y += 6;
+    }
+
+    // ════════════════════════════════════
     //  TOP PRODUCTOS
     // ════════════════════════════════════
     if (topProdRows > 0) {
@@ -260,7 +298,13 @@ export async function generateDailyClosePDF({
     doc.text('Reporte generado automáticamente · Sin valor fiscal', CX, y, { align: 'center' });
 
     // ── DESCARGAR / COMPARTIR ──
-    const dateStr = now.toISOString().split('T')[0];
+    const getLocalISODate = (d = new Date()) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    const dateStr = getLocalISODate(now);
     const filename = `cierre_${dateStr}.pdf`;
     const blob = doc.output('blob');
     const file = new File([blob], filename, { type: 'application/pdf' });

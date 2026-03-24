@@ -2,7 +2,7 @@
 // La tasa de efectivo ahora depende exclusivamente de la calibración manual del usuario
 
 // Formateadores
-export const formatBs = (val) => new Intl.NumberFormat('es-VE', { maximumFractionDigits: 0 }).format(Math.ceil(val));
+export const formatBs = (val) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
 export const formatUsd = (val) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
 
 // [REDONDEO INTELIGENTE PARA EFECTIVO]

@@ -145,7 +145,12 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.setFontSize(7);
     doc.setTextColor(...MUTED);
     doc.text('Tasa BCV: Bs ' + formatBs(rate) + ' por $1', CX, y, { align: 'center' });
-    y += 8;
+    y += 5;
+    if (sale.tasaCop > 0) {
+        doc.text('Tasa COP: ' + sale.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' por $1', CX, y, { align: 'center' });
+        y += 5;
+    }
+    y += 3;
 
     // ════════════════════════════════════
     //  TOTAL (cada cosa en su propia línea, centrado)
@@ -168,7 +173,18 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.setTextColor(...BODY);
     const totalBsStr = 'Bs ' + formatBs(sale.totalBs || 0);
     doc.text(totalBsStr, CX, y, { align: 'center' });
-    y += 8;
+    y += 6;
+
+    // Monto COP
+    if (sale.copEnabled && sale.tasaCop > 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(...BODY);
+        const totalCopStr = 'COP ' + (sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        doc.text(totalCopStr, CX, y, { align: 'center' });
+        y += 8;
+    } else {
+        y += 2;
+    }
 
     dash(y); y += 7;
 
@@ -435,14 +451,16 @@ export function printThermalTicket(sale, bcvRate) {
 
     <!-- Tasa -->
     <div class="center" style="font-size:${fTiny};color:#555;margin:4px 0;">
-        Tasa BCV: Bs ${formatBs(rate)} por $1
+        <div style="margin-bottom:2px;">Tasa BCV: Bs ${formatBs(rate)} por $1</div>
+        ${sale.tasaCop > 0 ? `<div>Tasa COP: ${sale.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por $1</div>` : ''}
     </div>
 
     <!-- Total -->
     <div style="margin:8px 0;">
         <div class="center bold" style="font-size:${fSmall};color:#555;margin-bottom:4px;">TOTAL A PAGAR</div>
         <div class="total-usd">$${parseFloat(sale.totalUsd || 0).toFixed(2)}</div>
-        <div class="total-bs">Bs ${formatBs(sale.totalBs || 0)}</div>
+        <div class="total-bs" style="margin-bottom:${sale.copEnabled && sale.tasaCop > 0 ? '2px' : '4px'}">Bs ${formatBs(sale.totalBs || 0)}</div>
+        ${sale.copEnabled && sale.tasaCop > 0 ? `<div class="total-bs" style="font-size:${is80 ? '16px' : '13px'};">COP ${(sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>` : ''}
     </div>
 
     <hr class="dash">

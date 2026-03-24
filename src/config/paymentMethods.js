@@ -11,6 +11,9 @@ export const FACTORY_PAYMENT_METHODS = [
     { id: 'punto_venta', label: 'Punto de Venta', icon: '💳', Icon: CreditCard, currency: 'BS', isFactory: true },
     // Dólares
     { id: 'efectivo_usd', label: 'Efectivo en Dólares', icon: '💲', Icon: DollarSign, currency: 'USD', isFactory: true },
+    // Pesos
+    { id: 'efectivo_cop', label: 'Efectivo en Pesos', icon: '🟡', Icon: Coins, currency: 'COP', isFactory: true },
+    { id: 'transferencia_cop', label: 'Transferencia COP', icon: '🏦', Icon: Store, currency: 'COP', isFactory: true },
 ];
 
 // Alias para compatibilidad
@@ -18,17 +21,38 @@ export const DEFAULT_PAYMENT_METHODS = FACTORY_PAYMENT_METHODS;
 
 // ── PERSISTENCIA ──
 
-/** Obtener métodos activos (fábrica + custom) */
-export async function getActivePaymentMethods() {
-    const saved = await storageService.getItem(PM_KEY, null);
-    if (!saved) return [...FACTORY_PAYMENT_METHODS];
+/** Obtener TODOS los métodos (activos e inactivos) */
+export async function getAllPaymentMethods() {
+    const saved = await storageService.getItem(PM_KEY, null) || [];
 
-    // Rehidratar: reinyectar el componente Icon según id
-    return saved.map(m => ({
+    // Si no hay nada guardado aún, devolver los de fábrica activos
+    if (saved.length === 0) {
+        return [...FACTORY_PAYMENT_METHODS].map(m => ({ ...m, isEnabled: true }));
+    }
+
+    // 1. Fusionar métodos de fábrica con la config guardada
+    const mergedFactory = FACTORY_PAYMENT_METHODS.map(factoryMethod => {
+        const savedMethod = saved.find(m => m.id === factoryMethod.id);
+        return {
+            ...factoryMethod,
+            isEnabled: savedMethod ? savedMethod.isEnabled !== false : true,
+        };
+    });
+
+    // 2. Extraer los métodos custom guardados y rehidratar el icono
+    const customMethods = saved.filter(m => !m.isFactory).map(m => ({
         ...m,
-        // Factory: por id | Custom: por iconKey string
-        Icon: PAYMENT_ICONS[m.id] ?? ICON_COMPONENTS[m.icon] ?? null,
+        isEnabled: m.isEnabled !== false,
+        Icon: ICON_COMPONENTS[m.icon] || null,
     }));
+
+    return [...mergedFactory, ...customMethods];
+}
+
+/** Obtener métodos activos (fábrica + custom) para el Checkout */
+export async function getActivePaymentMethods() {
+    const all = await getAllPaymentMethods();
+    return all.filter(m => m.isEnabled !== false);
 }
 
 /** Guardar métodos (reemplaza todo el array) */
@@ -45,7 +69,7 @@ export async function savePaymentMethods(methods) {
 
 /** Agregar un método custom */
 export async function addPaymentMethod({ label, currency, icon }) {
-    const methods = await getActivePaymentMethods();
+    const methods = await getAllPaymentMethods();
     const newMethod = {
         id: 'custom_' + Date.now(),
         label,
@@ -60,10 +84,23 @@ export async function addPaymentMethod({ label, currency, icon }) {
 
 /** Eliminar un método (solo custom, no fábrica) */
 export async function removePaymentMethod(id) {
-    const methods = await getActivePaymentMethods();
+    const methods = await getAllPaymentMethods();
     const filtered = methods.filter(m => m.id !== id || m.isFactory);
     await savePaymentMethods(filtered);
     return filtered;
+}
+
+/** Habilitar/deshabilitar un método */
+export async function togglePaymentMethodEnabled(id) {
+    const methods = await getAllPaymentMethods();
+    const updated = methods.map(m => {
+        if (m.id === id) {
+            return { ...m, isEnabled: m.isEnabled === false ? true : false };
+        }
+        return m;
+    });
+    await savePaymentMethods(updated);
+    return await getAllPaymentMethods(); // Return correctly hydrated array
 }
 
 // ── HELPERS ──

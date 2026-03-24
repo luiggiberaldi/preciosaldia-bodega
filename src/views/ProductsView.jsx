@@ -29,6 +29,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         useAutoRate, setUseAutoRate,
         customRate, setCustomRate,
         effectiveRate,
+        copEnabled,
+        tasaCop,
         adjustStock: baseAdjustStock
     } = useProductContext();
 
@@ -181,7 +183,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     const filteredProducts = useMemo(() => {
         let result = products.filter(p => {
-            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const term = searchTerm.toLowerCase();
+            const matchesSearch = p.name.toLowerCase().includes(term) || (p.barcode && p.barcode.toLowerCase().includes(term));
             if (activeCategory === 'bajo-stock') {
                 return matchesSearch && (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
             }
@@ -485,7 +488,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
             <div className="shrink-0 mb-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                        <Store size={22} className="text-emerald-500 shrink-0" />
+                        <Store size={22} className="text-brand shrink-0" />
                         <h2 className="text-lg sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight truncate">Inventario</h2>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -506,7 +509,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                             <Settings size={16} strokeWidth={2.5} />
                         </button>
                         <button onClick={() => { triggerHaptic && triggerHaptic(); setIsModalOpen(true); }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-white rounded-xl shadow-md shadow-emerald-500/20 transition-all active:scale-95 font-bold text-sm" title="Agregar">
+                            className="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl shadow-md shadow-brand/20 transition-all active:scale-95 font-bold text-sm" title="Agregar">
                             <Plus size={16} strokeWidth={2.5} />
                             <span className="hidden sm:inline">Nuevo</span>
                         </button>
@@ -531,7 +534,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                     <div className="ml-auto" />
                     <button
                         onClick={toggleViewMode}
-                        className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-emerald-500 hover:border-emerald-300 transition-all active:scale-95"
+                        className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-brand hover:border-brand-light transition-all active:scale-95"
                         title={viewMode === 'grid' ? 'Cambiar a vista lista' : 'Cambiar a vista cuadrícula'}
                     >
                         {viewMode === 'grid' ? <List size={16} /> : <LayoutGrid size={16} />}
@@ -546,7 +549,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                 key={cat.id}
                                 onClick={() => { handleSetActiveCategory(cat.id); triggerHaptic && triggerHaptic(); }}
                                 className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all snap-start border ${activeCategory === cat.id
-                                    ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 border-emerald-500'
+                                    ? 'bg-brand text-white shadow-sm shadow-brand/20 border-brand'
                                     : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 active:scale-95'
                                     }`}
                             >
@@ -572,7 +575,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                         placeholder="Buscar producto..."
                         value={searchTerm}
                         onChange={(e) => handleSetSearchTerm(e.target.value)}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 sm:py-3 pl-9 sm:pl-12 pr-4 text-sm text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-sm"
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 sm:py-3 pl-9 sm:pl-12 pr-4 text-sm text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 shadow-sm"
                     />
                 </div>
             </div>
@@ -645,6 +648,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                         effectiveRate={effectiveRate}
                                         streetRate={streetRate}
                                         categories={categories}
+                                        copEnabled={copEnabled}
+                                        tasaCop={tasaCop}
                                         onAdjustStock={adjustStock}
                                         onShare={setShareProduct}
                                         onEdit={handleEdit}
@@ -720,6 +725,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                             <div className="hidden sm:block">
                                                 <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${(p.priceUsdt || 0).toFixed(2)}</p>
                                                 <p className="text-[10px] text-slate-400 font-medium">{formatBs(valBs)} Bs</p>
+                                                {copEnabled && (
+                                                    <p className="text-[10px] font-bold text-amber-500/80 mt-0.5">{(p.priceUsdt * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>
+                                                )}
                                             </div>
                                             <div className="hidden sm:block">
                                                 <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{p.costUsd ? `$${p.costUsd.toFixed(2)}` : '-'}</p>
@@ -786,6 +794,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 stockInLotes={stockInLotes} setStockInLotes={setStockInLotes}
                 granelUnit={granelUnit} setGranelUnit={setGranelUnit}
                 effectiveRate={effectiveRate}
+                copEnabled={copEnabled}
+                tasaCop={tasaCop}
                 isFormShaking={isFormShaking}
                 handleImageUpload={handleImageUpload}
                 handleSave={handleSave}

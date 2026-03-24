@@ -28,7 +28,23 @@ export function ProductProvider({ children, rates }) {
         return saved && parseFloat(saved) > 0 ? saved : '';
     });
 
+    // AUTO COP LOGIC
+    const [copEnabled, setCopEnabled] = useState(() => {
+        return localStorage.getItem('cop_enabled') === 'true';
+    });
+    const [autoCopEnabled, setAutoCopEnabled] = useState(() => {
+        return localStorage.getItem('auto_cop_enabled') === 'true';
+    });
+    const [tasaCopManual, setTasaCopManual] = useState(() => {
+        return localStorage.getItem('tasa_cop') || '';
+    });
+
     const effectiveRate = useAutoRate ? rates.bcv?.price : (parseFloat(customRate) > 0 ? parseFloat(customRate) : rates.bcv?.price);
+    
+    // Calcula el COP efectivo. rates.autoCopRate es calculado en useRates basado en TRM y la Brecha USDT/BCV.
+    const tasaCop = autoCopEnabled && rates.autoCopRate?.price 
+        ? rates.autoCopRate.price 
+        : (parseFloat(tasaCopManual) > 0 ? parseFloat(tasaCopManual) : 4150);
 
     // Initial Load
     useEffect(() => {
@@ -89,6 +105,15 @@ export function ProductProvider({ children, rates }) {
             if (e.key === 'bodega_use_auto_rate') {
                 setUseAutoRate(!!JSON.parse(e.newValue));
             }
+            if (e.key === 'cop_enabled') {
+                setCopEnabled(e.newValue === 'true');
+            }
+            if (e.key === 'auto_cop_enabled') {
+                setAutoCopEnabled(e.newValue === 'true');
+            }
+            if (e.key === 'tasa_cop') {
+                setTasaCopManual(e.newValue);
+            }
             if (e.key === 'bodega_products_v1') {
                 // If modified in another tab, fetch it
                 storageService.getItem('bodega_products_v1', []).then(updatedProducts => setProducts(updatedProducts));
@@ -146,6 +171,13 @@ export function ProductProvider({ children, rates }) {
             customRate,
             setCustomRate,
             effectiveRate,
+            copEnabled,
+            setCopEnabled,
+            autoCopEnabled,
+            setAutoCopEnabled,
+            tasaCopManual,
+            setTasaCopManual,
+            tasaCop,
             adjustStock
         }}>
             {children}

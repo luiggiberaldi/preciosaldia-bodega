@@ -13,6 +13,7 @@ const TesterView = lazy(() => import('./views/TesterView').then(m => ({ default:
 import { useRates } from './hooks/useRates';
 import { useSecurity } from './hooks/useSecurity';
 import { ProductProvider } from './context/ProductContext';
+import { CartProvider } from './context/CartContext';
 import PremiumGuard from './components/security/PremiumGuard';
 import TermsOverlay from './components/TermsOverlay';
 import OnboardingOverlay from './components/OnboardingOverlay';
@@ -147,7 +148,7 @@ export default function App() {
     { id: 'inicio', label: 'Inicio', icon: Home },
     { id: 'ventas', label: 'Vender', icon: ShoppingCart },
     { id: 'catalogo', label: 'Inventario', icon: Store },
-    { id: 'clientes', label: 'Clientes', icon: Users },
+    { id: 'clientes', label: 'Contactos', icon: Users },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
   ];
 
@@ -200,7 +201,7 @@ export default function App() {
                 const msg = `Hola! Quiero adquirir la licencia Premium de PreciosAlDía. Acabo de terminar mi prueba gratuita.`;
                 window.open(`https://wa.me/584124051793?text=${encodeURIComponent(msg)}`, '_blank');
               }}
-              className="w-full py-3 bg-[#10B981] text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 active:scale-95 transition-transform text-sm mb-2"
+              className="w-full py-3 bg-brand text-white font-bold rounded-xl shadow-lg shadow-brand/20 active:scale-95 transition-transform text-sm mb-2"
             >
               Solicitar Licencia
             </button>
@@ -221,6 +222,7 @@ export default function App() {
         </div>
       )}
 
+      <CartProvider>
       <ProductProvider rates={rates}>
         <main className={`flex-1 min-h-0 w-full max-w-md md:max-w-3xl lg:max-w-none lg:px-6 mx-auto relative ${isKeyboardOpen ? 'pb-4' : 'pb-24'} flex flex-col overflow-y-auto`}>
 
@@ -267,7 +269,7 @@ export default function App() {
             <div data-view="reportes" className={`flex-1 flex flex-col ${activeTab === 'reportes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
                 <PremiumGuard featureName="Reportes Históricos">
-                  <ReportsView rates={rates} triggerHaptic={triggerHaptic} />
+                  <ReportsView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} />
                 </PremiumGuard>
               </ErrorBoundary>
             </div>
@@ -275,6 +277,7 @@ export default function App() {
         </Suspense>
       </main>
       </ProductProvider>
+      </CartProvider>
       
       <CommandPalette 
           isOpen={isCommandPaletteOpen} 
@@ -299,14 +302,14 @@ export default function App() {
             ))}
 
             {installPrompt && activeTab === 'inicio' && (
-              <button onClick={() => { triggerHaptic(); handleInstall(); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 bg-emerald-500 text-white shadow-md animate-pulse">
+              <button onClick={() => { triggerHaptic(); handleInstall(); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 bg-brand text-white shadow-md animate-pulse">
                 <Download size={20} strokeWidth={3} />
               </button>
             )}
 
             {/* iOS: botón manual de instalación */}
             {!installPrompt && showIOSButton && activeTab === 'inicio' && (
-              <button onClick={() => { triggerHaptic(); setShowIOSInstall(true); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 bg-emerald-500 text-white shadow-md animate-pulse">
+              <button onClick={() => { triggerHaptic(); setShowIOSInstall(true); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 bg-brand text-white shadow-md animate-pulse">
                 <Download size={20} strokeWidth={3} />
               </button>
             )}
@@ -341,7 +344,7 @@ export default function App() {
                 <p className="text-sm text-slate-600 dark:text-slate-300">¡Listo! La app aparecerá como un ícono en tu teléfono</p>
               </div>
             </div>
-            <button onClick={() => { setShowIOSInstall(false); localStorage.setItem('ios_install_dismissed', '1'); }} className="w-full mt-6 py-3 bg-emerald-500 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform">
+            <button onClick={() => { setShowIOSInstall(false); localStorage.setItem('ios_install_dismissed', '1'); }} className="w-full mt-6 py-3 bg-brand text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform">
               Entendido
             </button>
           </div>
@@ -375,7 +378,7 @@ export default function App() {
 
 function TabButton({ icon, label, isActive, onClick, 'data-tour': dataTour }) {
   return (
-    <button data-tour={dataTour} onClick={onClick} className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 ${isActive ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+    <button data-tour={dataTour} onClick={onClick} className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 ${isActive ? 'bg-brand text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
       {icon}
       {isActive && <span className="text-[9px] font-extrabold animate-in zoom-in duration-200">{label}</span>}
     </button>

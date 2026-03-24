@@ -9,12 +9,15 @@ export default function ProductCard({
     streetRate,
     categories,
     onAdjustStock,
+    copEnabled,
+    tasaCop,
     daysRemaining,
 
     onEdit,
     onDelete
 }) {
     const valBs = p.priceUsdt * effectiveRate;
+    const valCop = p.priceUsdt * tasaCop;
     const isLowStock = (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
     const margin = p.costBs > 0 ? ((valBs - p.costBs) / p.costBs * 100) : null;
     const catInfo = categories.find(c => c.id === p.category);
@@ -64,6 +67,9 @@ export default function ProductCard({
                             {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                         </p>
                         <p className="text-[11px] font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
+                        {copEnabled && (
+                            <p className="text-[11px] font-bold text-amber-500/80 mt-0.5">{valCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>
+                        )}
                         {p.unit === 'paquete' && p.sellByUnit && (
                             <p className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mt-0.5 flex items-center gap-0.5">
                                 <Layers size={10} />

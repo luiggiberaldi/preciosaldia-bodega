@@ -6,14 +6,23 @@ import { showToast } from '../components/Toast';
 import PaymentMethodsManager from './Settings/PaymentMethodsManager';
 
 import { useSecurity } from '../hooks/useSecurity';
+import { useProductContext } from '../context/ProductContext';
 
 export default function SettingsModal({ isOpen, onClose, products, onImport, triggerHaptic }) {
+    const { 
+        copEnabled, setCopEnabled,
+        autoCopEnabled, setAutoCopEnabled, 
+        tasaCopManual, setTasaCopManual, 
+        tasaCop: calculatedTasaCop 
+    } = useProductContext();
+
     const [importStatus, setImportStatus] = useState(null);
     const [statusMessage, setStatusMessage] = useState('');
     const fileInputRef = useRef(null);
     const { deviceId, forceHeartbeat } = useSecurity();
     const [idCopied, setIdCopied] = useState(false);
     const [allowNegativeStock, setAllowNegativeStock] = useState(() => localStorage.getItem('allow_negative_stock') === 'true');
+    // Used from context instead.
 
     // Configuración del negocio (Ticket WhatsApp)
     const [businessName, setBusinessName] = useState(() => localStorage.getItem('business_name') || '');
@@ -239,6 +248,82 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                                 allowNegativeStock ? 'translate-x-6' : 'translate-x-1'
                             }`} />
                         </button>
+                    </div>
+
+                    {/* Configuración Peso Colombiano (COP) */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h4 className="font-bold text-sm text-slate-700 dark:text-slate-200">Peso Colombiano (COP)</h4>
+                                <p className="text-[10px] text-slate-400 mt-1">Habilitar pagos y cálculos rápidos</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const newVal = !copEnabled;
+                                    setCopEnabled(newVal);
+                                    localStorage.setItem('cop_enabled', newVal.toString());
+                                    forceHeartbeat();
+                                    showToast(newVal ? 'COP Habilitado' : 'COP Deshabilitado', 'success');
+                                    if (triggerHaptic) triggerHaptic();
+                                }}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                    copEnabled ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'
+                                }`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    copEnabled ? 'translate-x-6' : 'translate-x-1'
+                                }`} />
+                            </button>
+                        </div>
+                        {copEnabled && (
+                            <div className="pt-2 border-t border-slate-200 dark:border-slate-700/50 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="font-bold text-[13px] text-slate-700 dark:text-slate-200">Calcular Automáticamente</h4>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">Usar TRM Oficial y Binance USDT</p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            const newVal = !autoCopEnabled;
+                                            setAutoCopEnabled(newVal);
+                                            localStorage.setItem('auto_cop_enabled', newVal.toString());
+                                            if (triggerHaptic) triggerHaptic();
+                                        }}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                            autoCopEnabled ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'
+                                        }`}
+                                    >
+                                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                            autoCopEnabled ? 'translate-x-5' : 'translate-x-1'
+                                        }`} />
+                                    </button>
+                                </div>
+                                
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                                        {autoCopEnabled ? 'Tasa Actual Calculada' : 'Tasa de Cambio Manual (COP por 1 USD)'}
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        placeholder="Ej: 4150" 
+                                        value={autoCopEnabled ? (calculatedTasaCop > 0 ? calculatedTasaCop.toFixed(2) : '') : tasaCopManual}
+                                        readOnly={autoCopEnabled}
+                                        onChange={(e) => {
+                                            if (!autoCopEnabled) {
+                                                setTasaCopManual(e.target.value);
+                                                localStorage.setItem('tasa_cop', e.target.value);
+                                            }
+                                        }}
+                                        className={`w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/30 ${
+                                            autoCopEnabled ? 'text-slate-400 dark:text-slate-400 cursor-not-allowed bg-slate-100 dark:bg-slate-800/80' : 'text-amber-600 dark:text-amber-500'
+                                        }`}
+                                    />
+                                    {autoCopEnabled && (
+                                        <p className="text-[9px] text-amber-600/70 dark:text-amber-400/70 mt-1.5 font-medium">Se actualiza automáticamente cada 30 segundos.</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Share Catalog Button */}

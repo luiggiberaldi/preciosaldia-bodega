@@ -1,10 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown } from 'lucide-react';
+import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown, ChevronUp, Clock, Send, Ban, Shuffle, Receipt, Search, X, Filter, Recycle } from 'lucide-react';
 import { storageService } from '../utils/storageService';
-import { formatBs } from '../utils/calculatorUtils';
-import { getPaymentLabel, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../config/paymentMethods';
+import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
+import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../config/paymentMethods';
+import { generateTicketPDF } from '../utils/ticketGenerator';
 import { useProductContext } from '../context/ProductContext';
+import { useCart } from '../context/CartContext';
 import EmptyState from '../components/EmptyState';
+import ConfirmModal from '../components/ConfirmModal';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -16,9 +19,16 @@ const RANGE_OPTIONS = [
     { id: 'custom', label: 'Personalizado' },
 ];
 
+function getLocalISODate(d = new Date()) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function getDateRange(rangeId) {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getLocalISODate(now);
 
     switch (rangeId) {
         case 'today': {
@@ -27,29 +37,77 @@ function getDateRange(rangeId) {
         case 'week': {
             const d = new Date(now);
             d.setDate(d.getDate() - d.getDay()); // domingo
-            return { from: d.toISOString().split('T')[0], to: todayStr };
+            return { from: getLocalISODate(d), to: todayStr };
         }
         case 'month': {
             const d = new Date(now.getFullYear(), now.getMonth(), 1);
-            return { from: d.toISOString().split('T')[0], to: todayStr };
+            return { from: getLocalISODate(d), to: todayStr };
         }
         case 'lastMonth': {
             const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             const end = new Date(now.getFullYear(), now.getMonth(), 0);
-            return { from: d.toISOString().split('T')[0], to: end.toISOString().split('T')[0] };
+            return { from: getLocalISODate(d), to: getLocalISODate(end) };
         }
         default:
             return { from: todayStr, to: todayStr };
     }
 }
 
-export default function ReportsView({ rates, triggerHaptic }) {
-    const { products, effectiveRate: bcvRate } = useProductContext();
+export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
+    const { products, setProducts, effectiveRate: bcvRate } = useProductContext();
+    const { loadCart } = useCart();
     const [allSales, setAllSales] = useState([]);
     const [selectedRange, setSelectedRange] = useState('week');
     const [customFrom, setCustomFrom] = useState('');
     const [customTo, setCustomTo] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [showHistory, setShowHistory] = useState(false);
+    const [expandedSaleId, setExpandedSaleId] = useState(null);
+    const [visibleCount, setVisibleCount] = useState(30);
+    const [historySearch, setHistorySearch] = useState('');
+    const [historyFilter, setHistoryFilter] = useState('all'); // all, completed, voided
+    const [voidSaleTarget, setVoidSaleTarget] = useState(null);
+    const [recycleOffer, setRecycleOffer] = useState(null);
+
+    // ── Void Sale Handler ──
+    const confirmVoidSale = async () => {
+        const sale = voidSaleTarget;
+        if (!sale) return;
+        setVoidSaleTarget(null);
+        try {
+            const updatedSales = allSales.map(s => s.id === sale.id ? { ...s, status: 'ANULADA' } : s);
+            // Restore stock
+            if (sale.items && sale.items.length > 0) {
+                const updatedProducts = products.map(p => {
+                    const itemsInSale = sale.items.filter(i => (i._originalId || i.id) === p.id);
+                    if (itemsInSale.length > 0) {
+                        const totalToRestore = itemsInSale.reduce((sum, item) => {
+                            if (item.isWeight) return sum + item.qty;
+                            if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
+                            return sum + item.qty;
+                        }, 0);
+                        return { ...p, stock: (p.stock || 0) + totalToRestore };
+                    }
+                    return p;
+                });
+                setProducts(updatedProducts);
+            }
+            // Revert debt
+            const savedCustomers = await storageService.getItem('bodega_customers_v1', []);
+            const fiadoAmountUsd = sale.fiadoUsd || (sale.tipo === 'VENTA_FIADA' ? sale.totalUsd : 0) || 0;
+            const favorUsed = sale.payments?.filter(p => p.methodId === 'saldo_favor').reduce((sum, p) => sum + p.amountUsd, 0) || 0;
+            const debtToReverse = fiadoAmountUsd + favorUsed;
+            if (sale.customerId && debtToReverse > 0) {
+                const finalCustomers = savedCustomers.map(c => c.id === sale.customerId ? { ...c, deuda: Math.max(0, (c.deuda || 0) - debtToReverse) } : c);
+                await storageService.setItem('bodega_customers_v1', finalCustomers);
+            }
+            await storageService.setItem(SALES_KEY, updatedSales);
+            setAllSales(updatedSales);
+            setRecycleOffer(sale);
+        } catch (error) {
+            console.error('Error anulando venta:', error);
+        }
+    };
 
     useEffect(() => {
         const load = async () => {
@@ -63,8 +121,8 @@ export default function ReportsView({ rates, triggerHaptic }) {
     const { from, to } = useMemo(() => {
         if (selectedRange === 'custom') {
             return {
-                from: customFrom || new Date().toISOString().split('T')[0],
-                to: customTo || new Date().toISOString().split('T')[0],
+                from: customFrom || getLocalISODate(new Date()),
+                to: customTo || getLocalISODate(new Date()),
             };
         }
         return getDateRange(selectedRange);
@@ -72,8 +130,23 @@ export default function ReportsView({ rates, triggerHaptic }) {
 
     const filteredSales = useMemo(() => {
         return allSales.filter(s => {
-            if (s.status === 'ANULADA' || s.tipo === 'COBRO_DEUDA' || s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA' || s.tipo === 'VENTA_FIADA') return false;
-            const dateStr = s.timestamp?.split('T')[0];
+            if (s.status === 'ANULADA' || s.tipo === 'COBRO_DEUDA' || s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA' || s.tipo === 'VENTA_FIADA' || s.tipo === 'PAGO_PROVEEDOR') return false;
+            
+            // s.timestamp is an ISO string (UTC). We need to get the local date string to match `from` and `to`.
+            const saleDate = new Date(s.timestamp);
+            const dateStr = getLocalISODate(saleDate);
+
+            return dateStr >= from && dateStr <= to;
+        });
+    }, [allSales, from, to]);
+
+    const historySales = useMemo(() => {
+        return allSales.filter(s => {
+            if (s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA') return false;
+            
+            const saleDate = new Date(s.timestamp);
+            const dateStr = getLocalISODate(saleDate);
+
             return dateStr >= from && dateStr <= to;
         });
     }, [allSales, from, to]);
@@ -110,8 +183,22 @@ export default function ReportsView({ rates, triggerHaptic }) {
     filteredSales.forEach(s => {
         (s.payments || []).forEach(p => {
             if (!paymentBreakdown[p.methodId]) paymentBreakdown[p.methodId] = { total: 0, currency: p.currency || 'BS', label: p.methodLabel };
-            paymentBreakdown[p.methodId].total += (p.currency === 'USD' ? p.amountUsd : p.amountBs) || 0;
+            const amount = (p.currency === 'USD' ? p.amountUsd : p.amountBs) || 0;
+            paymentBreakdown[p.methodId].total += amount;
         });
+        
+        // Restar el cambio devuelto para obtener el Neto Real
+        if (s.changeUsd > 0 && paymentBreakdown['efectivo_usd']) {
+            paymentBreakdown['efectivo_usd'].total -= s.changeUsd;
+        }
+        if (s.changeBs > 0 && paymentBreakdown['efectivo_bs']) {
+            paymentBreakdown['efectivo_bs'].total -= s.changeBs;
+        }
+    });
+    
+    // Aplicar redondeo final al Breakdown
+    Object.keys(paymentBreakdown).forEach(k => {
+        paymentBreakdown[k].total = Math.round(paymentBreakdown[k].total * 100) / 100;
     });
 
     // Top productos
@@ -125,11 +212,11 @@ export default function ReportsView({ rates, triggerHaptic }) {
     });
     const topProducts = Object.values(productMap).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
 
-    // Ventas por día para mini gráfica
+    // Ventas por da para mini grfica
     const salesByDay = useMemo(() => {
         const map = {};
         filteredSales.forEach(s => {
-            const day = s.timestamp?.split('T')[0];
+            const day = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
             if (!map[day]) map[day] = { date: day, total: 0, count: 0 };
             map[day].total += s.totalUsd || 0;
             map[day].count++;
@@ -329,16 +416,172 @@ export default function ReportsView({ rates, triggerHaptic }) {
                 </div>
             )}
 
+            {/* Transaction List Toggle */}
+            {historySales.length > 0 && (() => {
+                const searchedSales = historySales.filter(s => {
+                    const matchesFilter = historyFilter === 'all'
+                        || (historyFilter === 'completed' && s.status !== 'ANULADA')
+                        || (historyFilter === 'voided' && s.status === 'ANULADA');
+                    if (!matchesFilter) return false;
+                    if (!historySearch.trim()) return true;
+                    const q = historySearch.toLowerCase();
+                    if ((s.customerName || 'consumidor final').toLowerCase().includes(q)) return true;
+                    if (s.items && s.items.some(i => i.name.toLowerCase().includes(q))) return true;
+                    if (s.id.toLowerCase().includes(q)) return true;
+                    return false;
+                });
+                const completedInList = searchedSales.filter(s => s.status !== 'ANULADA');
+                const voidedInList = searchedSales.filter(s => s.status === 'ANULADA');
+                const sumUsd = completedInList.reduce((a, s) => a + (s.totalUsd || 0), 0);
+
+                return (
+                    <div className="mt-2">
+                        <button
+                            onClick={() => { triggerHaptic && triggerHaptic(); setShowHistory(h => !h); setVisibleCount(30); setHistorySearch(''); setHistoryFilter('all'); }}
+                            className="w-full flex items-center justify-between bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.99] transition-all"
+                        >
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+                                    <Clock size={16} className="text-indigo-600 dark:text-indigo-400" />
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-xs font-bold text-slate-700 dark:text-white">Listado de Transacciones</p>
+                                    <p className="text-[10px] text-slate-400">{historySales.length} {historySales.length === 1 ? 'transacción' : 'transacciones'} en este periodo</p>
+                                </div>
+                            </div>
+                            {showHistory ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+                        </button>
+
+                        {showHistory && (
+                            <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                {/* Search + Filter Bar */}
+                                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+                                    <div className="relative">
+                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            value={historySearch}
+                                            onChange={e => { setHistorySearch(e.target.value); setVisibleCount(30); }}
+                                            placeholder="Buscar por cliente, producto u orden..."
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg py-2 pl-9 pr-8 text-xs font-medium text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all"
+                                        />
+                                        {historySearch && (
+                                            <button onClick={() => setHistorySearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                                <X size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        {[{ id: 'all', label: 'Todas' }, { id: 'completed', label: 'Completadas' }, { id: 'voided', label: 'Anuladas' }].map(f => (
+                                            <button
+                                                key={f.id}
+                                                onClick={() => { setHistoryFilter(f.id); setVisibleCount(30); }}
+                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${historyFilter === f.id
+                                                    ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                                    : 'bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-slate-600'}`}
+                                            >{f.label}</button>
+                                        ))}
+                                        <div className="flex-1" />
+                                        <span className="text-[10px] font-bold text-slate-400">{searchedSales.length} resultado{searchedSales.length !== 1 ? 's' : ''}</span>
+                                    </div>
+                                </div>
+
+                                {/* Mini Summary Strip */}
+                                {searchedSales.length > 0 && (
+                                    <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-500">
+                                        <span className="flex items-center gap-1"><DollarSign size={12} className="text-emerald-500" /> ${sumUsd.toFixed(2)}</span>
+                                        <span className="w-px h-3 bg-slate-300 dark:bg-slate-700" />
+                                        <span>{completedInList.length} venta{completedInList.length !== 1 ? 's' : ''}</span>
+                                        {voidedInList.length > 0 && (
+                                            <><span className="w-px h-3 bg-slate-300 dark:bg-slate-700" /><span className="text-red-400">{voidedInList.length} anulada{voidedInList.length !== 1 ? 's' : ''}</span></>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Transaction Rows */}
+                                {searchedSales.slice(0, visibleCount).map(s => (
+                                    <TransactionRow
+                                        key={s.id}
+                                        sale={s}
+                                        bcvRate={bcvRate}
+                                        isExpanded={expandedSaleId === s.id}
+                                        onToggle={() => setExpandedSaleId(prev => prev === s.id ? null : s.id)}
+                                        onVoidSale={setVoidSaleTarget}
+                                        onRecycleSale={setRecycleOffer}
+                                    />
+                                ))}
+
+                                {searchedSales.length === 0 && (
+                                    <div className="text-center py-6">
+                                        <Search size={24} className="text-slate-300 mx-auto mb-2" />
+                                        <p className="text-xs font-bold text-slate-400">Sin resultados para esta busqueda</p>
+                                    </div>
+                                )}
+
+                                {visibleCount < searchedSales.length && (
+                                    <button
+                                        onClick={() => setVisibleCount(c => c + 30)}
+                                        className="w-full py-3 text-xs font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors active:scale-[0.98]"
+                                    >
+                                        Mostrar mas ({searchedSales.length - visibleCount} restantes)
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
+
             {/* Empty state */}
             {filteredSales.length === 0 && (
                 <div className="mt-8">
                     <EmptyState
                         icon={BarChart3}
-                        title="Sin ventas en este período"
-                        description="Selecciona otro rango de fechas o usa el botón Personalizado para buscar más atrás."
+                        title="Sin ventas en este periodo"
+                        description="Selecciona otro rango de fechas o usa el boton Personalizado para buscar mas atras."
                     />
                 </div>
             )}
+            {/* Recycle Offer Modal */}
+            {recycleOffer && (
+                <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
+                    onClick={() => setRecycleOffer(null)}>
+                    <div className="bg-white dark:bg-slate-900 w-full sm:max-w-xs sm:rounded-2xl rounded-t-[2rem] p-5 shadow-2xl animate-in slide-in-from-bottom-4 duration-200"
+                        onClick={e => e.stopPropagation()}>
+                        <div className="flex flex-col items-center gap-2 mb-4">
+                            <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600">
+                                <Recycle size={28} />
+                            </div>
+                            <h3 className="text-sm font-black text-slate-800 dark:text-white">Venta Anulada</h3>
+                            <p className="text-[11px] text-slate-400 text-center">Puedes reciclar los productos de esta venta al carrito actual.</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setRecycleOffer(null)}
+                                className="flex-1 py-2.5 text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 rounded-xl transition-all active:scale-95"
+                            >Cerrar</button>
+                            <button
+                                onClick={() => {
+                                    loadCart(recycleOffer.items);
+                                    setRecycleOffer(null);
+                                    if (onNavigate) onNavigate('ventas');
+                                }}
+                                className="flex-1 py-2.5 text-xs font-bold text-white bg-indigo-600 rounded-xl shadow-md shadow-indigo-500/20 transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                            ><Recycle size={16} /> Reciclar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirm Void Modal */}
+            <ConfirmModal
+                isOpen={!!voidSaleTarget}
+                onClose={() => setVoidSaleTarget(null)}
+                onConfirm={confirmVoidSale}
+                title={`Anular venta #${voidSaleTarget?.id?.substring(0, 6).toUpperCase() || ''}`}
+                message={'Esta accion:\n- Marcara la venta como ANULADA\n- Devolvera el stock a la bodega\n- Revertira deudas o saldos a favor\n\nEsta accion no se puede deshacer.'}
+                confirmText="Si, anular"
+            />
         </div>
     );
 }
@@ -358,6 +601,139 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
             <p className="text-[10px] font-bold text-slate-400 uppercase">{label}</p>
             <p className="text-lg md:text-xl font-black text-slate-800 dark:text-white mt-0.5">{value}</p>
             {sub && <p className="text-xs font-bold text-slate-400 mt-0.5">{sub}</p>}
+        </div>
+    );
+}
+
+function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, onRecycleSale }) {
+    const d = new Date(s.timestamp);
+    let methodLabel = 'Efectivo';
+    let PayMethodIcon = PAYMENT_ICONS['efectivo_bs'];
+
+    if (s.payments && s.payments.length === 1) {
+        methodLabel = toTitleCase(s.payments[0].methodLabel);
+        const m = getPaymentMethod(s.payments[0].methodId);
+        if (m) PayMethodIcon = getPaymentIcon(m.id) || m.Icon || null;
+    } else if (s.payments && s.payments.length > 1) {
+        methodLabel = 'Pago Mixto';
+        PayMethodIcon = Shuffle;
+    } else if (s.paymentMethod) {
+        const m = getPaymentMethod(s.paymentMethod);
+        if (m) {
+            methodLabel = toTitleCase(m.label);
+            PayMethodIcon = getPaymentIcon(m.id) || m.Icon || null;
+        }
+    }
+
+    const isCanceled = s.status === 'ANULADA';
+    const dateLabel = d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });
+
+    const handleShare = (e) => {
+        e.stopPropagation();
+        let text = `*COMPROBANTE | PRECIOS AL DIA*\n`;
+        text += `Orden: #${s.id.substring(0, 6).toUpperCase()}\n`;
+        text += `Fecha: ${d.toLocaleString('es-VE')}\n`;
+        text += `================================\n`;
+        if (s.items && s.items.length > 0) {
+            s.items.forEach(item => {
+                const qty = item.isWeight ? `${item.qty.toFixed(3)}Kg` : `${item.qty} Und`;
+                text += `- ${item.name} ${qty} x $${item.priceUsd.toFixed(2)} = *$${(item.priceUsd * item.qty).toFixed(2)}*\n`;
+            });
+        }
+        text += `\n*TOTAL: $${(s.totalUsd || 0).toFixed(2)}*\n`;
+        text += `Ref: ${formatBs(s.totalBs || 0)} Bs\n`;
+        const encoded = encodeURIComponent(text);
+        window.open(`https://wa.me/?text=${encoded}`, '_blank');
+    };
+
+    const handlePDF = (e) => {
+        e.stopPropagation();
+        generateTicketPDF(s, bcvRate);
+    };
+
+    return (
+        <div className={`rounded-xl border transition-all ${isCanceled ? 'bg-red-50/50 border-red-100/50 dark:bg-red-900/10 dark:border-red-900/20' : 'bg-white dark:bg-slate-800/50 border-slate-200/60 dark:border-slate-700/60'} overflow-hidden`}>
+            <div
+                className="flex items-center gap-3 p-3 cursor-pointer select-none active:bg-slate-100 dark:active:bg-slate-800"
+                onClick={onToggle}
+            >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isCanceled ? 'bg-red-100 opacity-50' : 'bg-slate-50 dark:bg-slate-700 shadow-sm'}`}>
+                    {isCanceled ? <Ban size={20} className="text-red-400" /> : (PayMethodIcon ? <PayMethodIcon size={20} className="text-slate-500" /> : <span className="text-xl">$</span>)}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-bold flex items-center gap-1.5 truncate ${isCanceled ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                        {s.customerName || 'Consumidor Final'}
+                        {s.tipo === 'VENTA_FIADA' && <span className="text-[9px] bg-amber-100 text-amber-600 px-1 rounded uppercase">Fiado</span>}
+                        {isCanceled && <span className="text-[9px] bg-red-100 text-red-500 px-1 rounded uppercase">Anulada</span>}
+                    </p>
+                    <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                        <span>{dateLabel}</span> · <span>{d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</span> · <span>{methodLabel}</span>
+                    </p>
+                </div>
+                <div className="text-right shrink-0">
+                    <p className={`text-sm font-black ${isCanceled ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>${(s.totalUsd || 0).toFixed(2)}</p>
+                    <div className="flex justify-end mt-0.5">
+                        {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                    </div>
+                </div>
+            </div>
+
+            {isExpanded && (
+                <div className="px-3 pb-3 pt-1 border-t border-slate-200 dark:border-slate-700/50 text-sm animate-in fade-in slide-in-from-top-1">
+                    {s.items && s.items.length > 0 ? (
+                        <div className="space-y-1 mb-3 pt-2">
+                            <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">Productos ({s.items.length})</p>
+                            {s.items.map((item, i) => (
+                                <div key={i} className={`flex justify-between items-center text-xs ${isCanceled ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'}`}>
+                                    <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
+                                    <span className="font-medium">${(item.priceUsd * item.qty).toFixed(2)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-xs text-slate-400 mb-3 pt-2">Pago de Deudas (Sin productos)</p>
+                    )}
+
+                    <div className="flex justify-between text-[10px] font-medium text-slate-400 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg p-2 mb-3">
+                        <div className="flex flex-col gap-0.5">
+                            <span>Ref: {formatBs(s.totalBs)} Bs @ {formatBs(s.rate || bcvRate)}</span>
+                            {s.tasaCop > 0 && <span>COP: {(s.totalCop || (s.totalUsd * s.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} @ {s.tasaCop}</span>}
+                        </div>
+                        {s.changeUsd > 0 && <div className="text-emerald-500 font-bold self-start mt-0.5">Vuelto: ${s.changeUsd.toFixed(2)}</div>}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <button
+                            onClick={handleShare}
+                            className="flex-1 min-w-[120px] whitespace-nowrap py-2 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 active:scale-95"
+                        >
+                            <Send size={14} /> Compartir
+                        </button>
+                        <button
+                            onClick={handlePDF}
+                            className="py-2 px-3 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm active:scale-95"
+                        >
+                            PDF
+                        </button>
+                        {!isCanceled && onVoidSale && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onVoidSale(s); }}
+                                className="py-2 px-3 bg-slate-100 dark:bg-slate-900 text-red-600 dark:text-red-400 hover:bg-red-50 hover:dark:bg-red-900/30 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs border border-slate-200 dark:border-slate-800 shadow-sm active:scale-95"
+                            >
+                                <Ban size={14} /> Anular
+                            </button>
+                        )}
+                        {onRecycleSale && s.items && s.items.length > 0 && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onRecycleSale(s); }}
+                                className="py-2 px-3 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 hover:dark:bg-indigo-900/50 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm active:scale-95"
+                            >
+                                <Recycle size={14} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

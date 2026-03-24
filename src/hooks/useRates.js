@@ -91,12 +91,17 @@ export function useRates() {
             return null;
         };
 
-        const getEuroFactorFallback = async () => {
+        const getExternalRatesFallback = async () => {
             try {
                 const data = await fetchGeneric(`https://v6.exchangerate-api.com/v6/${EXCHANGERATE_KEY}/latest/USD`);
-                if (data?.result === "success" && data.conversion_rates?.EUR) return 1 / data.conversion_rates.EUR;
+                if (data?.result === "success") {
+                    return {
+                        eur: data.conversion_rates?.EUR ? 1 / data.conversion_rates.EUR : DEFAULT_EUR_USD_RATIO,
+                        cop: data.conversion_rates?.COP || null
+                    };
+                }
             } catch (e) { }
-            return DEFAULT_EUR_USD_RATIO;
+            return { eur: DEFAULT_EUR_USD_RATIO, cop: null };
         };
 
         const getMeta = (newP, oldP, oldChange = 0, apiChange = null) => {
@@ -112,25 +117,35 @@ export function useRates() {
         };
 
         try {
-            // Fetch en paralelo: datos privados (Google Script), dolarapi fallback, y factor euro
+            // Fetch en paralelo: datos privados (Google Script), dolarapi fallback, y external rates (Euro, COP)
             const taskPrivate = fetchGeneric(GOOGLE_SCRIPT_URL);
             const taskDolarApi = fetchGeneric('https://ve.dolarapi.com/v1/dolares');
-            const taskEuroFactor = getEuroFactorFallback();
+            const taskExternal = getExternalRatesFallback();
 
-            const [privateData, bcvFallbackData, euroFactor] = await Promise.all([
+            const [privateData, bcvFallbackData, externalRates] = await Promise.all([
                 taskPrivate.catch(() => null),
                 taskDolarApi.catch(() => null),
-                taskEuroFactor.catch(() => DEFAULT_EUR_USD_RATIO)
+                taskExternal.catch(() => ({ eur: DEFAULT_EUR_USD_RATIO, cop: null }))
             ]);
+            
+            const euroFactor = externalRates.eur;
 
             if (privateData) log("✅ Datos Privados Recibidos", "success");
 
             let newRates = { ...(ratesRef.current || DEFAULT_RATES) };
-            // Limpiar campo usdt legacy si existe
-            if (newRates.usdt) delete newRates.usdt;
 
             let newBcvPrice = 0;
             let newEuroPrice = 0;
+            let newUsdtPrice = 0;
+
+            // Extraer USDT de privateData o DolarApi
+            if (privateData && privateData.usdt) {
+                newUsdtPrice = parseSafeFloat(typeof privateData.usdt === 'object' ? privateData.usdt.price : privateData.usdt);
+            }
+            if (!newUsdtPrice && bcvFallbackData) {
+                const usdtData = Array.isArray(bcvFallbackData) ? bcvFallbackData.find(d => d.nombre?.toLowerCase() === 'binance' || d.fuente === 'binance' || d.casa === 'binance') || bcvFallbackData.find(d => d.nombre?.toLowerCase() === 'paralelo' || d.fuente === 'paralelo' || d.casa === 'paralelo') : null;
+                if (usdtData?.promedio > 0) newUsdtPrice = parseSafeFloat(usdtData.promedio);
+            }
 
             // Procesar BCV/Euro desde datos privados (Google Script)
             if (privateData) {
@@ -183,6 +198,18 @@ export function useRates() {
                         newRates.euro = { ...newRates.euro, ...metaEur, source: 'Euro BCV (Triangulado)' };
                     }
                 }
+            }
+
+            // Integrar cálculo AutoCOP con TRM y USDT
+            if (externalRates.cop > 0) {
+                // El usuario espera que 1 USD del sistema equivalga a 1 USDT real en COP (~TRM / Binance P2P)
+                let calcCop = externalRates.cop;
+                newRates.autoCopRate = { 
+                    price: calcCop, 
+                    source: 'Binance USDT / TRM', 
+                    rawTrm: externalRates.cop, 
+                    rawUsdt: newUsdtPrice 
+                };
             }
 
             newRates.lastUpdate = new Date();

@@ -20,9 +20,12 @@ export default function CheckoutModal({
     onUseSaldoFavor,
     triggerHaptic,
     onCreateCustomer,
+    copEnabled,
+    tasaCop
 }) {
     // ── State: un valor por barra ──
     const [barValues, setBarValues] = useState({});
+    
     const [showCustomerPicker, setShowCustomerPicker] = useState(false);
     const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
     const [newClientName, setNewClientName] = useState('');
@@ -39,16 +42,20 @@ export default function CheckoutModal({
     const totalPaidUsd = useMemo(() => {
         return paymentMethods.reduce((sum, m) => {
             const val = parseFloat(barValues[m.id]) || 0;
-            return sum + (m.currency === 'USD' ? val : val / effectiveRate);
+            if (m.currency === 'USD') return sum + val;
+            if (m.currency === 'COP') return sum + (val / tasaCop);
+            return sum + (val / effectiveRate);
         }, 0);
-    }, [barValues, paymentMethods, effectiveRate]);
+    }, [barValues, paymentMethods, effectiveRate, tasaCop]);
 
-    const totalPaidBs = useMemo(() =>
-        paymentMethods.reduce((sum, m) => {
+    const totalPaidBs = useMemo(() => {
+        return paymentMethods.reduce((sum, m) => {
             const val = parseFloat(barValues[m.id]) || 0;
-            return sum + (m.currency === 'BS' ? val : val * effectiveRate);
-        }, 0)
-        , [barValues, paymentMethods, effectiveRate]);
+            if (m.currency === 'BS') return sum + val;
+            if (m.currency === 'COP') return sum + ((val / tasaCop) * effectiveRate);
+            return sum + (val * effectiveRate);
+        }, 0);
+    }, [barValues, paymentMethods, effectiveRate, tasaCop]);
 
     const remainingUsd = Math.max(0, cartTotalUsd - totalPaidUsd);
     // Para remainingBs, tomamos la diferencia exacta de cartTotalBs - totalPaidBs para no perder decimales por tasa de cambio
@@ -71,11 +78,18 @@ export default function CheckoutModal({
 
     const fillBar = useCallback((methodId, currency) => {
         triggerHaptic && triggerHaptic();
-        const remaining = currency === 'USD' ? remainingUsd : remainingBs;
-        if (remaining <= 0) return;
-        const val = Number(remaining.toFixed(2)).toString();
-        setBarValues(prev => ({ ...prev, [methodId]: val }));
-    }, [remainingUsd, remainingBs, triggerHaptic]);
+        let val;
+        if (currency === 'USD') {
+            val = remainingUsd > 0 ? Number(remainingUsd.toFixed(2)).toString() : null;
+        } else if (currency === 'COP') {
+            val = remainingUsd > 0 ? Number((remainingUsd * tasaCop).toFixed(2)).toString() : null;
+        } else {
+            val = remainingBs > 0 ? Number(remainingBs.toFixed(2)).toString() : null;
+        }
+        if (val) {
+            setBarValues(prev => ({ ...prev, [methodId]: val }));
+        }
+    }, [remainingUsd, remainingBs, triggerHaptic, tasaCop]);
 
     // Construir payments[] desde barValues al confirmar
     const handleConfirm = useCallback(() => {
@@ -91,13 +105,16 @@ export default function CheckoutModal({
                     currency: m.currency,
                     amountInput: amount,
                     amountInputCurrency: m.currency,
-                    amountUsd: m.currency === 'USD' ? amount : amount / effectiveRate,
-                    amountBs: m.currency === 'BS' ? amount : amount * effectiveRate,
+                    amountUsd: m.currency === 'USD' ? amount : m.currency === 'COP' ? amount / tasaCop : amount / effectiveRate,
+                    amountBs: m.currency === 'BS' ? amount : m.currency === 'COP' ? (amount / tasaCop) * effectiveRate : amount * effectiveRate,
                 };
             });
+        const defaultUsdChange = (!changeUsdGiven && !changeBsGiven) ? changeUsd : (parseFloat(changeUsdGiven) || 0);
+        const defaultBsChange = (!changeUsdGiven && !changeBsGiven) ? 0 : (parseFloat(changeBsGiven) || 0);
+
         onConfirmSale(payments, {
-            changeUsdGiven: Math.min(parseFloat(changeUsdGiven) || 0, changeUsd),
-            changeBsGiven: Math.min(parseFloat(changeBsGiven) || 0, changeUsd * effectiveRate),
+            changeUsdGiven: Math.min(defaultUsdChange, changeUsd),
+            changeBsGiven: Math.min(defaultBsChange, changeUsd * effectiveRate),
         });
     }, [barValues, paymentMethods, effectiveRate, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd]);
 
@@ -127,6 +144,7 @@ export default function CheckoutModal({
     // Agrupar métodos por moneda
     const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
     const methodsBs = paymentMethods.filter(m => m.currency === 'BS');
+    const methodsCop = paymentMethods.filter(m => m.currency === 'COP');
 
     // ── Estilos de barra por moneda ──
     const sectionStyles = {
@@ -150,6 +168,16 @@ export default function CheckoutModal({
             inputActive: 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-950/30',
             btnBg: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 active:bg-blue-300',
         },
+        COP: {
+            bg: 'bg-amber-50/50 dark:bg-amber-950/20',
+            border: 'border-amber-100 dark:border-amber-900/50',
+            title: 'text-amber-800 dark:text-amber-300',
+            titleBg: 'bg-amber-100 dark:bg-amber-900/50',
+            titleIcon: 'text-amber-600 dark:text-amber-400',
+            inputBorder: 'border-amber-200 dark:border-amber-800 focus:border-amber-500 focus:ring-amber-500/20',
+            inputActive: 'border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30',
+            btnBg: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 active:bg-amber-300',
+        },
     };
 
     const renderPaymentBar = (method, styles) => {
@@ -157,6 +185,8 @@ export default function CheckoutModal({
         const hasValue = parseFloat(val) > 0;
         const equivUsd = method.currency === 'BS' && hasValue
             ? (parseFloat(val) / effectiveRate).toFixed(2)
+            : method.currency === 'COP' && hasValue
+            ? (parseFloat(val) / tasaCop).toFixed(2)
             : null;
 
         return (
@@ -184,7 +214,7 @@ export default function CheckoutModal({
                             ? `${styles.titleBg} ${styles.title} ${styles.border}`
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
                             }`}>
-                            {method.currency === 'USD' ? '$' : 'Bs'}
+                            {method.currency === 'USD' ? '$' : method.currency === 'COP' ? 'COP' : 'Bs'}
                         </span>
                     </div>
                     <button
@@ -226,6 +256,7 @@ export default function CheckoutModal({
                     <div className="text-center">
                         <span className="text-3xl font-black text-slate-900 dark:text-white">${cartTotalUsd.toFixed(2)}</span>
                         <span className="block text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">Bs {formatBs(cartTotalBs)}</span>
+                        {copEnabled && <span className="block text-sm font-bold text-amber-600 dark:text-amber-400 mt-0.5">COP {(cartTotalUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
                     </div>
                 </div>
 
@@ -256,6 +287,22 @@ export default function CheckoutModal({
                     </div>
                 )}
 
+                {/* ── SECCIÓN PESOS (COP) ── */}
+                {copEnabled && methodsCop.length > 0 && (
+                    <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.COP.bg} ${sectionStyles.COP.border} p-3`}>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${sectionStyles.COP.title}`}>
+                                <span className={`p-1 rounded-lg ${sectionStyles.COP.titleBg}`}>🟡</span>
+                                Pesos (COP)
+                            </h3>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${sectionStyles.COP.titleBg} ${sectionStyles.COP.title}`}>
+                                Tasa: {formatBs(tasaCop)}
+                            </span>
+                        </div>
+                        {methodsCop.map(m => renderPaymentBar(m, sectionStyles.COP))}
+                    </div>
+                )}
+
                 {/* ── BANNER VUELTO / RESTANTE ── */}
                 <div className="px-3 py-2">
                     <div className={`p-3.5 rounded-xl border-2 transition-all ${isPaid
@@ -267,14 +314,24 @@ export default function CheckoutModal({
                             {isPaid ? 'Vuelto' : 'Resta por Cobrar'}
                         </p>
                         <div className="flex items-end justify-between">
-                            <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'
-                                }`}>
-                                ${isPaid ? changeUsd.toFixed(2) : remainingUsd.toFixed(2)}
-                            </span>
-                            <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'
-                                }`}>
-                                Bs {formatBs(isPaid ? changeBs : remainingBs)}
-                            </span>
+                            <div className="flex flex-col">
+                                <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'
+                                    }`}>
+                                    ${isPaid ? changeUsd.toFixed(2) : remainingUsd.toFixed(2)}
+                                </span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                                <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'
+                                    }`}>
+                                    Bs {formatBs(isPaid ? changeBs : remainingBs)}
+                                </span>
+                                {copEnabled && (
+                                    <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'
+                                        }`}>
+                                        COP {isPaid ? (changeUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (remainingUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         {/* DESGLOSE DE VUELTO — solo visible cuando hay vuelto */}
