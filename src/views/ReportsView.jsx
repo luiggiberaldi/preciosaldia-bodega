@@ -349,7 +349,7 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
                 const fmtCop = (v) => v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
                 const renderMethod = ([method, data]) => {
-                    const label = toTitleCase(data.label || getPaymentLabel(method));
+                    const label = toTitleCase(getPaymentLabel(method));
                     const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
                     const totalBsEquiv = data.currency === 'USD' ? data.total * bcvRate : data.currency === 'COP' ? (data.total / (tasaCop || 1)) * bcvRate : data.total;
                     const pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;
