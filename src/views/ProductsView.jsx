@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { Package, Plus, Trash2, X, Store, Tag, Pencil, Banknote, Search, ChevronLeft, ChevronRight, Settings, AlertTriangle, Box, LayoutGrid, List, Minus, ArrowUpDown, Clock, Percent } from 'lucide-react';
+import { Package, Plus, Trash2, X, Store, Tag, Pencil, Banknote, Search, ChevronLeft, ChevronRight, AlertTriangle, Box, LayoutGrid, List, Minus, ArrowUpDown, Clock, Percent } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ProductShareModal } from '../components/ProductShareModal';
-import SettingsModal from '../components/SettingsModal';
+
 import ShareInventoryModal from '../components/ShareInventoryModal';
 import { formatBs, formatUsd, smartCashRounding } from '../utils/calculatorUtils';
 import { useWallet } from '../hooks/useWallet';
@@ -60,7 +60,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     // Modal UI States
     const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [isBulkPriceOpen, setIsBulkPriceOpen] = useState(false);
     const [deleteCategoryConfirmId, setDeleteCategoryConfirmId] = useState(null);
@@ -181,9 +181,12 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     // ─── FILTERING & PAGINATION ─────────────────────────────
 
+    // Performance Optimization: Defer search term to avoid blocking the main thread when typing fast
+    const deferredSearchTerm = React.useDeferredValue(searchTerm);
+
     const filteredProducts = useMemo(() => {
         let result = products.filter(p => {
-            const term = searchTerm.toLowerCase();
+            const term = deferredSearchTerm.toLowerCase();
             const matchesSearch = p.name.toLowerCase().includes(term) || (p.barcode && p.barcode.toLowerCase().includes(term));
             if (activeCategory === 'bajo-stock') {
                 return matchesSearch && (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
@@ -212,7 +215,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
             });
         }
         return result;
-    }, [products, searchTerm, activeCategory, sortField, sortDir, effectiveRate]);
+    }, [products, deferredSearchTerm, activeCategory, sortField, sortDir, effectiveRate]);
 
     const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
     const paginatedProducts = filteredProducts.slice(
@@ -504,10 +507,6 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                 </button>
                             </>
                         )}
-                        <button onClick={() => { triggerHaptic && triggerHaptic(); setIsSettingsOpen(true); }}
-                            className="p-2 bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-xl transition-all active:scale-95" title="Ajustes">
-                            <Settings size={16} strokeWidth={2.5} />
-                        </button>
                         <button onClick={() => { triggerHaptic && triggerHaptic(); setIsModalOpen(true); }}
                             className="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl shadow-md shadow-brand/20 transition-all active:scale-95 font-bold text-sm" title="Agregar">
                             <Plus size={16} strokeWidth={2.5} />
@@ -560,7 +559,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                             onClick={() => { triggerHaptic && triggerHaptic(); setIsCategoryManagerOpen(true); }}
                             className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-transparent active:scale-95 flex items-center gap-1 snap-start"
                         >
-                            <Settings size={12} /> Editar
+                            <Pencil size={12} /> Editar
                         </button>
                     </div>
                     {/* Right fade indicator for scroll */}
@@ -877,7 +876,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 </div>
             </Modal>
 
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onImport={() => setIsShareOpen(true)} />
+
 
             <ShareInventoryModal
                 isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} products={products} categories={categories}

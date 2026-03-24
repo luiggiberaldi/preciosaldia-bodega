@@ -137,6 +137,8 @@ export async function generateDailyClosePDF({
             const label = data.label ? toTitleCase(data.label) : getPaymentLabel(methodId);
             const val = data.currency === 'USD'
                 ? `$${data.total.toFixed(2)}`
+                : data.currency === 'COP'
+                ? `COP ${data.total.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 : `Bs ${formatBs(data.total)}`;
 
             doc.setFont('helvetica', 'normal');

@@ -55,7 +55,7 @@ function getDateRange(rangeId) {
 }
 
 export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
-    const { products, setProducts, effectiveRate: bcvRate } = useProductContext();
+    const { products, setProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
     const [allSales, setAllSales] = useState([]);
     const [selectedRange, setSelectedRange] = useState('week');
@@ -323,37 +323,82 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
             )}
 
             {/* Payment Breakdown */}
-            {Object.keys(paymentBreakdown).length > 0 && (
+            {Object.keys(paymentBreakdown).length > 0 && (() => {
+                const entries = Object.entries(paymentBreakdown);
+                const bsMethods = entries.filter(([, d]) => d.currency === 'BS' || (!d.currency));
+                const usdMethods = entries.filter(([, d]) => d.currency === 'USD');
+                const copMethods = entries.filter(([, d]) => d.currency === 'COP');
+                const fmtCop = (v) => v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                const renderMethod = ([method, data]) => {
+                    const label = toTitleCase(data.label || getPaymentLabel(method));
+                    const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
+                    const totalBsEquiv = data.currency === 'USD' ? data.total * bcvRate : data.currency === 'COP' ? (data.total / (tasaCop || 1)) * bcvRate : data.total;
+                    const pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;
+                    const displayAmount = data.currency === 'USD'
+                        ? `$ ${data.total.toFixed(2)}`
+                        : data.currency === 'COP'
+                        ? `${fmtCop(data.total)} COP`
+                        : `${formatBs(data.total)} Bs`;
+                    return (
+                        <div key={method}>
+                            <div className="flex justify-between text-sm mb-1">
+                                <span className="text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5">
+                                    {PayIcon && <PayIcon size={14} className="text-slate-400" />}
+                                    {label}
+                                </span>
+                                <span className="font-bold text-slate-700 dark:text-white">
+                                    {displayAmount}
+                                </span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                        </div>
+                    );
+                };
+
+                return (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
                     <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
-                        <DollarSign size={12} /> Desglose por Método de Pago
+                        <DollarSign size={12} /> Desglose por Metodo de Pago
                     </h3>
-                    <div className="space-y-3">
-                        {Object.entries(paymentBreakdown).map(([method, data]) => {
-                            const label = toTitleCase(data.label || getPaymentLabel(method));
-                            const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
-                            const totalBsEquiv = data.currency === 'USD' ? data.total * bcvRate : data.total;
-                            const pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;
-                            return (
-                                <div key={method}>
-                                    <div className="flex justify-between text-sm mb-1">
-                                        <span className="text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5">
-                                            {PayIcon && <PayIcon size={14} className="text-slate-400" />}
-                                            {label}
-                                        </span>
-                                        <span className="font-bold text-slate-700 dark:text-white">
-                                            {data.currency === 'USD' ? `$ ${data.total.toFixed(2)}` : `${formatBs(data.total)} Bs`}
-                                        </span>
-                                    </div>
-                                    <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    {bsMethods.length > 0 && (
+                        <div className="mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Bolivares</span>
+                                <span className="text-xs font-black text-blue-600 dark:text-blue-400">{formatBs(bsMethods.reduce((s, [,d]) => s + d.total, 0))} Bs</span>
+                            </div>
+                            <div className="space-y-3 pl-1 border-l-2 border-blue-200 dark:border-blue-800/40">
+                                <div className="pl-3 space-y-3">{bsMethods.map(renderMethod)}</div>
+                            </div>
+                        </div>
+                    )}
+                    {usdMethods.length > 0 && (
+                        <div className={copMethods.length > 0 ? 'mb-3' : ''}>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Dolares</span>
+                                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">${usdMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span>
+                            </div>
+                            <div className="space-y-3 pl-1 border-l-2 border-emerald-200 dark:border-emerald-800/40">
+                                <div className="pl-3 space-y-3">{usdMethods.map(renderMethod)}</div>
+                            </div>
+                        </div>
+                    )}
+                    {copEnabled && copMethods.length > 0 && (
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pesos Colombianos</span>
+                                <span className="text-xs font-black text-amber-600 dark:text-amber-400">{fmtCop(copMethods.reduce((s, [,d]) => s + d.total, 0))} COP</span>
+                            </div>
+                            <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
+                                <div className="pl-3 space-y-3">{copMethods.map(renderMethod)}</div>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            )}
+                );
+            })()}
 
             {/* Top Products */}
             {topProducts.length > 0 && (

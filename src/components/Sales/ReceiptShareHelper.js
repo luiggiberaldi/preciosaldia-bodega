@@ -24,8 +24,11 @@ export function buildReceiptWhatsAppUrl(receipt, currentRate) {
 
     // Pagos
     const paymentsLines = (r.payments ?? []).map(p => {
+        const isCop = p.currency === 'COP';
         const isBs = p.currency === 'BS';
-        const val = isBs
+        const val = isCop
+            ? `COP ${(p.amountBs ?? p.amountUsd * (r.tasaCop || 1)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : isBs
             ? `Bs ${Math.ceil(p.amountBs ?? p.amountUsd * r.rate)}`
             : `$${parseFloat(p.amountUsd).toFixed(2)}`;
         return `  ${p.methodLabel}: ${val}`;

@@ -69,21 +69,25 @@ export function ProductProvider({ children, rates }) {
         }
     }, [rates.bcv?.price, streetRate]);
 
-    // Auto-save products and categories
+    // Auto-save products and categories with Debounce (Performance Fix)
     useEffect(() => {
         if (!isLoadingProducts) {
             savingRef.current = true;
-            const savePromises = [];
-            if (products.length > 0) {
-                savePromises.push(storageService.setItem('bodega_products_v1', products));
-            } else {
-                savePromises.push(storageService.removeItem('bodega_products_v1'));
-            }
-            savePromises.push(storageService.setItem('my_categories_v1', categories));
-            Promise.all(savePromises).finally(() => {
-                // Reset guard after microtask queue flushes
-                setTimeout(() => { savingRef.current = false; }, 50);
-            });
+            const timer = setTimeout(() => {
+                const savePromises = [];
+                if (products.length > 0) {
+                    savePromises.push(storageService.setItem('bodega_products_v1', products));
+                } else {
+                    savePromises.push(storageService.removeItem('bodega_products_v1'));
+                }
+                savePromises.push(storageService.setItem('my_categories_v1', categories));
+                Promise.all(savePromises).finally(() => {
+                    // Reset guard after microtask queue flushes
+                    setTimeout(() => { savingRef.current = false; }, 50);
+                });
+            }, 1000); // 1 segundo de debounce
+
+            return () => clearTimeout(timer);
         }
     }, [products, categories, isLoadingProducts]);
 

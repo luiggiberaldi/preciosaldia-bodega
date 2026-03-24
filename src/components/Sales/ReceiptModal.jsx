@@ -71,7 +71,7 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                 {receipt.payments.map(p => (
                                     <div key={p.id} className="flex justify-between text-slate-600 mb-1">
                                         <span>{p.methodLabel}:</span>
-                                        <span className="font-bold">{p.amountInputCurrency === 'USD' ? '$' : 'Bs'} {p.amountInput}</span>
+                                        <span className="font-bold">{p.amountInputCurrency === 'USD' ? '$' : p.amountInputCurrency === 'COP' ? 'COP' : 'Bs'} {p.amountInput}</span>
                                     </div>
                                 ))}
 

@@ -4,6 +4,7 @@ import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Moon, Sun, Ba
 import SalesView from './views/SalesView';
 import DashboardView from './views/DashboardView';
 import { ProductsView } from './views/ProductsView';
+import SettingsView from './views/SettingsView';
 
 // Lazy-loaded views (no se usan al inicio)
 const CustomersView = lazy(() => import('./views/CustomersView'));
@@ -37,6 +38,7 @@ export default function App() {
   const [adminClicks, setAdminClicks] = useState(0);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showTester, setShowTester] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
@@ -222,6 +224,7 @@ export default function App() {
         </div>
       )}
 
+
       <CartProvider>
       <ProductProvider rates={rates}>
         <main className={`flex-1 min-h-0 w-full max-w-md md:max-w-3xl lg:max-w-none lg:px-6 mx-auto relative ${isKeyboardOpen ? 'pb-4' : 'pb-24'} flex flex-col overflow-y-auto`}>
@@ -250,7 +253,7 @@ export default function App() {
 
         <div className={`flex-1 flex flex-col ${activeTab === 'inicio' ? '' : 'hidden'}`}>
           <ErrorBoundary>
-            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} isDemo={isDemo} demoTimeLeft={demoTimeLeft} />
+            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={(tab) => { if (tab === 'ajustes') { setShowSettings(true); } else { setActiveTab(tab); } }} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} isDemo={isDemo} demoTimeLeft={demoTimeLeft} />
           </ErrorBoundary>
         </div>
 
@@ -276,6 +279,17 @@ export default function App() {
           )}
         </Suspense>
       </main>
+
+      {/* Settings View Overlay — inside providers for context access */}
+      {showSettings && (
+        <SettingsView
+          onClose={() => setShowSettings(false)}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          triggerHaptic={triggerHaptic}
+        />
+      )}
+
       </ProductProvider>
       </CartProvider>
       

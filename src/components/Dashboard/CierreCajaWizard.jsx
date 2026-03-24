@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ChevronRight, DollarSign, Wallet, CheckCircle2, AlertTriangle, TrendingUp, ShoppingBag, Package, ArrowRight } from 'lucide-react';
+import { X, ChevronRight, DollarSign, Wallet, CheckCircle2, AlertTriangle, TrendingUp, ShoppingBag, Package, ArrowRight, Coins } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentIcon, toTitleCase } from '../../config/paymentMethods';
 
@@ -16,21 +16,36 @@ export default function CierreCajaWizard({
     todayExpensesUsd = 0,
     paymentBreakdown = {},
     todayTopProducts = [],
-    bcvRate = 1
+    bcvRate = 1,
+    copEnabled = false,
+    tasaCop = 0
 }) {
     const [step, setStep] = useState(1);
     const [actualUsd, setActualUsd] = useState('');
     const [actualBs, setActualBs] = useState('');
+    const [actualCop, setActualCop] = useState('');
 
     if (!isOpen) return null;
 
     const expectedUsd = paymentBreakdown['efectivo_usd']?.total || 0;
     const expectedBs = paymentBreakdown['efectivo_bs']?.total || 0;
+    const expectedCop = paymentBreakdown['efectivo_cop']?.total || 0;
 
     const declaredUsd = parseFloat(actualUsd) || 0;
     const declaredBs = parseFloat(actualBs) || 0;
+    const declaredCop = parseFloat(actualCop) || 0;
     const diffUsd = declaredUsd - expectedUsd;
     const diffBs = declaredBs - expectedBs;
+    const diffCop = declaredCop - expectedCop;
+
+    // Check if there were any COP transactions today
+    const hasCopTransactions = copEnabled && (
+        expectedCop > 0 ||
+        Object.keys(paymentBreakdown).some(k => paymentBreakdown[k].currency === 'COP')
+    );
+
+    // Total COP del dia (sum of all COP-currency payments)
+    const todayTotalCop = copEnabled && tasaCop > 0 ? todayTotalUsd * tasaCop : 0;
 
     // Semaforo
     const absDiffUsd = Math.abs(diffUsd);
@@ -41,20 +56,32 @@ export default function CierreCajaWizard({
     };
 
     const handleConfirm = () => {
-        onConfirm({ declaredUsd, declaredBs, diffUsd, diffBs });
+        onConfirm({ declaredUsd, declaredBs, declaredCop, diffUsd, diffBs, diffCop });
         setStep(1);
         setActualUsd('');
         setActualBs('');
+        setActualCop('');
     };
 
     const handleClose = () => {
         setStep(1);
         setActualUsd('');
         setActualBs('');
+        setActualCop('');
         onClose();
     };
 
     const paymentEntries = Object.entries(paymentBreakdown);
+
+    // Helper: format COP display  
+    const fmtCop = (v) => v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Helper: determine currency label for payment breakdown display
+    const getCurrencyDisplay = (methodId, data) => {
+        if (data.currency === 'COP') return `${fmtCop(data.total)} COP`;
+        if (data.currency === 'BS' || methodId.includes('_bs') || methodId === 'pago_movil') return `${formatBs(data.total)} Bs`;
+        return `$${data.total.toFixed(2)}`;
+    };
 
     return (
         <div className="fixed inset-0 z-[200] bg-slate-950/90 backdrop-blur-md flex items-end sm:items-center justify-center animate-in fade-in duration-200" onClick={handleClose}>
@@ -94,6 +121,9 @@ export default function CierreCajaWizard({
                                 <p className="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-1">Ingresos brutos del dia</p>
                                 <p className="text-3xl font-black">${todayTotalUsd.toFixed(2)}</p>
                                 <p className="text-sm font-bold text-indigo-200 mt-0.5">{formatBs(todayTotalBs)} Bs</p>
+                                {hasCopTransactions && todayTotalCop > 0 && (
+                                    <p className="text-sm font-bold text-amber-300 mt-0.5">{fmtCop(todayTotalCop)} COP</p>
+                                )}
                                 <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/20">
                                     <div className="flex items-center gap-1.5">
                                         <ShoppingBag size={14} className="text-indigo-200" />
@@ -137,7 +167,6 @@ export default function CierreCajaWizard({
                                     <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
                                         {paymentEntries.map(([methodId, data]) => {
                                             const IconComp = getPaymentIcon(methodId);
-                                            const isBs = data.currency === 'BS';
                                             return (
                                                 <div key={methodId} className="flex items-center justify-between px-4 py-3">
                                                     <div className="flex items-center gap-2.5">
@@ -147,7 +176,7 @@ export default function CierreCajaWizard({
                                                         <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{toTitleCase(getPaymentLabel(methodId))}</span>
                                                     </div>
                                                     <span className="text-sm font-black text-slate-800 dark:text-white font-mono">
-                                                        {isBs ? `${formatBs(data.total)} Bs` : `$${data.total.toFixed(2)}`}
+                                                        {getCurrencyDisplay(methodId, data)}
                                                     </span>
                                                 </div>
                                             );
@@ -238,6 +267,28 @@ export default function CierreCajaWizard({
                                 </p>
                             </div>
 
+                            {/* COP Input — only visible if COP transactions exist */}
+                            {hasCopTransactions && (
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1 mb-1.5 block">Efectivo en pesos (COP)</label>
+                                    <div className="relative flex items-center">
+                                        <Coins size={18} className="absolute left-4 text-amber-500" />
+                                        <input
+                                            type="number"
+                                            step="any"
+                                            inputMode="decimal"
+                                            value={actualCop}
+                                            onChange={e => setActualCop(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-amber-200 dark:border-amber-800/50 rounded-2xl py-4 pl-12 pr-4 text-xl text-slate-800 dark:text-white font-black outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all font-mono"
+                                        />
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 mt-1.5 pl-1">
+                                        Sistema espera: <span className="font-bold text-amber-500">{fmtCop(expectedCop)} COP</span>
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Actions */}
                             <div className="flex gap-3 pt-2">
                                 <button onClick={() => setStep(1)} className="flex-1 py-3.5 text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
@@ -288,13 +339,23 @@ export default function CierreCajaWizard({
                                             </span>
                                         </div>
                                         {/* Bs Row */}
-                                        <div className="grid grid-cols-3 gap-0 px-4 py-3 border-b border-slate-100 dark:border-slate-700/50">
+                                        <div className={`grid grid-cols-3 gap-0 px-4 py-3 ${hasCopTransactions ? 'border-b border-slate-100 dark:border-slate-700/50' : 'border-b border-slate-100 dark:border-slate-700/50'}`}>
                                             <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Bs</span>
                                             <span className="text-sm font-mono font-bold text-slate-500 text-center">{formatBs(expectedBs)}</span>
                                             <span className={`text-sm font-mono font-black text-center ${Math.abs(diffBs) <= expectedBs * 0.02 ? 'text-emerald-600' : 'text-amber-600'}`}>
                                                 {formatBs(declaredBs)}
                                             </span>
                                         </div>
+                                        {/* COP Row */}
+                                        {hasCopTransactions && (
+                                            <div className="grid grid-cols-3 gap-0 px-4 py-3 border-b border-slate-100 dark:border-slate-700/50">
+                                                <span className="text-sm font-bold text-amber-600 dark:text-amber-400">COP</span>
+                                                <span className="text-sm font-mono font-bold text-slate-500 text-center">{fmtCop(expectedCop)}</span>
+                                                <span className={`text-sm font-mono font-black text-center ${Math.abs(diffCop) <= expectedCop * 0.02 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                    {fmtCop(declaredCop)}
+                                                </span>
+                                            </div>
+                                        )}
                                         {/* Diff Row */}
                                         <div className="grid grid-cols-3 gap-0 px-4 py-3 bg-slate-100/50 dark:bg-slate-700/30">
                                             <span className="text-xs font-bold text-slate-500 uppercase">Diferencia</span>
@@ -305,6 +366,15 @@ export default function CierreCajaWizard({
                                                 {diffBs >= 0 ? '+' : ''}{formatBs(diffBs)}
                                             </span>
                                         </div>
+                                        {hasCopTransactions && (
+                                            <div className="grid grid-cols-3 gap-0 px-4 py-2 bg-amber-50/50 dark:bg-amber-900/10">
+                                                <span className="text-xs font-bold text-amber-500 uppercase">Dif. COP</span>
+                                                <span></span>
+                                                <span className={`text-sm font-mono font-black text-center ${diffCop >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                    {diffCop >= 0 ? '+' : ''}{fmtCop(diffCop)}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

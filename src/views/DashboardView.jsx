@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { FinancialEngine } from '../core/FinancialEngine';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, Moon, Sun, UserPlus, Phone, FileText, Recycle, Key, Settings, Lock, CheckCircle2 } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, Lock, CheckCircle2 } from 'lucide-react';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, getPaymentIcon, toTitleCase } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
@@ -17,7 +17,7 @@ import SyncStatus from '../components/SyncStatus';
 import { useProductContext } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import { useSecurity } from '../hooks/useSecurity';
-import SettingsModal from '../components/SettingsModal';
+
 import Skeleton from '../components/Skeleton';
 
 const SALES_KEY = 'bodega_sales_v1';
@@ -25,11 +25,11 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const { notifyCierrePendiente, requestPermission } = useNotifications();
     const { deviceId } = useSecurity();
     const [sales, setSales] = useState([]);
-    const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate } = useProductContext();
+    const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
     const [customers, setCustomers] = useState([]);
     const [isLoadingLocal, setIsLoadingLocal] = useState(true);
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
     const isLoading = isLoadingProducts || isLoadingLocal;
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -337,7 +337,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             if (s.payments && s.payments.length > 0) {
                 s.payments.forEach(p => {
                     if (!acc[p.methodId]) acc[p.methodId] = { total: 0, currency: p.currency || 'BS', label: p.methodLabel };
-                    acc[p.methodId].total += (p.currency === 'USD' ? p.amountUsd : p.amountBs) || 0;
+                    if (p.currency === 'USD') {
+                        acc[p.methodId].total += p.amountUsd || 0;
+                    } else if (p.currency === 'COP') {
+                        // Store native COP amount: convert back from USD using sale's tasaCop
+                        acc[p.methodId].total += (p.amountUsd * (s.tasaCop || tasaCop || 1)) || 0;
+                    } else {
+                        acc[p.methodId].total += p.amountBs || 0;
+                    }
                 });
             } else {
                 const method = s.paymentMethod || 'efectivo_bs';
@@ -492,19 +499,13 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     <img src={theme === 'dark' ? '/logodark.png' : '/logo.png'} alt="PreciosAlDía" className="h-14 sm:h-16 w-auto object-contain drop-shadow-sm" />
                     <div className="flex items-center gap-1.5 pl-3">
                         <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.18em] leading-none">Bodegas</span>
-                        <button
-                            onClick={() => { triggerHaptic(); toggleTheme(); }}
-                            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-opacity active:scale-90 outline-none"
-                        >
-                            {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
-                        </button>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <SyncStatus />
                     {/* GEAR ICON FOR SETTINGS */}
                     <button
-                        onClick={() => { triggerHaptic(); setIsSettingsOpen(true); }}
+                        onClick={() => { triggerHaptic(); onNavigate('ajustes'); }}
                         className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-300 rounded-full shadow-sm hover:shadow active:scale-95 transition-all outline-none"
                         title="Configuración"
                     >
@@ -715,16 +716,24 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             {/* Pago por Metodo (agrupado Bs / USD) */}
             {Object.keys(paymentBreakdown).length > 0 && (() => {
                 const entries = Object.entries(paymentBreakdown);
-                const bsMethods = entries.filter(([, d]) => d.currency !== 'USD');
+                const bsMethods = entries.filter(([, d]) => d.currency === 'BS' || (!d.currency));
                 const usdMethods = entries.filter(([, d]) => d.currency === 'USD');
+                const copMethods = entries.filter(([, d]) => d.currency === 'COP');
                 const subtotalBs = bsMethods.reduce((s, [, d]) => s + d.total, 0);
                 const subtotalUsd = usdMethods.reduce((s, [, d]) => s + d.total, 0);
+                const subtotalCop = copMethods.reduce((s, [, d]) => s + d.total, 0);
+                const fmtCop = (v) => v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
                 const renderMethod = ([method, data]) => {
                     const label = toTitleCase(data.label || getPaymentLabel(method));
                     const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
-                    const totalBsEquiv = data.currency === 'USD' ? data.total * bcvRate : data.total;
+                    const totalBsEquiv = data.currency === 'USD' ? data.total * bcvRate : data.currency === 'COP' ? (data.total / (tasaCop || 1)) * bcvRate : data.total;
                     const pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0;
+                    const displayAmount = data.currency === 'USD'
+                        ? `$ ${data.total.toFixed(2)}`
+                        : data.currency === 'COP'
+                        ? `${fmtCop(data.total)} COP`
+                        : `${formatBs(data.total)} Bs`;
                     return (
                         <div key={method}>
                             <div className="flex justify-between text-sm mb-1">
@@ -733,7 +742,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                     {label}
                                 </span>
                                 <span className="font-bold text-slate-700 dark:text-white">
-                                    {data.currency === 'USD' ? `$ ${data.total.toFixed(2)}` : `${formatBs(data.total)} Bs`}
+                                    {displayAmount}
                                 </span>
                             </div>
                             <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -758,13 +767,24 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         </div>
                     )}
                     {usdMethods.length > 0 && (
-                        <div>
+                        <div className={copMethods.length > 0 ? 'mb-3' : ''}>
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Dolares</span>
                                 <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">${subtotalUsd.toFixed(2)}</span>
                             </div>
                             <div className="space-y-2 pl-1 border-l-2 border-emerald-200 dark:border-emerald-800/40">
                                 <div className="pl-3 space-y-2">{usdMethods.map(renderMethod)}</div>
+                            </div>
+                        </div>
+                    )}
+                    {copEnabled && copMethods.length > 0 && (
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pesos Colombianos</span>
+                                <span className="text-xs font-black text-amber-600 dark:text-amber-400">{fmtCop(subtotalCop)} COP</span>
+                            </div>
+                            <div className="space-y-2 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
+                                <div className="pl-3 space-y-2">{copMethods.map(renderMethod)}</div>
                             </div>
                         </div>
                     )}
@@ -1070,13 +1090,11 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 paymentBreakdown={paymentBreakdown}
                 todayTopProducts={todayTopProducts}
                 bcvRate={bcvRate}
+                copEnabled={copEnabled}
+                tasaCop={tasaCop}
             />
 
-            <SettingsModal
-                isOpen={isSettingsOpen}
-                onClose={() => setIsSettingsOpen(false)}
-                triggerHaptic={triggerHaptic}
-            />
+
         </div>
     );
 }

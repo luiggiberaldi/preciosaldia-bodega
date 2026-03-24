@@ -72,20 +72,38 @@ export class FinancialEngine {
         const breakdown = {};
 
         salesArray.forEach(sale => {
-            if (!sale.payments) return;
-
-            // Aggregate incoming payments
-            sale.payments.forEach(p => {
-                if (!breakdown[p.methodId]) {
-                    breakdown[p.methodId] = { 
-                        total: 0, 
-                        currency: p.currency || 'BS', 
-                        label: p.methodLabel 
-                    };
+            if (!sale.payments || sale.payments.length === 0) {
+                // V1 Legacy Sales
+                const method = sale.paymentMethod || 'efectivo_bs';
+                if (!breakdown[method]) {
+                    breakdown[method] = { total: 0, currency: 'BS', label: method };
                 }
-                const amount = (p.currency === 'USD' ? p.amountUsd : p.amountBs) || 0;
-                breakdown[p.methodId].total += amount;
-            });
+                breakdown[method].total += (sale.totalBs || 0);
+            } else {
+                // Aggregate incoming payments (V2 sales)
+                sale.payments.forEach(p => {
+                    if (!breakdown[p.methodId]) {
+                        breakdown[p.methodId] = { 
+                            total: 0, 
+                            currency: p.currency || 'BS', 
+                            label: p.methodLabel 
+                        };
+                    }
+
+                    // Fallbacks for older V2 sales that only had p.amount
+                    const amountUsd = p.amountUsd !== undefined ? p.amountUsd : (p.currency === 'USD' ? p.amount : (p.amount / (sale.rate || 36)));
+                    const amountBs = p.amountBs !== undefined ? p.amountBs : (p.currency === 'BS' ? p.amount : (p.amount * (sale.rate || 36)));
+
+                    if (p.currency === 'USD') {
+                        breakdown[p.methodId].total += amountUsd || 0;
+                    } else if (p.currency === 'COP') {
+                        // Store native COP amount: convert back from USD using sale's tasaCop
+                        breakdown[p.methodId].total += (amountUsd * (sale.tasaCop || 1)) || 0;
+                    } else {
+                        breakdown[p.methodId].total += amountBs || 0;
+                    }
+                });
+            }
 
             // Deduct outgoing change to find True Net Income
             if (sale.changeUsd > 0 && breakdown['efectivo_usd']) {

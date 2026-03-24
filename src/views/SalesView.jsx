@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue } from 'react';
 import { FinancialEngine } from '../core/FinancialEngine';
 import { storageService } from '../utils/storageService';
 import { useSounds } from '../hooks/useSounds';
@@ -160,16 +160,18 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     };
 
     // ── Derived (memos) ───────────────────────────
+    const deferredSearchTerm = useDeferredValue(searchTerm);
+
     const searchResults = useMemo(() => {
-        if (searchTerm.length < 1) return [];
-        const normalizedTerm = searchTerm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (deferredSearchTerm.length < 1) return [];
+        const normalizedTerm = deferredSearchTerm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         
         return products.filter(p => {
-            if (p.barcode?.includes(searchTerm)) return true;
+            if (p.barcode?.includes(deferredSearchTerm)) return true;
             const normalizedName = p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             return normalizedName.includes(normalizedTerm);
         }).slice(0, 6);
-    }, [searchTerm, products]);
+    }, [deferredSearchTerm, products]);
 
     const filteredByCategory = useMemo(() => selectedCategory === 'todos'
         ? products
@@ -199,12 +201,17 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
     const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
-    // Persist cart
+    // Search Deferred Value for Performance (moved to top of memos)
+
+    // Persist cart (With Debounce to avoid blocking UI on rapid scans)
     const isCartInitialized = useRef(false);
     useEffect(() => {
         if (!isCartInitialized.current) { isCartInitialized.current = true; return; }
-        if (cart.length > 0) storageService.setItem('bodega_pending_cart_v1', cart);
-        else storageService.removeItem('bodega_pending_cart_v1');
+        const timer = setTimeout(() => {
+            if (cart.length > 0) storageService.setItem('bodega_pending_cart_v1', cart);
+            else storageService.removeItem('bodega_pending_cart_v1');
+        }, 1000);
+        return () => clearTimeout(timer);
     }, [cart]);
 
     // Load data

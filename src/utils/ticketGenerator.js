@@ -214,8 +214,11 @@ export async function generateTicketPDF(sale, bcvRate) {
 
         if (sale.payments && sale.payments.length > 0) {
             sale.payments.forEach(p => {
-                const isBs = p.currency ? p.currency !== 'USD' : (p.methodId.includes('_bs') || p.methodId === 'pago_movil');
-                const val = isBs
+                const isCop = p.currency === 'COP';
+                const isBs = !isCop && (p.currency ? p.currency !== 'USD' : (p.methodId.includes('_bs') || p.methodId === 'pago_movil'));
+                const val = isCop
+                    ? 'COP ' + (p.amountBs || (p.amountUsd * (sale.tasaCop || 1))).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : isBs
                     ? 'Bs ' + formatBs(p.amountBs || (p.amountUsd * rate))
                     : '$' + (p.amountUsd || 0).toFixed(2);
 
@@ -339,8 +342,11 @@ export function printThermalTicket(sale, bcvRate) {
 
     // Generar filas de pagos
     const paymentsHtml = (sale.payments || []).map(p => {
-        const isBs = p.currency ? p.currency !== 'USD' : (p.methodId?.includes('_bs') || p.methodId === 'pago_movil');
-        const val = isBs
+        const isCop = p.currency === 'COP';
+        const isBs = !isCop && (p.currency ? p.currency !== 'USD' : (p.methodId?.includes('_bs') || p.methodId === 'pago_movil'));
+        const val = isCop
+            ? 'COP ' + (p.amountBs || (p.amountUsd * (sale.tasaCop || 1))).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : isBs
             ? 'Bs ' + formatBs(p.amountBs || (p.amountUsd * rate))
             : '$' + (p.amountUsd || 0).toFixed(2);
         return `
