@@ -26,7 +26,7 @@ export default function CheckoutModal({
     copEnabled,
     tasaCop
 }) {
-    // ── State: un valor por barra ──
+    // -- State: un valor por barra --
     const [barValues, setBarValues] = useState({});
     
     const [showCustomerPicker, setShowCustomerPicker] = useState(false);
@@ -41,7 +41,7 @@ export default function CheckoutModal({
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
-    // ── Cálculos bimoneda ──
+    // -- Cálculos bimoneda --
     const totalPaidUsd = useMemo(() => {
         return paymentMethods.reduce((sum, m) => {
             const val = parseFloat(barValues[m.id]) || 0;
@@ -69,7 +69,7 @@ export default function CheckoutModal({
     const changeBs = Math.max(0, Math.round((totalPaidBs - cartTotalBs) * 100) / 100);
     const isPaid = remainingUsd < 0.009;
 
-    // ── Handlers ──
+    // -- Handlers --
     const handleBarChange = useCallback((methodId, value) => {
         // Solo números y punto decimal
         let v = value.replace(',', '.');
@@ -149,7 +149,7 @@ export default function CheckoutModal({
     const methodsBs = paymentMethods.filter(m => m.currency === 'BS');
     const methodsCop = paymentMethods.filter(m => m.currency === 'COP');
 
-    // ── Estilos de barra por moneda ──
+    // -- Estilos de barra por moneda --
     const sectionStyles = {
         USD: {
             bg: 'bg-emerald-50/50 dark:bg-emerald-950/20',
@@ -239,7 +239,7 @@ export default function CheckoutModal({
     return (
         <div className="fixed inset-0 z-50 bg-white dark:bg-slate-950 flex flex-col overflow-hidden">
 
-            {/* ═══ HEADER ═══ */}
+            {/* --- HEADER --- */}
             <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
                 <button onClick={onClose} className="p-2 -ml-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                     <X size={22} />
@@ -250,10 +250,10 @@ export default function CheckoutModal({
                 </span>
             </div>
 
-            {/* ═══ SCROLLABLE BODY ═══ */}
+            {/* --- SCROLLABLE BODY --- */}
             <div className="flex-1 overflow-y-auto overscroll-contain pb-28">
 
-                {/* ── TOTAL BIMONEDA ── */}
+                {/* -- TOTAL BIMONEDA -- */}
                 <div className="px-4 py-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
                     {discountData?.active && (
                         <div className="flex flex-col items-center justify-center space-y-1 mb-3 pb-3 border-b border-slate-200/50 dark:border-slate-800/50">
@@ -287,7 +287,7 @@ export default function CheckoutModal({
                     </div>
                 </div>
 
-                {/* ── SECCIÓN DÓLARES ($) ── */}
+                {/* -- SECCION DOLARES ($) -- */}
                 {methodsUsd.length > 0 && (
                     <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.USD.bg} ${sectionStyles.USD.border} p-3`}>
                         <h3 className={`text-[11px] font-black uppercase tracking-widest mb-3 flex items-center gap-2 ${sectionStyles.USD.title}`}>
@@ -298,7 +298,7 @@ export default function CheckoutModal({
                     </div>
                 )}
 
-                {/* ── SECCIÓN BOLÍVARES (Bs) ── */}
+                {/* -- SECCION BOLIVARES (Bs) -- */}
                 {methodsBs.length > 0 && (
                     <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.BS.bg} ${sectionStyles.BS.border} p-3`}>
                         <div className="flex items-center justify-between mb-3">
@@ -314,7 +314,7 @@ export default function CheckoutModal({
                     </div>
                 )}
 
-                {/* ── SECCIÓN PESOS (COP) ── */}
+                {/* -- SECCION PESOS (COP) -- */}
                 {copEnabled && methodsCop.length > 0 && (
                     <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.COP.bg} ${sectionStyles.COP.border} p-3`}>
                         <div className="flex items-center justify-between mb-3">
@@ -330,7 +330,7 @@ export default function CheckoutModal({
                     </div>
                 )}
 
-                {/* ── BANNER VUELTO / RESTANTE ── */}
+                {/* -- BANNER VUELTO / RESTANTE -- */}
                 <div className="px-3 py-2">
                     <div className={`p-3.5 rounded-xl border-2 transition-all ${isPaid
                         ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
@@ -431,10 +431,9 @@ export default function CheckoutModal({
                     </div>
                 </div>
 
-                {/* ── CLIENTE (colapsable) ── */}
-                {customers.length > 0 && (
-                    <div className="px-3 py-2">
-                        <button
+                {/* -- CLIENTE (colapsable) -- */}
+                <div className="px-3 py-2">
+                    <button
                             onClick={() => setShowCustomerPicker(!showCustomerPicker)}
                             className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors"
                         >
@@ -551,7 +550,6 @@ export default function CheckoutModal({
                             </div>
                         )}
                     </div>
-                )}
 
                 {/* Saldo a Favor */}
                 {selectedCustomer?.deuda < -0.01 && remainingUsd > 0.01 && (
@@ -566,7 +564,7 @@ export default function CheckoutModal({
                 )}
             </div>
 
-            {/* ═══ BOTÓN CTA FIJO ═══ */}
+            {/* --- BOTON CTA FIJO --- */}
             <div className="shrink-0 px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <button
                     onClick={() => {
@@ -595,7 +593,7 @@ export default function CheckoutModal({
                 </button>
             </div>
 
-            {/* ═══ MODAL CONFIRMACIÓN FIAR ═══ */}
+            {/* --- MODAL CONFIRMACION FIAR --- */}
             {confirmFiar && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setConfirmFiar(false)}>
                     <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 max-w-sm sm:max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>

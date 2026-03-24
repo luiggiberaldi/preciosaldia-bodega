@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { FinancialEngine } from '../core/FinancialEngine';
-import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown, ChevronUp, Clock, Send, Ban, Shuffle, Receipt, Search, X, Filter, Recycle } from 'lucide-react';
+import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown, ChevronUp, Clock, Send, Ban, Shuffle, Receipt, Search, X, Filter, Recycle, Lock } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../config/paymentMethods';
@@ -54,7 +54,7 @@ function getDateRange(rangeId) {
     }
 }
 
-export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
+export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive }) {
     const { products, setProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
     const [allSales, setAllSales] = useState([]);
@@ -111,13 +111,18 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
     };
 
     useEffect(() => {
+        if (isActive === false) return; // Si es explicitamente false, abortamos
+        let mounted = true;
         const load = async () => {
             const saved = await storageService.getItem(SALES_KEY, []);
-            setAllSales(saved);
-            setIsLoading(false);
+            if (mounted) {
+                setAllSales(saved);
+                setIsLoading(false);
+            }
         };
         load();
-    }, []);
+        return () => { mounted = false; };
+    }, [isActive]);
 
     const { from, to } = useMemo(() => {
         if (selectedRange === 'custom') {
@@ -129,11 +134,25 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
         return getDateRange(selectedRange);
     }, [selectedRange, customFrom, customTo]);
 
-    const filteredSales = useMemo(() => {
+    // Ventas de Mercancía (para Totales, Profit, Top Productos)
+    const salesForStats = useMemo(() => {
         return allSales.filter(s => {
-            if (s.status === 'ANULADA' || s.tipo === 'COBRO_DEUDA' || s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA' || s.tipo === 'VENTA_FIADA' || s.tipo === 'PAGO_PROVEEDOR') return false;
+            if (s.status === 'ANULADA' || (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA')) return false;
             
-            // s.timestamp is an ISO string (UTC). We need to get the local date string to match `from` and `to`.
+            const saleDate = new Date(s.timestamp);
+            const dateStr = getLocalISODate(saleDate);
+
+            return dateStr >= from && dateStr <= to;
+        });
+    }, [allSales, from, to]);
+
+    // Flujo de Dinero (para Desglose de Pagos, incluye pagos de deudas)
+    const salesForCashFlow = useMemo(() => {
+        return allSales.filter(s => {
+            if (s.status === 'ANULADA') return false;
+            // Solo transacciones que mueven dinero real del cliente a la tienda hoy o pagos a proveedores
+            if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA' && s.tipo !== 'COBRO_DEUDA' && s.tipo !== 'PAGO_PROVEEDOR') return false;
+            
             const saleDate = new Date(s.timestamp);
             const dateStr = getLocalISODate(saleDate);
 
@@ -152,20 +171,19 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
         });
     }, [allSales, from, to]);
 
-    // ── Métricas ──
-    const totalUsd = filteredSales.reduce((s, sale) => s + (sale.totalUsd || 0), 0);
-    const totalBs = filteredSales.reduce((s, sale) => s + (sale.totalBs || 0), 0);
-    const totalItems = filteredSales.reduce((s, sale) => s + sale.items.reduce((is, i) => is + i.qty, 0), 0);
+    // ── Métricas (Basadas en Mercancía Vendida) ──
+    const totalUsd = salesForStats.reduce((s, sale) => s + (sale.totalUsd || 0), 0);
+    const totalBs = salesForStats.reduce((s, sale) => s + (sale.totalBs || 0), 0);
+    const totalItems = salesForStats.reduce((s, sale) => s + (sale.items ? sale.items.reduce((is, i) => is + i.qty, 0) : 0), 0);
+    const profit = FinancialEngine.calculateAggregateProfit(salesForStats, bcvRate, products);
 
-    const profit = FinancialEngine.calculateAggregateProfit(filteredSales, bcvRate, products);
-
-    // Desglose por método de pago
-    const paymentBreakdown = FinancialEngine.calculatePaymentBreakdown(filteredSales);
+    // ── Desglose por método de pago (Basado en Dinero Real Ingresado) ──
+    const paymentBreakdown = FinancialEngine.calculatePaymentBreakdown(salesForCashFlow);
 
     // Top productos
     const productMap = {};
-    filteredSales.forEach(s => {
-        s.items.forEach(item => {
+    salesForStats.forEach(s => {
+        s.items?.forEach(item => {
             if (!productMap[item.name]) productMap[item.name] = { name: item.name, qty: 0, revenue: 0 };
             productMap[item.name].qty += item.qty;
             productMap[item.name].revenue += item.priceUsd * item.qty;
@@ -176,14 +194,14 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
     // Ventas por da para mini grfica
     const salesByDay = useMemo(() => {
         const map = {};
-        filteredSales.forEach(s => {
+        salesForStats.forEach(s => {
             const day = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
             if (!map[day]) map[day] = { date: day, total: 0, count: 0 };
             map[day].total += s.totalUsd || 0;
             map[day].count++;
         });
         return Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
-    }, [filteredSales]);
+    }, [salesForStats]);
 
     const maxDayTotal = Math.max(...salesByDay.map(d => d.total), 1);
 
@@ -193,8 +211,8 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
         try {
             const { generateDailyClosePDF } = await import('../utils/dailyCloseGenerator');
             await generateDailyClosePDF({
-                sales: filteredSales,
-                allSales: filteredSales,
+                sales: salesForCashFlow,
+                allSales: salesForStats,
                 bcvRate,
                 paymentBreakdown,
                 topProducts,
@@ -240,7 +258,7 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
                 </h2>
                 <button
                     onClick={handleExportPDF}
-                    disabled={filteredSales.length === 0}
+                    disabled={salesForStats.length === 0 && salesForCashFlow.length === 0}
                     className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold rounded-xl text-sm shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
                 >
                     <Download size={16} /> Descargar PDF
@@ -289,7 +307,7 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
 
             {/* Summary Cards — Responsive grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <StatCard icon={ShoppingBag} label="Ventas" value={filteredSales.length} color="emerald" />
+                <StatCard icon={ShoppingBag} label="Ventas" value={salesForStats.length} color="emerald" />
                 <StatCard icon={DollarSign} label="Ingresos" value={`$${totalUsd.toFixed(2)}`} sub={`${formatBs(totalBs)} Bs`} color="blue" />
                 <StatCard icon={TrendingUp} label="Ganancia" value={bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00'} sub={`${formatBs(profit)} Bs`} color="indigo" />
                 <StatCard icon={Package} label="Artículos" value={totalItems} color="amber" />
@@ -539,7 +557,7 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
             })()}
 
             {/* Empty state */}
-            {filteredSales.length === 0 && (
+            {salesForStats.length === 0 && salesForCashFlow.length === 0 && (
                 <div className="mt-8">
                     <EmptyState
                         icon={BarChart3}
@@ -721,13 +739,18 @@ function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, on
                         >
                             PDF
                         </button>
-                        {!isCanceled && onVoidSale && (
+                        {!isCanceled && onVoidSale && !s.cajaCerrada && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onVoidSale(s); }}
                                 className="py-2 px-3 bg-slate-100 dark:bg-slate-900 text-red-600 dark:text-red-400 hover:bg-red-50 hover:dark:bg-red-900/30 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs border border-slate-200 dark:border-slate-800 shadow-sm active:scale-95"
                             >
                                 <Ban size={14} /> Anular
                             </button>
+                        )}
+                        {!isCanceled && s.cajaCerrada && (
+                            <div title="Venta protegida por Cierre de Caja" className="py-2 px-3 bg-slate-50 dark:bg-slate-900 text-slate-400 font-bold rounded-lg flex justify-center items-center gap-1.5 text-[10px] uppercase border border-slate-100 dark:border-slate-800 tracking-wider cursor-not-allowed">
+                                <Lock size={12} /> Cerrada
+                            </div>
                         )}
                         {onRecycleSale && s.items && s.items.length > 0 && (
                             <button

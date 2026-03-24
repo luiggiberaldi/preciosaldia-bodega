@@ -17,11 +17,15 @@ export default function AnimatedCounter({ value, prefix = '', suffix = '', durat
 
         const animate = (now) => {
             const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
+            if (elapsed >= duration) {
+                setDisplay(numericValue);
+                return;
+            }
+            const progress = elapsed / duration;
             // easeOutExpo
             const eased = 1 - Math.pow(2, -10 * progress);
             setDisplay(numericValue * eased);
-            if (progress < 1) rafId = requestAnimationFrame(animate);
+            rafId = requestAnimationFrame(animate);
         };
 
         rafId = requestAnimationFrame(animate);

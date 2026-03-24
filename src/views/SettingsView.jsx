@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
     ArrowLeft, Store, Printer, Coins, Package, CreditCard, Database,
     Palette, Fingerprint, Upload, Download, Share2, Check, X,
-    AlertTriangle, Copy, Sun, Moon, ChevronRight
+    AlertTriangle, Copy, Sun, Moon, ChevronRight, Trash2
 } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import localforage from 'localforage';
@@ -165,7 +165,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
 
     // ─── RENDER ───────────────────────────────────────────
     return (
-        <div className="fixed inset-0 z-[150] bg-slate-50 dark:bg-slate-950 flex flex-col animate-in slide-in-from-right duration-300">
+        <div className="fixed inset-0 z-[150] bg-slate-50 dark:bg-slate-950 flex flex-col h-[100dvh] max-h-[100dvh] w-full overflow-hidden animate-in slide-in-from-right duration-300">
             {/* Header */}
             <div className="shrink-0 px-4 pt-[env(safe-area-inset-top)] bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shadow-sm">
                 <div className="flex items-center gap-3 py-4">
@@ -180,7 +180,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
             </div>
 
             {/* Body - scroll */}
-            <div className="flex-1 overflow-y-auto pb-12">
+            <div className="flex-1 overflow-y-auto pb-[calc(3rem+env(safe-area-inset-bottom))]">
                 <div className="max-w-md mx-auto p-4 space-y-4">
 
                     {/* 1. Mi Negocio */}
@@ -409,6 +409,36 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                             </button>
                         </div>
                         <p className="text-[9px] text-slate-400">Comparte este ID si necesitas soporte tecnico.</p>
+                    </SectionCard>
+
+                    {/* 9. Zona de Peligro */}
+                    <SectionCard icon={AlertTriangle} title="Zona de Peligro" subtitle="Acciones irreversibles" iconColor="text-red-500">
+                        <div className="p-2.5 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30 rounded-xl mb-3">
+                            <p className="text-[10px] text-red-700 dark:text-red-400 leading-relaxed font-bold">
+                                Esta acción eliminará todo el historial de ventas y reportes estadísticos. El inventario NO será afectado.
+                            </p>
+                        </div>
+                        <button
+                            onClick={async () => {
+                                if (window.confirm("¿Estás seguro de que deseas ELIMINAR TODO EL HISTORIAL DE VENTAS? Esto no se puede deshacer y dejará las estadísticas en cero. Tu inventario quedará intacto.")) {
+                                    try {
+                                        triggerHaptic && triggerHaptic();
+                                        await storageService.removeItem('bodega_sales_v1');
+                                        showToast('Historial de ventas eliminado exitosamente', 'success');
+                                        setTimeout(() => window.location.reload(), 1500);
+                                    } catch (err) {
+                                        showToast('Error eliminando historial', 'error');
+                                    }
+                                }
+                            }}
+                            className="w-full flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors group active:scale-[0.98]"
+                        >
+                            <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-lg"><Trash2 size={18} className="text-red-600 dark:text-red-400" /></div>
+                            <div className="text-left flex-1">
+                                <p className="text-sm font-bold text-red-700 dark:text-red-400">Borrar Historial de Ventas</p>
+                                <p className="text-[10px] text-red-500/80 dark:text-red-400/80">El inventario no se borrará</p>
+                            </div>
+                        </button>
                     </SectionCard>
 
                     {/* Version footer */}

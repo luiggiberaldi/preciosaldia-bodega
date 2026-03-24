@@ -131,23 +131,23 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
                         placeholder="Nombre del método..."
                         className="w-full py-2.5 px-3 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-900 text-sm font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30"
                     />
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         <button
                             onClick={() => setNewCurrency('BS')}
-                            className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${newCurrency === 'BS' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'}`}
+                            className={`flex-1 min-w-[120px] py-2 rounded-lg text-xs font-black transition-all ${newCurrency === 'BS' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'}`}
                         >
                             Bolívares (Bs)
                         </button>
                         <button
                             onClick={() => setNewCurrency('USD')}
-                            className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${newCurrency === 'USD' ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'}`}
+                            className={`flex-1 min-w-[120px] py-2 rounded-lg text-xs font-black transition-all ${newCurrency === 'USD' ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'}`}
                         >
                             Dólares ($)
                         </button>
                         {copEnabled && (
                             <button
                                 onClick={() => setNewCurrency('COP')}
-                                className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${newCurrency === 'COP' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'}`}
+                                className={`flex-1 min-w-[120px] py-2 rounded-lg text-xs font-black transition-all ${newCurrency === 'COP' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'}`}
                             >
                                 Pesos (COP)
                             </button>

@@ -817,25 +817,40 @@ async function analyzeWithGroq(summary) {
         `${s.status === 'passed' ? '✅' : '❌'} [${s.id}] ${s.name}${s.error ? ` — ERROR: ${s.error}` : ''}`
     ).join('\n');
 
-    const prompt = `Eres un auditor senior de QA para una aplicación PWA de punto de venta llamada "PreciosAlDía" (Venezuela). 
-Acabamos de correr la batería de tests automáticos del SystemTester v4.0. Aquí están los resultados:
+    const prompt = `Eres un AUDITOR FINANCIERO FORENSE senior especializado en sistemas POS para una aplicación PWA llamada "PreciosAlDía" (Venezuela, economía bimoneda USD/Bs). Tu rol es examinar los resultados de la batería de pruebas automatizadas SystemTester v4.0 como si fueras un perito contable que debe certificar la integridad matemática del sistema ante un tribunal.
 
-RESULTADOS:
-- Total: ${summary.suites.length} suites
+CONTEXTO DEL SISTEMA:
+- App POS para bodegueros venezolanos que manejan USD, Bolívares y COP simultáneamente.
+- Motor Financiero centralizado (FinancialEngine.js) que calcula ganancias, vueltos, descuentos y conversiones.
+- Incluye: detección de anomalías (fat-finger), protección anti-descuento excesivo, tasa histórica por ticket, vuelto cross-currency, reportes diarios (libros).
+- Las pruebas cubren: Storage, CRUD, Carrito, Bimoneda, Checkout, Clientes, Reportes, Golden Master, Anomalías, Libros Diarios, Edge Cases Extremos (remates, granel, hiperinflación, cross-currency).
+
+RESULTADOS DE LA BATERÍA:
+- Total de suites: ${summary.suites.length}
 - Aprobadas: ${passed}
 - Fallidas: ${failed}
-- Tiempo: ${elapsed}s
+- Tiempo de ejecución: ${elapsed}s
 
 DETALLE POR SUITE:
 ${suiteDetails}
 
-Analiza estos resultados y dame:
-1. Un veredicto breve (1 línea) sobre la salud general del sistema.
-2. Si hay fallos, explica qué podría estar causándolos y qué riesgo representan para el usuario final (bodeguero venezolano).
-3. Si todo pasa, menciona qué áreas críticas quedaron validadas.
-4. Un puntaje de confianza del 1 al 10 para deployar a producción.
+INSTRUCCIONES DE ANÁLISIS (sé exhaustivo, NO hay límite de palabras):
 
-Responde en español, de forma concisa y directa. Máximo 200 palabras.`;
+1. **VEREDICTO GENERAL**: Una línea sobre la salud del sistema.
+
+2. **ANÁLISIS FORENSE POR ÁREA**:
+   - Para cada suite que PASÓ: Explica brevemente qué riesgo financiero cubre y por qué es crítico que haya pasado.
+   - Para cada suite que FALLÓ: Diagnóstico detallado de la causa probable, el impacto financiero real para el bodeguero (¿pierde dinero? ¿reportes incorrectos? ¿cierre de caja descuadrado?), y la urgencia de corrección.
+
+3. **MAPA DE COBERTURA**: Lista qué áreas del flujo financiero están blindadas y cuáles podrían tener puntos ciegos aún no cubiertos.
+
+4. **RIESGOS RESIDUALES**: Identifica posibles escenarios de la vida real venezolana que podrían no estar cubiertos (ej: cortes de luz durante checkout, cambio de tasa BCV a mitad de día, etc.).
+
+5. **PUNTAJE DE CONFIANZA**: Del 1 al 10 para deploy a producción, con justificación detallada.
+
+6. **RECOMENDACIONES**: Acciones concretas para llevar el sistema al 10/10.
+
+Responde en español, con formato estructurado usando encabezados. Sé tan detallado como sea necesario.`;
 
     try {
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -847,8 +862,8 @@ Responde en español, de forma concisa y directa. Máximo 200 palabras.`;
             body: JSON.stringify({
                 model: 'llama-3.3-70b-versatile',
                 messages: [{ role: 'user', content: prompt }],
-                temperature: 0.3,
-                max_tokens: 400,
+                temperature: 0.4,
+                max_tokens: 2000,
             }),
         });
 
@@ -1011,10 +1026,213 @@ async function suiteGoldenMaster() {
     };
     
     // products argument not strictly needed if sale items exist
-    const profit = FinancialEngine.calculateNetProfit(sale, 40, []);
-    assertClose(profit, 8.95, 'Ganancia neta afectada por descuento incorrecta');
+    const profit = FinancialEngine.calculateSaleProfit(sale, 40, []);
+    assertClose(profit, 358, 'Ganancia neta afectada por descuento incorrecta (valor en Bs)');
 
     log('Golden Master FinancialEngine: Matemáticas críticas aprobadas.', 'success');
+}
+
+// 17. FinancialEngine (Detección de Anomalías de Vuelto Masivo)
+async function suiteAnomalyCash() {
+    section('🚨 SUITE: FinancialEngine — Control de Anomalías de Vuelto');
+
+    await storageService.setItem(TEST_KEYS.sales, []); // Limpiar
+
+    const now = new Date().toISOString();
+    const mySales = [
+        // 1. Caso Fat-Finger en Punto de Venta (BS)
+        {
+            id: 'an1',
+            timestamp: now,
+            status: 'COMPLETADA',
+            totalUsd: 10.00,
+            totalBs: 360.00,
+            changeBs: 140000, 
+            payments: [{ methodId: 'punto_venta', currency: 'BS', amountBs: 140360 }],
+            items: [{ id: 'i1', name: 'P1', qty: 1, priceUsd: 10.00 }]
+        },
+        // 2. Caso Vuelto Normal (BS)
+        {
+            id: 'an2',
+            timestamp: now,
+            status: 'COMPLETADA',
+            totalUsd: 5.00,
+            totalBs: 180.00,
+            changeBs: 20.00, 
+            payments: [{ methodId: 'pago_movil', currency: 'BS', amountBs: 200 }],
+            items: [{ id: 'i2', name: 'P2', qty: 1, priceUsd: 5.00 }]
+        },
+        // 3. Caso Vuelto Anómalo en Pago Móvil (USD) -> Cambiado a Zelle para aislarlo de an2
+        {
+            id: 'an3',
+            timestamp: now,
+            status: 'COMPLETADA',
+            totalUsd: 2.00,
+            totalBs: 72.00,
+            changeUsd: 998.00, // Pagó con 1000$ (typo)
+            payments: [{ methodId: 'zelle', currency: 'USD', amountUsd: 1000.00 }],
+            items: [{ id: 'i3', name: 'P3', qty: 1, priceUsd: 2.00 }]
+        },
+        // 4. Caso Venta con Total 0 (o nulo) y Vuelto
+        {
+            id: 'an4',
+            timestamp: now,
+            status: 'COMPLETADA',
+            totalUsd: 0,
+            totalBs: 0,
+            changeBs: 50.00,
+            payments: [{ methodId: 'transferencia_bs', currency: 'BS', amountBs: 50.00 }],
+            items: [] 
+        }
+    ];
+
+    await storageService.setItem(TEST_KEYS.sales, mySales);
+
+    // Filter out voided sales as ReportsView does (none in this mySales list)
+    const activeSales = mySales.filter(s => s.status !== 'ANULADA');
+    const paymentBreakdown = FinancialEngine.calculatePaymentBreakdown(activeSales);
+
+    // Verificaciones:
+    
+    // an1: 140360 Bs entraron por Punto. El vuelto de 140,000 debe ser IGNORADO (> 5x totalBs)
+    assertClose(paymentBreakdown['punto_venta'].total, 140360, 'an1: Punto de Venta registra ingreso completo');
+    
+    // an2: 200 Bs entraron por Pago Movil. Vuelto 20 Bs es LEGAL (< 5x totalBs). 
+    // Debe restarse de Efectivo Bs.
+    assertClose(paymentBreakdown['pago_movil'].total, 200, 'an2: Pago Movil registra ingreso completo');
+    
+    // an3: 1000$ entraron por Pago Movil. Vuelto 998$ es ANÓMALO (> 5x totalUsd).
+    // El escudo debe ignorarlo, no debe restar 998$ de la caja chica de USD.
+    
+    // an4: Venta de 0 con vuelto de 50. El vuelto debe ser ignorado.
+    
+    // Resultado Final en Cajas:
+    // Efectivo Bs = -20 (an2 legal) + 0 (an1 ignorado) + 0 (an4 ignorado)
+    assertClose(paymentBreakdown['efectivo_bs']?.total || 0, -20.00, 'Caja Bs: Solo restó el vuelto legal de an2');
+
+    // Efectivo USD = 0 (an3 ignorado)
+    assertClose(paymentBreakdown['efectivo_usd']?.total || 0, 0, 'Caja USD: El vuelto gigante de an3 fue bloqueado');
+
+    log('FinancialEngine: Escudo Anti-Anomalías Multidimensional validado OK', 'success');
+}
+
+// 18. Auditoría de Libros por Días (ReportsView Simulación)
+async function suiteLibrosDiarios() {
+    section('📔 SUITE: Auditoría de Libros y Reportes Diarios');
+
+    await storageService.setItem(TEST_KEYS.sales, []); // Limpiar
+    
+    const nowLocal = new Date().toISOString();
+    
+    const salesDia = [
+        // 1. Venta Normal Efectivo: Entran $10 netos al cajón
+        {
+            id: 'ld1', timestamp: nowLocal, status: 'COMPLETADA', tipo: 'VENTA',
+            totalUsd: 10.00,
+            payments: [{ methodId: 'efectivo_usd', currency: 'USD', amountUsd: 10.00 }],
+            items: [{ name: 'Producto A', qty: 2, priceUsd: 5.00 }]
+        },
+        // 2. Venta Fiada (Crédito): Entran $0 al cajón de ingresos (saldo a favor aumenta localmente, no evaluado acá)
+        {
+            id: 'ld2', timestamp: nowLocal, status: 'COMPLETADA', tipo: 'VENTA_FIADA',
+            totalUsd: 20.00, fiadoUsd: 20.00,
+            payments: [], // No hay pagos hoy
+            items: [{ name: 'Bolsa Harina', qty: 10, priceUsd: 2.00 }]
+        },
+        // 3. Cobro de Deuda (Cliente paga): Entra $15 al cajón 
+        {
+            id: 'ld3', timestamp: nowLocal, status: 'COMPLETADA', tipo: 'COBRO_DEUDA',
+            totalUsd: 15.00,
+            payments: [{ methodId: 'pago_movil', currency: 'BS', amountBs: 600, amountUsd: 15.00 }], // Suponiendo tasa $1=40Bs
+            items: [{ name: 'Abono deuda anterior', qty: 1, priceUsd: 15.00 }]
+        },
+        // 4. Pago a Proveedor (Egreso): Salen $5 del cajón 
+        {
+            id: 'ld4', timestamp: nowLocal, status: 'COMPLETADA', tipo: 'PAGO_PROVEEDOR',
+            totalUsd: -5.00, // Egresos se guardan en negativo
+            payments: [{ methodId: 'efectivo_usd', currency: 'USD', amountUsd: -5.00 }],
+            items: [{ name: 'Pago Proveedor Polar', qty: 1, priceUsd: -5.00 }]
+        }
+    ];
+
+    // Simular el hook que usamos en ReportsView (`salesForCashFlow`)
+    // ReportsView incluye: VENTA, VENTA_FIADA, COBRO_DEUDA, PAGO_PROVEEDOR
+    const salesForCashFlow = salesDia.filter(s => {
+        return ['VENTA', 'VENTA_FIADA', 'COBRO_DEUDA', 'PAGO_PROVEEDOR'].includes(s.tipo);
+    });
+
+    const breakdown = FinancialEngine.calculatePaymentBreakdown(salesForCashFlow);
+
+    // Auditoría de "Cajón":
+    // efectivo_usd: +$10 (Venta) - $5 (Egreso_Proveedor) = $5. (Venta fiada aporta 0 pagos)
+    assertClose(breakdown['efectivo_usd']?.total || 0, 5.00, 'Caja Fuerte USD: Venta Efectivo menos Pago a Proveedor es exacto');
+    
+    // pago_movil: +$15 en equivalencia bs (simulado por 600BS)
+    assertClose(breakdown['pago_movil']?.total || 0, 600, 'Banco (Pago Movil): Registra el pago de deudas anterior inmaculadamente');
+
+    // Stats "Mercancía Vendida" (Income Dashboard - Excluye cobros de deuda y egresos, ya que son movimientos de caja o inventario pasados/futuros)
+    const salesForStats = salesDia.filter(s => {
+        return ['VENTA', 'VENTA_FIADA'].includes(s.tipo);
+    });
+    const totalVentasRegistradas = salesForStats.reduce((s, sale) => s + (sale.totalUsd || 0), 0);
+    
+    // Vendido hoy: 10 (A) + 20 (Fiada) = 30
+    assertClose(totalVentasRegistradas, 30.00, 'Libro de Ventas Diarias (Gross Revenue): Solo cuenta mercancía que salió (VENTA + FIADA) exacto.');
+
+    log('Libros Diarios y Flujo de Caja Inmaculados.', 'success');
+}
+
+// 19. Edge Cases Financieros (Remates, Granel, Inflación Histórica, Cross-Currency)
+async function suiteEdgeCasesFinancieros() {
+    section('🤯 SUITE: Casos de Borde Financieros Extremos (Edge Cases)');
+
+    // 1. Venta a Pérdida (Remate Inferior al Costo)
+    const salePerdida = {
+        items: [{ priceUsd: 3.00, costUsd: 5.00, qty: 1 }],
+        discountAmountUsd: 0,
+        rate: 40 // Tasa histórica
+    };
+    const profitPerdida = FinancialEngine.calculateSaleProfit(salePerdida, 40, []);
+    // 3.00 - 5.00 = -2.00 USD * 40 Bs = -80 Bs
+    assertClose(profitPerdida, -80, 'Remate por debajo del costo: Debe arrojar ganancia negativa exacta de -80 Bs');
+
+    // 2. Fraccionamiento de Granel (Decimales infinitos)
+    const saleGranel = {
+        items: [{ priceUsd: 4.55, qty: 0.333 }], // Subtotal: 1.51515
+    };
+    const totalsGranel = FinancialEngine.buildCartTotals(saleGranel.items, null, 40);
+    // 1.51515 USD sin redondear en reducer. Max(0, 1.51515). Luego al UI se redondea, pero el totalUsd en BD queda como precision
+    assertClose(totalsGranel.totalUsd, 1.51515, 'Granel subtotal crudo OK', 0.001);
+
+    // 3. Descuento Agresivo Absoluto (> Total)
+    const itemsNormal = [{ priceUsd: 10, qty: 1 }];
+    const totalsDesc = FinancialEngine.buildCartTotals(itemsNormal, { type: 'percentage', value: 150 }, 40); // 150% Off!
+    assertEqual(totalsDesc.totalUsd, 0, 'Descuento del 150%: El sistema lo debe capar al 100% de la venta, no arrojar saldos negativos a favor del cliente');
+    assertEqual(totalsDesc.discountAmountUsd, 10, 'El valor del descuento máximo no supera el total bruto de 10');
+
+    // 4. Hiperinflación Histórica (Tasa Asíncrona)
+    const saleHistorica = {
+        items: [{ priceUsd: 10, costUsd: 5, qty: 1 }], 
+        rate: 40 // Se vendió a 40 Bs ($10 * 40 = 400 Bs. Costo: 200 Bs, Ganancia: 200 Bs).
+    };
+    const bcvRateActual = 80; // Hoy la tasa es el doble!
+    const profitAsincrono = FinancialEngine.calculateSaleProfit(saleHistorica, bcvRateActual, []);
+    assertEqual(profitAsincrono, 200, 'Inflación Histórica: El reporte respeta la tasa en la que ocurrió la venta (40), no la actual (80), manteniendo intacto los 200 Bs de ganancia nominal');
+
+    // 5. Vuelto Multimeda Asimétrico (Cross-Currency Change)
+    // El cliente debe $5. Paga con $10. Vuelto es $5 (200 Bs).
+    const cajaCross = {
+        id: 'cross1', status: 'COMPLETADA', tipo: 'VENTA',
+        totalUsd: 5.00, totalBs: 200.00,
+        changeBs: 200.00, // Le damos 200 Bs de vuelto
+        changeUsd: 0,
+        payments: [{ methodId: 'efectivo_usd', currency: 'USD', amountUsd: 10.00 }] // Pagó con 10 físico
+    };
+    const pBreakdown = FinancialEngine.calculatePaymentBreakdown([cajaCross]);
+    assertClose(pBreakdown['efectivo_usd'].total, 10.00, 'Cross-Currency (USD): Entró billete de $10 exacto a la caja USD de ingresos brutos');
+    assertClose(pBreakdown['efectivo_bs'].total, -200, 'Cross-Currency (Bs): Salieron -200 Bs de tu caja chica de Bolívares por el vuelto, cruzando las fronteras monetarias contablemente');
+
+    log('Edge Cases Extremos: Escudo Total del Financial Engine Validado', 'success');
 }
 
 // ════════════════════════════════════════════
@@ -1050,6 +1268,9 @@ const SUITES = [
     { key: 'regresion_20260304', name: '🔧 Regresión: Ganancia/Vuelto/Plural/Moneda', fn: suiteRegresion20260304, fast: true },
     { key: 'cierre_caja', name: '📦 Flujo: Vueltos Netos / Proveedores / Cierre', fn: suiteCierreCaja, fast: true },
     { key: 'golden_master', name: '🏆 Golden Master (Motor Financiero)', fn: suiteGoldenMaster, fast: true },
+    { key: 'anomaly_cash', name: '🚨 Anomalía Financiera (Vuelto Masivo)', fn: suiteAnomalyCash, fast: true },
+    { key: 'libros_diarios', name: '📔 Auditoría de Libros por Días', fn: suiteLibrosDiarios, fast: true },
+    { key: 'edge_cases', name: '🤯 Edge Cases Financieros Extremos', fn: suiteEdgeCasesFinancieros, fast: true },
 
     { key: '7days', name: '🗓️ Week Sim (Storage Pesado)', fn: suite7Days, fast: false },
 ];

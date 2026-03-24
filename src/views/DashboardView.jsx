@@ -323,11 +323,11 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             s.items.forEach(item => {
                 if (!productSalesMap[item.name]) productSalesMap[item.name] = { name: item.name, qty: 0, revenue: 0 };
                 productSalesMap[item.name].qty += item.qty;
-                productSalesMap[item.name].revenue += item.priceUsd * item.qty * (s.rate || bcvRate);
+                productSalesMap[item.name].revenue += item.priceUsd * item.qty;
             });
         });
         return Object.values(productSalesMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
-    }, [sales, bcvRate]);
+    }, [sales]);
 
     // Payment method breakdown (today)
     const paymentBreakdown = useMemo(() => {
@@ -374,11 +374,11 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             s.items.forEach(item => {
                 if (!todayProductMap[item.name]) todayProductMap[item.name] = { name: item.name, qty: 0, revenue: 0 };
                 todayProductMap[item.name].qty += item.qty;
-                todayProductMap[item.name].revenue += item.priceUsd * item.qty * (s.rate || bcvRate);
+                todayProductMap[item.name].revenue += item.priceUsd * item.qty;
             });
         });
         return Object.values(todayProductMap).sort((a, b) => b.qty - a.qty).slice(0, 10);
-    }, [todaySales, bcvRate]);
+    }, [todaySales]);
 
     // Handler: Cierre de Caja (abre modal de confirmación y cuadre)
     const handleDailyClose = () => {

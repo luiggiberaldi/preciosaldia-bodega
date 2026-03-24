@@ -153,12 +153,17 @@ export default function SalesHistory({
                                             </button>
                                         )}
 
-                                        {!isCanceled && (
+                                        {!isCanceled && !s.cajaCerrada && (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onVoidSale(s); }}
                                                 className="py-2 px-3 bg-slate-100 dark:bg-slate-900 text-red-600 dark:text-red-400 hover:bg-red-50 hover:dark:bg-red-900/30 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs border border-slate-200 dark:border-slate-800 shadow-sm active:scale-95">
                                                 <Ban size={14} /> Anular
                                             </button>
+                                        )}
+                                        {!isCanceled && s.cajaCerrada && (
+                                            <div title="Venta protegida por Cierre de Caja" className="py-2 px-3 bg-slate-50 dark:bg-slate-900 text-slate-400 font-bold rounded-lg flex justify-center items-center gap-1.5 text-[10px] uppercase border border-slate-100 dark:border-slate-800 tracking-wider cursor-not-allowed">
+                                                <Lock size={12} /> Cerrada
+                                            </div>
                                         )}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onRecycleSale(s); }}

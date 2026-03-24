@@ -272,7 +272,7 @@ export default function App() {
             <div data-view="reportes" className={`flex-1 flex flex-col ${activeTab === 'reportes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
                 <PremiumGuard featureName="Reportes Históricos">
-                  <ReportsView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} />
+                  <ReportsView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'reportes'} />
                 </PremiumGuard>
               </ErrorBoundary>
             </div>

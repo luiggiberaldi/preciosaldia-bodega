@@ -106,11 +106,20 @@ export class FinancialEngine {
             }
 
             // Deduct outgoing change to find True Net Income
-            if (sale.changeUsd > 0 && breakdown['efectivo_usd']) {
-                breakdown['efectivo_usd'].total -= sale.changeUsd;
+            // Anomaly detection: if change given is absurdly larger than the sale itself, it's a data entry error (e.g., typed COP into BS field).
+            let safeChangeUsd = sale.changeUsd || 0;
+            let safeChangeBs = sale.changeBs || 0;
+            
+            if (safeChangeUsd > ((sale.totalUsd || 0) * 5)) safeChangeUsd = 0;
+            if (safeChangeBs > ((sale.totalBs || 0) * 5)) safeChangeBs = 0;
+
+            if (safeChangeUsd > 0) {
+                if (!breakdown['efectivo_usd']) breakdown['efectivo_usd'] = { total: 0, currency: 'USD', label: 'Efectivo $' };
+                breakdown['efectivo_usd'].total -= safeChangeUsd;
             }
-            if (sale.changeBs > 0 && breakdown['efectivo_bs']) {
-                breakdown['efectivo_bs'].total -= sale.changeBs;
+            if (safeChangeBs > 0) {
+                if (!breakdown['efectivo_bs']) breakdown['efectivo_bs'] = { total: 0, currency: 'BS', label: 'Efectivo Bs' };
+                breakdown['efectivo_bs'].total -= safeChangeBs;
             }
         });
 
