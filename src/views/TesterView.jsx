@@ -10,7 +10,7 @@ import {
     Zap, ChevronLeft, ChevronDown, ChevronUp, TerminalSquare, Trash2, Brain,
     Download, Filter, Database
 } from 'lucide-react';
-import { storageService } from '../services/storageService';
+import { storageService } from '../utils/storageService';
 
 const SUITE_ICONS = {
     dash_validations: '📊', chaos_data: '🌪️', extreme_stress: '🌋', quota_mock: '🔌',
