@@ -11,6 +11,10 @@ import PaymentMethodsManager from '../components/Settings/PaymentMethodsManager'
 import UsersManager from '../components/Settings/UsersManager';
 import AuditLogViewer from '../components/Settings/AuditLogViewer';
 import { useSecurity } from '../hooks/useSecurity';
+import { generateDailyClosePDF } from '../utils/dailyCloseGenerator';
+import { useNotifications } from '../hooks/useNotifications';
+import { supabaseCloud } from '../config/supabaseCloud';
+import AnimatedCounter from '../components/AnimatedCounter';
 import { useProductContext } from '../context/ProductContext';
 import { useAuthStore } from '../hooks/store/useAuthStore';
 import ShareInventoryModal from '../components/ShareInventoryModal';
@@ -114,14 +118,77 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
         triggerHaptic?.();
     };
 
-    const handleSaveCloudAccount = () => {
+    const handleSaveCloudAccount = async () => {
         if (!inputEmail.includes('@') || inputPassword.length < 4) {
             showToast('Correo inválido o contraseña muy corta', 'error');
             return;
         }
-        setAdminCredentials(inputEmail, inputPassword);
-        showToast('Credenciales guardadas y seguridad habilitada', 'success');
-        triggerHaptic?.();
+
+        try {
+            setImportStatus('loading');
+            setStatusMessage('Guardando y sincronizando con la nube...');
+            
+            // 1. Recolectar toda la data de la app (IDB y LS)
+            const idbKeys = [
+                'bodega_products_v1', 'my_categories_v1', 
+                'bodega_sales_v1', 'bodega_customers_v1',
+                'bodega_suppliers_v1', 'bodega_supplier_invoices_v1',
+                'bodega_accounts_v2', 'bodega_pending_cart_v1',
+                'payment_methods_v1', 'payment_methods_v2'
+            ];
+            const idbData = {};
+            for (const key of idbKeys) {
+                const data = await storageService.getItem(key, null);
+                if (data !== null) idbData[key] = data;
+            }
+
+            const lsKeys = [
+                'premium_token', 'street_rate_bs', 'catalog_use_auto_usdt', 
+                'catalog_custom_usdt_price', 'catalog_show_cash_price', 
+                'monitor_rates_v12', 'business_name', 'business_rif',
+                'printer_paper_width', 'allow_negative_stock', 'cop_enabled',
+                'auto_cop_enabled', 'tasa_cop', 'bodega_use_auto_rate',
+                'bodega_custom_rate', 'bodega_inventory_view'
+            ];
+            const lsData = {};
+            for (const key of lsKeys) {
+                const val = localStorage.getItem(key);
+                if (val !== null) lsData[key] = val;
+            }
+
+            const backupData = {
+                timestamp: new Date().toISOString(),
+                version: '2.0',
+                appName: 'TasasAlDia_Bodegas_Cloud',
+                data: { idb: idbData, ls: lsData }
+            };
+
+            // 2. Subir a Supabase (usando el correo como clave primaria)
+            if (supabaseCloud) {
+                const { error } = await supabaseCloud
+                    .from('cloud_backups')
+                    .upsert({
+                        email: inputEmail,
+                        password_hash: inputPassword, // En produccion idealmente un hash, o delegarlo a Auth
+                        backup_data: backupData,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'email' });
+
+                if (error) throw error;
+            }
+
+            // 3. Establecer como exitoso localmente
+            setAdminCredentials(inputEmail, inputPassword);
+            showToast('Credenciales guardadas y backup enviado a la nube', 'success');
+            auditLog('NUBE', 'REGISTRO_Y_BACKUP', `Se subio el primer backup a la cuenta: ${inputEmail}`);
+            triggerHaptic?.();
+            setImportStatus(null);
+            
+        } catch (error) {
+            console.error('Error sincronizando con la nube:', error);
+            showToast('Hubo un error subiendo el backup a la nube', 'error');
+            setImportStatus('error');
+        }
     };
 
     const handleExport = async () => {
