@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import {
     ArrowLeft, Store, Printer, Coins, Package, CreditCard, Database,
     Palette, Fingerprint, Upload, Download, Share2, Check, X,
-    AlertTriangle, Copy, Sun, Moon, ChevronRight, Trash2, Users, FileText, Lock
+    AlertTriangle, Copy, Sun, Moon, ChevronRight, Trash2, Users, FileText, Lock,
+    Mail, Eye, EyeOff, CheckCircle2, ShieldCheck
 } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import localforage from 'localforage';
@@ -95,6 +96,12 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const [inputEmail, setInputEmail] = useState(adminEmail || '');
     const [inputPassword, setInputPassword] = useState(adminPassword || '');
     const isCloudConfigured = Boolean(adminEmail && adminPassword);
+    const [isCloudLogin, setIsCloudLogin] = useState(false);
+    
+    // UI states for Auth form
+    const [showPassword, setShowPassword] = useState(false);
+    const [emailError, setEmailError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
 
     // Business Data
     const [businessName, setBusinessName] = useState(() => localStorage.getItem('business_name') || '');
@@ -119,16 +126,63 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     };
 
     const handleSaveCloudAccount = async () => {
-        if (!inputEmail.includes('@') || inputPassword.length < 4) {
-            showToast('Correo inválido o contraseña muy corta', 'error');
+        // Validación estricta UX
+        setEmailError('');
+        setPasswordError('');
+
+        let hasError = false;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        if (!emailRegex.test(inputEmail.trim())) {
+            setEmailError('Formato de correo no válido');
+            hasError = true;
+        }
+
+        // Supabase requiere mínimo 6 caracteres para contraseñas de Auth por defecto
+        if (inputPassword.length < 6) {
+            setPasswordError('Mínimo 6 caracteres para mayor seguridad');
+            hasError = true;
+        }
+
+        if (hasError) {
+            triggerHaptic?.();
             return;
         }
 
         try {
             setImportStatus('loading');
-            setStatusMessage('Guardando y sincronizando con la nube...');
+            setStatusMessage('Autenticando en la nube...');
+
+            // --- 1. Lógica Auth de abasto 2.0 ---
+            if (supabaseCloud) {
+                const emailToUse = inputEmail.trim().toLowerCase();
+                if (isCloudLogin) {
+                    const { data, error: err } = await supabaseCloud.auth.signInWithPassword({
+                        email: emailToUse,
+                        password: inputPassword,
+                    });
+                    if (err) throw new Error('Error al iniciar sesión: ' + err.message);
+                } else {
+                    const { data, error: err } = await supabaseCloud.auth.signUp({
+                        email: emailToUse,
+                        password: inputPassword,
+                        options: {
+                            data: { full_name: businessName || 'Bodega' },
+                        },
+                    });
+                    if (err) {
+                        // Si ya existe, dar mensaje amigable
+                        if (err.message.includes('already registered')) {
+                            throw new Error('Este correo ya está registrado. Selecciona "Entrar".');
+                        }
+                        throw new Error('Error en el registro: ' + err.message);
+                    }
+                }
+            }
+
+            setStatusMessage('Guardando y sincronizando datos locales...');
             
-            // 1. Recolectar toda la data de la app (IDB y LS)
+            // --- 2. Recolectar toda la data de la app ---
             const idbKeys = [
                 'bodega_products_v1', 'my_categories_v1', 
                 'bodega_sales_v1', 'bodega_customers_v1',
@@ -177,16 +231,16 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                 if (error) throw error;
             }
 
-            // 3. Establecer como exitoso localmente
+            // 4. Establecer como exitoso localmente
             setAdminCredentials(inputEmail, inputPassword);
-            showToast('Credenciales guardadas y backup enviado a la nube', 'success');
-            auditLog('NUBE', 'REGISTRO_Y_BACKUP', `Se subio el primer backup a la cuenta: ${inputEmail}`);
+            showToast(isCloudLogin ? 'Sesión iniciada y sincronizada' : 'Cuenta creada y backup enviado', 'success');
+            auditLog('NUBE', isCloudLogin ? 'LOGIN_NUBE' : 'REGISTRO_NUBE', `Sincronización para: ${inputEmail}`);
             triggerHaptic?.();
             setImportStatus(null);
             
         } catch (error) {
             console.error('Error sincronizando con la nube:', error);
-            showToast('Hubo un error subiendo el backup a la nube', 'error');
+            showToast(error.message || 'Hubo un error contactando la nube', 'error');
             setImportStatus('error');
         }
     };
@@ -522,29 +576,90 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="space-y-2 mb-3">
-                                            <input 
-                                                type="email" 
-                                                autoComplete="off"
-                                                placeholder="Correo del administrador"
-                                                value={inputEmail}
-                                                onChange={e => setInputEmail(e.target.value)}
-                                                className="w-full bg-white dark:bg-slate-950 border border-rose-200 dark:border-rose-900/50 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-rose-500/30 transition-all font-medium text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                                            />
-                                            <input 
-                                                type="password" 
-                                                autoComplete="new-password"
-                                                placeholder="Contraseña (Mín. 4 caracteres)"
-                                                value={inputPassword}
-                                                onChange={e => setInputPassword(e.target.value)}
-                                                className="w-full bg-white dark:bg-slate-950 border border-rose-200 dark:border-rose-900/50 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-rose-500/30 transition-all font-medium text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-                                            />
+
+                                        {/* Tabs tipo abasto 2.0 */}
+                                        <div className="flex bg-rose-100/50 dark:bg-slate-900/50 p-1 rounded-xl mb-4 border border-rose-200/50 dark:border-rose-800/20 shadow-inner">
+                                            <button
+                                                type="button"
+                                                onClick={() => { setIsCloudLogin(false); }}
+                                                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-300 ${!isCloudLogin ? 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+                                            >
+                                                Registrar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setIsCloudLogin(true); }}
+                                                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-300 ${isCloudLogin ? 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
+                                            >
+                                                Entrar
+                                            </button>
                                         </div>
+
+                                        <div className="space-y-4 mb-4">
+                                            {/* Correo Field */}
+                                            <div>
+                                                <div className="relative group">
+                                                    <input 
+                                                        type="email" 
+                                                        inputMode="email"
+                                                        placeholder="admin@miabasto.com" 
+                                                        value={inputEmail} 
+                                                        onChange={(e) => {
+                                                            setInputEmail(e.target.value);
+                                                            if (emailError) setEmailError('');
+                                                        }} 
+                                                        className={`w-full bg-white dark:bg-slate-900 border-2 ${emailError ? 'border-rose-400 focus:border-rose-500' : 'border-rose-100 dark:border-rose-900/50 focus:border-rose-400'} rounded-xl px-4 py-3 pl-11 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none transition-all shadow-sm`}
+                                                    />
+                                                    <Mail size={18} className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${emailError ? 'text-rose-500' : 'text-slate-400 group-focus-within:text-rose-500'}`} />
+                                                </div>
+                                                {emailError ? (
+                                                    <p className="text-[10px] text-rose-500 font-bold mt-1.5 ml-1 animate-in slide-in-from-top-1">{emailError}</p>
+                                                ) : (
+                                                    <p className="text-[10px] text-slate-400 mt-1.5 ml-1">Usaremos este correo para identificar tu base de datos</p>
+                                                )}
+                                            </div>
+
+                                            {/* Password Field */}
+                                            <div>
+                                                <div className="relative group">
+                                                    <input 
+                                                        type={showPassword ? 'text' : 'password'}
+                                                        placeholder="Mínimo 6 caracteres" 
+                                                        value={inputPassword} 
+                                                        onChange={(e) => {
+                                                            setInputPassword(e.target.value);
+                                                            if (passwordError) setPasswordError('');
+                                                        }} 
+                                                        className={`w-full bg-white dark:bg-slate-900 border-2 ${passwordError ? 'border-rose-400 focus:border-rose-500' : 'border-rose-100 dark:border-rose-900/50 focus:border-rose-400'} rounded-xl px-4 py-3 pl-11 pr-11 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none transition-all shadow-sm tracking-wide`}
+                                                    />
+                                                    <Lock size={18} className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${passwordError ? 'text-rose-500' : 'text-slate-400 group-focus-within:text-rose-500'}`} />
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setShowPassword(!showPassword)}
+                                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
+                                                    >
+                                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                    </button>
+                                                </div>
+                                                {passwordError ? (
+                                                    <p className="text-[10px] text-rose-500 font-bold mt-1.5 ml-1 animate-in slide-in-from-top-1">{passwordError}</p>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                        
                                         <button 
                                             onClick={handleSaveCloudAccount}
-                                            className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 rounded-xl text-xs active:scale-95 transition-all shadow-sm shadow-rose-500/20"
+                                            disabled={importStatus === 'loading'}
+                                            className="w-full bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-widest active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2 group disabled:opacity-70 disabled:active:scale-100 disabled:cursor-not-allowed"
                                         >
-                                            Guardar Credenciales
+                                            {importStatus === 'loading' ? (
+                                                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                                <>
+                                                    {isCloudLogin ? <ShieldCheck size={16} className="text-white/80" /> : <Upload size={16} className="text-white/80 group-hover:-translate-y-0.5 transition-transform" />}
+                                                    {isCloudLogin ? 'Entrar y Sincronizar' : 'Registrar y Subir'}
+                                                </>
+                                            )}
                                         </button>
                                     </div>
                                 )}
