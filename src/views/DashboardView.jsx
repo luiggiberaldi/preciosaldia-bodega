@@ -17,6 +17,8 @@ import SyncStatus from '../components/SyncStatus';
 import { useProductContext } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import { useSecurity } from '../hooks/useSecurity';
+import { useAuthStore } from '../hooks/store/useAuthStore';
+import { useAudit } from '../hooks/useAudit';
 
 import Skeleton from '../components/Skeleton';
 
@@ -24,6 +26,9 @@ const SALES_KEY = 'bodega_sales_v1';
 export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme, isActive, isDemo, demoTimeLeft }) {
     const { notifyCierrePendiente, requestPermission } = useNotifications();
     const { deviceId } = useSecurity();
+    const usuarioActivo = useAuthStore(s => s.usuarioActivo);
+    const authLogout = useAuthStore(s => s.logout);
+    const { log: auditLog } = useAudit();
     const [sales, setSales] = useState([]);
     const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
@@ -350,6 +355,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         setSales(updatedSales);
         setIsCashReconOpen(false);
         showToast('Cierre de caja completado (Historial conservado)', 'success');
+        auditLog('VENTA', 'CIERRE_CAJA', 'Cierre de caja completado');
     };
 
     if (isLoading) {
@@ -425,11 +431,25 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
                 <div className="flex items-center gap-2">
                     <SyncStatus />
+                    {/* USER BADGE */}
+                    {usuarioActivo && (
+                        <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full pl-3 pr-1 py-1 shadow-sm">
+                            <div className={`w-2 h-2 rounded-full ${usuarioActivo.rol === 'ADMIN' ? 'bg-purple-500' : 'bg-emerald-500'}`} />
+                            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 max-w-[80px] truncate">{usuarioActivo.nombre}</span>
+                            <button
+                                onClick={() => { triggerHaptic(); authLogout(); }}
+                                className="p-1.5 text-slate-400 hover:text-red-500 active:scale-90 transition-all rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
+                                title="Cerrar Sesion"
+                            >
+                                <LockIcon size={14} />
+                            </button>
+                        </div>
+                    )}
                     {/* GEAR ICON FOR SETTINGS */}
                     <button
                         onClick={() => { triggerHaptic(); onNavigate('ajustes'); }}
                         className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-300 rounded-full shadow-sm hover:shadow active:scale-95 transition-all outline-none"
-                        title="Configuración"
+                        title="Configuracion"
                     >
                         <Settings size={22} className="text-slate-700 dark:text-slate-200" />
                     </button>

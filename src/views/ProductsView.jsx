@@ -22,6 +22,8 @@ import SwipeableItem from '../components/SwipeableItem';
 import { useInventoryVelocity } from '../hooks/useInventoryVelocity';
 import { useProductFiltering } from '../hooks/useProductFiltering';
 import { buildProductPayload } from '../utils/productProcessor';
+import { useAuthStore } from '../hooks/store/useAuthStore';
+import { useAudit } from '../hooks/useAudit';
 
 export const ProductsView = ({ rates, triggerHaptic }) => {
     // ─── STATE DEL HOOK ─────────────────────────────────────
@@ -37,6 +39,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         tasaCop,
         adjustStock: baseAdjustStock
     } = useProductContext();
+    const isCajero = useAuthStore(s => s.usuarioActivo)?.rol === 'CAJERO';
+    const { log: auditLog } = useAudit();
 
     // Envolver adjustStock para incluir registro de movimiento + haptic
     const adjustStock = async (productId, delta) => {
@@ -273,6 +277,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
             setProducts(products.map(p =>
                 p.id === editingId ? { ...p, ...productData, image: image || p.image } : p
             ));
+            auditLog('INVENTARIO', 'PRODUCTO_EDITADO', `Producto "${name}" editado`);
         } else {
             setProducts([{
                 id: crypto.randomUUID(),
@@ -280,6 +285,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 image,
                 createdAt: new Date().toISOString()
             }, ...products]);
+            auditLog('INVENTARIO', 'PRODUCTO_CREADO', `Producto "${name}" creado - $${priceUsd || '0'}`);
         }
         handleClose();
     };
@@ -360,7 +366,11 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     const handleDelete = (id) => { triggerHaptic && triggerHaptic(); setDeleteId(id); };
     const confirmDelete = () => {
-        if (deleteId) { setProducts(products.filter(p => p.id !== deleteId)); setDeleteId(null); triggerHaptic && triggerHaptic(); }
+        if (deleteId) {
+            const p = products.find(x => x.id === deleteId);
+            auditLog('INVENTARIO', 'PRODUCTO_ELIMINADO', `Producto "${p?.name || '?'}" eliminado`);
+            setProducts(products.filter(p => p.id !== deleteId)); setDeleteId(null); triggerHaptic && triggerHaptic();
+        }
     };
 
     const handleClose = () => {
@@ -429,7 +439,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                         <h2 className="text-lg sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight truncate">Inventario</h2>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                        {products.length > 0 && (
+                        {products.length > 0 && !isCajero && (
                             <>
                                 <button onClick={() => { triggerHaptic && triggerHaptic(); setIsBulkPriceOpen(true); }}
                                     className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 rounded-xl transition-all active:scale-95" title="Ajuste Masivo de Precios">
@@ -441,11 +451,13 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                 </button>
                             </>
                         )}
+                        {!isCajero && (
                         <button onClick={() => { triggerHaptic && triggerHaptic(); setIsModalOpen(true); }}
                             className="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl shadow-md shadow-brand/20 transition-all active:scale-95 font-bold text-sm" title="Agregar">
                             <Plus size={16} strokeWidth={2.5} />
                             <span className="hidden sm:inline">Nuevo</span>
                         </button>
+                        )}
                     </div>
                 </div>
 
@@ -611,6 +623,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                         onShare={setShareProduct}
                                         onEdit={handleEdit}
                                         onDelete={handleDelete}
+                                        readOnly={isCajero}
                                         daysRemaining={
                                             salesVelocityMap[p.id] > 0 && (p.stock ?? 0) > 0
                                                 ? Math.round((p.stock ?? 0) / salesVelocityMap[p.id])
@@ -637,10 +650,10 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                 <button onClick={() => handleSort('price')} className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
                                     Precio {sortField === 'price' && <ArrowUpDown size={10} />}
                                 </button>
-                                <span>Costo</span>
-                                <button onClick={() => handleSort('margin')} className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                <span>{!isCajero && 'Costo'}</span>
+                                {!isCajero && <button onClick={() => handleSort('margin')} className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
                                     Margen {sortField === 'margin' && <ArrowUpDown size={10} />}
-                                </button>
+                                </button>}
                                 <button onClick={() => handleSort('stock')} className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
                                     Stock {sortField === 'stock' && <ArrowUpDown size={10} />}
                                 </button>
@@ -681,12 +694,15 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                             {/* Mobile: compact actions */}
                                             <div className="flex items-center gap-1.5 sm:hidden">
                                                 <button onClick={() => handlePrintSingle(p)} className="p-1.5 text-slate-300 hover:text-brand transition-colors"><Printer size={14} /></button>
+                                                {!isCajero && (
                                                 <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-lg">
                                                     <button onClick={() => adjustStock(p.id, -1)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"><Minus size={14} /></button>
                                                     <span className={`text-xs font-black min-w-[28px] text-center ${isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>{p.stock ?? 0}</span>
                                                     <button onClick={() => adjustStock(p.id, 1)} className="p-1.5 text-slate-400 hover:text-emerald-500 transition-colors"><Plus size={14} /></button>
                                                 </div>
-                                                <button onClick={() => handleEdit(p)} className="p-1.5 text-slate-300 hover:text-amber-500 transition-colors"><Pencil size={14} /></button>
+                                                )}
+                                                {isCajero && <span className={`text-xs font-black ${isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>{p.stock ?? 0}</span>}
+                                                {!isCajero && <button onClick={() => handleEdit(p)} className="p-1.5 text-slate-300 hover:text-amber-500 transition-colors"><Pencil size={14} /></button>}
                                             </div>
 
                                             {/* Desktop columns */}
@@ -698,24 +714,24 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                                 )}
                                             </div>
                                             <div className="hidden sm:block">
-                                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{p.costUsd ? `$${p.costUsd.toFixed(2)}` : '-'}</p>
+                                                {!isCajero ? <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{p.costUsd ? `$${p.costUsd.toFixed(2)}` : '-'}</p> : <span className="text-[10px] text-slate-300">-</span>}
                                             </div>
                                             <div className="hidden sm:block">
-                                                {margin !== null ? (
+                                                {!isCajero ? (margin !== null ? (
                                                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${margin >= 0 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
                                                         {margin >= 0 ? '+' : ''}{margin.toFixed(0)}%
                                                     </span>
-                                                ) : <span className="text-[10px] text-slate-300">-</span>}
+                                                ) : <span className="text-[10px] text-slate-300">-</span>) : <span className="text-[10px] text-slate-300">-</span>}
                                             </div>
                                             <div className="hidden sm:flex items-center gap-1">
-                                                <button onClick={() => adjustStock(p.id, -1)} className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors active:scale-90"><Minus size={14} /></button>
+                                                {!isCajero && <button onClick={() => adjustStock(p.id, -1)} className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors active:scale-90"><Minus size={14} /></button>}
                                                 <span className={`text-sm font-black min-w-[32px] text-center ${isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>{p.stock ?? 0}</span>
-                                                <button onClick={() => adjustStock(p.id, 1)} className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-colors active:scale-90"><Plus size={14} /></button>
+                                                {!isCajero && <button onClick={() => adjustStock(p.id, 1)} className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-colors active:scale-90"><Plus size={14} /></button>}
                                             </div>
                                             <div className="hidden sm:flex items-center justify-end gap-1">
                                                 <button onClick={() => handlePrintSingle(p)} className="p-1.5 rounded-lg text-slate-300 hover:text-brand hover:bg-brand/10 transition-all" title="Imprimir Etiqueta"><Printer size={14} /></button>
-                                                <button onClick={() => handleEdit(p)} className="p-1.5 rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"><Pencil size={14} /></button>
-                                                <button onClick={() => handleDelete(p.id)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"><Trash2 size={14} /></button>
+                                                {!isCajero && <button onClick={() => handleEdit(p)} className="p-1.5 rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"><Pencil size={14} /></button>}
+                                                {!isCajero && <button onClick={() => handleDelete(p.id)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"><Trash2 size={14} /></button>}
                                             </div>
                                         </div>
                                     );

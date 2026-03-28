@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { X, TrendingUp, TrendingDown, Percent, Check, AlertTriangle } from 'lucide-react';
+import { logEvent } from '../../services/auditService';
+import { useAuthStore } from '../../hooks/store/useAuthStore';
 
 export default function BulkPriceAdjustModal({
     isOpen,
@@ -69,6 +71,8 @@ export default function BulkPriceAdjustModal({
 
             const label = direction === 'up' ? `+${percent}%` : `-${percent}%`;
             showToast && showToast(`Precios ajustados ${label} en ${affectedProducts.length} productos`, 'success');
+            const user = useAuthStore.getState().usuarioActivo;
+            logEvent('INVENTARIO', 'AJUSTE_MASIVO_PRECIOS', `Ajuste masivo ${label} en ${affectedProducts.length} productos (cat: ${selectedCategory})`, user);
 
             setTimeout(() => {
                 setShowSuccess(false);

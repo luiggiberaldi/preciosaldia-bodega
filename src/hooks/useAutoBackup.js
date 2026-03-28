@@ -12,8 +12,9 @@ const CRITICAL_KEYS = [
     'bodega_payment_methods_v1',
     'monitor_rates_v12',
 ];
+import { supabase } from '../core/supabaseClient';
 
-export function useAutoBackup() {
+export function useAutoBackup(isPremium, isDemo, deviceId) {
     const intervalRef = useRef(null);
 
     useEffect(() => {
@@ -38,6 +39,16 @@ export function useAutoBackup() {
                     device: navigator.userAgent?.substring(0, 80),
                 });
 
+                // Si es usuario premium permanente y tiene deviceId, subir el backup a la nube silenciosamente
+                if (isPremium && !isDemo && deviceId) {
+                    await supabase.from('device_backups').upsert({
+                        device_id: deviceId,
+                        product_id: 'bodega',
+                        backup_data: snapshot,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'device_id' });
+                }
+
             } catch (e) {
                 console.error('[AutoBackup] Error:', e);
             }
@@ -53,7 +64,7 @@ export function useAutoBackup() {
             clearTimeout(initialTimer);
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
-    }, []);
+    }, [isPremium, isDemo, deviceId]);
 }
 
 // Restaurar desde backup (para emergencias)

@@ -15,6 +15,7 @@ export default function ProductCard({
     isSelected,
     onToggleSelect,
     onPrint,
+    readOnly = false,
 
     onEdit,
     onDelete
@@ -83,7 +84,7 @@ export default function ProductCard({
                             </p>
                         )}
                     </div>
-                    {margin !== null && (
+                    {!readOnly && margin !== null && (
                         <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${margin >= 0 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
                             {margin >= 0 ? '+' : ''}{margin.toFixed(0)}%
                         </span>
@@ -93,9 +94,11 @@ export default function ProductCard({
                 {/* Stock Control Prominente */}
                 <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">
                     <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-xl p-1">
+                        {!readOnly && (
                         <button onClick={() => onAdjustStock(p.id, -1)} className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-red-500 shadow-sm active:scale-95 transition-all">
                             <Minus size={18} strokeWidth={2.5} />
                         </button>
+                        )}
                         <div className="flex flex-col items-center justify-center px-2 text-center min-w-[50px]">
                             <span className={`text-base font-black leading-none mb-0.5 ${isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>
                                 {p.stock ?? 0}
@@ -105,9 +108,11 @@ export default function ProductCard({
                                 <span className="text-[8px] text-slate-400 leading-none">= {Math.floor((p.stock ?? 0) / p.unitsPerPackage)} lotes</span>
                             )}
                         </div>
+                        {!readOnly && (
                         <button onClick={() => onAdjustStock(p.id, 1)} className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-emerald-500 shadow-sm active:scale-95 transition-all">
                             <Plus size={18} strokeWidth={2.5} />
                         </button>
+                        )}
                     </div>
 
                     {/* Days Remaining Badge */}
@@ -132,8 +137,8 @@ export default function ProductCard({
             {/* Actions */}
             <div className="flex border-t border-slate-100 dark:border-slate-800">
                 <button onClick={onPrint} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-brand hover:bg-brand/10 transition-colors" title="Imprimir Etiqueta"><Printer size={12} /></button>
-                <button onClick={() => onEdit(p)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"><Pencil size={12} /></button>
-                <button onClick={() => onDelete(p.id)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"><Trash2 size={12} /></button>
+                {!readOnly && <button onClick={() => onEdit(p)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"><Pencil size={12} /></button>}
+                {!readOnly && <button onClick={() => onDelete(p.id)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"><Trash2 size={12} /></button>}
             </div>
         </div >
     );

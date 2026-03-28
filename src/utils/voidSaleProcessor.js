@@ -1,4 +1,6 @@
 import { storageService } from './storageService';
+import { logEvent } from '../services/auditService';
+import { useAuthStore } from '../hooks/store/useAuthStore';
 
 const SALES_KEY = 'bodega_sales_v1';
 const CUSTOMERS_KEY = 'bodega_customers_v1';
@@ -55,6 +57,9 @@ export async function processVoidSale(sale, currentSales, currentProducts) {
     // 4. Guardar todo
     await storageService.setItem(SALES_KEY, updatedSales);
     await storageService.setItem(CUSTOMERS_KEY, updatedCustomers);
+
+    const user = useAuthStore.getState().usuarioActivo;
+    logEvent('VENTA', 'VENTA_ANULADA', `Venta #${sale.saleNumber || '?'} anulada - $${sale.totalUsd?.toFixed(2)}`, user, { saleId: sale.id });
 
     return { updatedSales, updatedProducts, updatedCustomers };
 }

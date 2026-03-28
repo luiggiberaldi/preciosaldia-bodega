@@ -1,5 +1,7 @@
 import { storageService } from './storageService';
 import { procesarImpactoCliente } from './financialLogic';
+import { logEvent } from '../services/auditService';
+import { useAuthStore } from '../hooks/store/useAuthStore';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -73,6 +75,11 @@ export async function processSaleTransaction({
     const finalPersistedSale = Object.freeze({ ...sale, saleNumber });
 
     await storageService.setItem(SALES_KEY, [finalPersistedSale, ...existingSales]);
+
+    // Audit log
+    const user = useAuthStore.getState().usuarioActivo;
+    const tipo = fiadoAmountUsd > 0 ? 'VENTA_FIADO' : 'VENTA_COMPLETADA';
+    logEvent('VENTA', tipo, `Venta #${saleNumber} - $${cartTotalUsd.toFixed(2)} - ${cart.length} items - ${selectedCustomer?.name || 'Consumidor Final'}`, user, { saleId: finalPersistedSale.id, total: cartTotalUsd, items: cart.length });
 
     // Deduct stock
     const updatedProducts = products.map(p => {

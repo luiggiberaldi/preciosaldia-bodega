@@ -23,6 +23,10 @@ import { useOfflineQueue } from './hooks/useOfflineQueue';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import CommandPalette from './components/CommandPalette';
 import SpotlightTour from './components/SpotlightTour';
+import LockScreen from './components/security/LockScreen';
+import { useAuthStore } from './hooks/store/useAuthStore';
+import { useAutoLock } from './hooks/useAutoLock';
+import { purgeOldEntries } from './services/auditService';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
@@ -43,9 +47,13 @@ export default function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   const { rates, loading, isOffline, updateData } = useRates();
-  const { isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg } = useSecurity();
+  const { isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg, deviceId } = useSecurity();
   const { isOnline, cacheRates } = useOfflineQueue();
-  useAutoBackup();
+  useAutoBackup(isPremium, isDemo, deviceId);
+  useAutoLock(); // Auto-lock for ADMINs
+
+  // Purge old audit log entries on startup
+  useEffect(() => { purgeOldEntries(); }, []);
 
   // Cache rates whenever they update
   useEffect(() => { if (rates) cacheRates(rates); }, [rates, cacheRates]);
@@ -146,13 +154,24 @@ export default function App() {
     };
   }, []);
 
-  const TABS = [
+  // === AUTH ===
+  const usuarioActivo = useAuthStore(s => s.usuarioActivo);
+  const isCajero = usuarioActivo?.rol === 'CAJERO';
+
+  const ALL_TABS = [
     { id: 'inicio', label: 'Inicio', icon: Home },
     { id: 'ventas', label: 'Vender', icon: ShoppingCart },
     { id: 'catalogo', label: 'Inventario', icon: Store },
     { id: 'clientes', label: 'Contactos', icon: Users },
-    { id: 'reportes', label: 'Reportes', icon: BarChart3 },
+    { id: 'reportes', label: 'Reportes', icon: BarChart3, adminOnly: true },
   ];
+
+  const TABS = isCajero ? ALL_TABS.filter(t => !t.adminOnly) : ALL_TABS;
+
+  // Si no hay sesion activa, mostrar LockScreen
+  if (!usuarioActivo) {
+    return <LockScreen />;
+  }
 
   return (
     <div className="font-sans antialiased bg-slate-50 dark:bg-black h-[100dvh] flex flex-col overflow-clip transition-colors duration-300">

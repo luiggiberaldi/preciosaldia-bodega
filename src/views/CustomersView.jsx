@@ -11,6 +11,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import EmptyState from '../components/EmptyState';
 import SwipeableItem from '../components/SwipeableItem';
 import { useProductContext } from '../context/ProductContext';
+import { useAudit } from '../hooks/useAudit';
 
 // Importaciones de Proveedores
 import SuppliersList from '../components/Suppliers/SuppliersList';
@@ -31,6 +32,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
     const [activePaymentMethods, setActivePaymentMethods] = useState([]);
     const [resetBalanceCustomer, setResetBalanceCustomer] = useState(null);
     const { effectiveRate: bcvRate, tasaCop, copEnabled } = useProductContext();
+    const { log: auditLog } = useAudit();
     const [expandedHistory, setExpandedHistory] = useState(null);
     const [historyData, setHistoryData] = useState([]);
     // Modales de Clientes
@@ -112,9 +114,11 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
         if (editingSupplier) {
             updated = suppliers.map(s => s.id === supplierData.id ? supplierData : s);
             showToast('Proveedor actualizado', 'success');
+            auditLog('PROVEEDOR', 'PROVEEDOR_EDITADO', `Proveedor "${supplierData.name}" actualizado`);
         } else {
             updated = [...suppliers, supplierData];
             showToast('Proveedor agregado', 'success');
+            auditLog('PROVEEDOR', 'PROVEEDOR_CREADO', `Proveedor "${supplierData.name}" creado`);
         }
         await saveSuppliers(updated);
         setIsAddSupplierModalOpen(false);
@@ -154,6 +158,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
         }
         setIsAddInvoiceModalOpen(false);
         showToast('Factura registrada', 'success');
+        auditLog('PROVEEDOR', 'FACTURA_REGISTRADA', `Factura $${invoiceData.amountUsd?.toFixed(2)} - ${suppliers.find(s => s.id === invoiceData.supplierId)?.name || '?'}`);
         refreshSupplierHistory(invoiceData.supplierId);
     };
 
@@ -199,6 +204,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
 
         setIsPayInvoiceModalOpen(false);
         showToast('Pago registrado correctamente', 'success');
+        auditLog('PROVEEDOR', 'PAGO_PROVEEDOR', `Pago $${amountUsd.toFixed(2)} a ${supplier.name}`);
         refreshSupplierHistory(supplier.id);
     };
 
@@ -234,6 +240,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
         const newCustomers = customers.map(c => c.id === customer.id ? updatedCustomer : c);
         await saveCustomers(newCustomers);
         showToast(`Saldo reiniciado a cero para ${customer.name}`, 'success');
+        auditLog('CLIENTE', 'DEUDA_CONDONADA', `Saldo reiniciado a $0 para ${customer.name}`);
         setResetBalanceCustomer(null);
     };
 
@@ -254,6 +261,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
 
         await saveCustomers(newCustomers);
         showToast(`Operación de ${transactionModal.type} exitosa`, 'success');
+        auditLog('CLIENTE', transactionModal.type === 'ABONO' ? 'ABONO_REGISTRADO' : 'CREDITO_REGISTRADO', `${transactionModal.type} de ${transactionAmount} ${currencyMode} para ${transactionModal.customer?.name}`);
 
         // Cerrar modal
         setTransactionModal({ isOpen: false, type: null, customer: null });
@@ -481,6 +489,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                         onSave={async (newC) => {
                             const updated = [...customers, newC];
                             await saveCustomers(updated);
+                            auditLog('CLIENTE', 'CLIENTE_CREADO', `Cliente "${newC.name}" creado`);
                             setIsAddModalOpen(false);
                         }}
                     />
@@ -562,6 +571,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                     const updated = customers.filter(c => c.id !== deleteCustomerTarget.id);
                     await saveCustomers(updated);
                     showToast(`Cliente ${deleteCustomerTarget.name} eliminado`, 'success');
+                    auditLog('CLIENTE', 'CLIENTE_ELIMINADO', `Cliente "${deleteCustomerTarget.name}" eliminado`);
                     setDeleteCustomerTarget(null);
                 }}
                 title="Eliminar cliente"
