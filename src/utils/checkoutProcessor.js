@@ -2,6 +2,7 @@ import { storageService } from './storageService';
 import { procesarImpactoCliente } from './financialLogic';
 import { logEvent } from '../services/auditService';
 import { useAuthStore } from '../hooks/store/useAuthStore';
+import { round2, sumR, subR } from './dinero';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -24,9 +25,11 @@ export async function processSaleTransaction({
     if (cart.length === 0) return { success: false, error: 'Carrito vacío' };
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
-    const totalPaidUsd = payments.reduce((acc, p) => acc + p.amountUsd, 0);
-    const remainingUsd = Math.max(0, Math.round((cartTotalUsd - totalPaidUsd) * 100) / 100);
-    const changeUsd = Math.max(0, Math.round((totalPaidUsd - cartTotalUsd) * 100) / 100);
+
+    // ── Aritmética precisa con dinero.js (elimina IEEE 754 drift) ──
+    const totalPaidUsd = sumR(payments.map(p => p.amountUsd));
+    const remainingUsd = round2(Math.max(0, subR(cartTotalUsd, totalPaidUsd)));
+    const changeUsd    = round2(Math.max(0, subR(totalPaidUsd, cartTotalUsd)));
 
     if (!selectedCustomer && remainingUsd > 0.01) {
         return { success: false, error: 'Se requiere cliente para ventas fiadas' };
@@ -41,30 +44,48 @@ export async function processSaleTransaction({
     }
 
     const fiadoAmountUsd = remainingUsd > 0.01 ? remainingUsd : 0;
+
+    // ── Normalizar payments: asegurar currency y methodLabel ──
+    // Esto permite que el FinancialEngine calcule el breakdown correctamente
+    // sin depender de campos que podían llegar undefined en versiones anteriores.
+    const normalizedPayments = payments.map(p => ({
+        ...p,
+        currency:    p.currency    || 'USD',
+        methodLabel: p.methodLabel || p.methodId,
+    }));
+
     const sale = {
         id: crypto.randomUUID(),
         tipo: fiadoAmountUsd > 0 ? 'VENTA_FIADA' : 'VENTA',
         status: 'COMPLETADA',
-        items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, costUsd: i.costUsd || 0, isWeight: i.isWeight })),
+        items: cart.map(i => ({
+            id: i.id,
+            name: i.name,
+            qty: i.qty,
+            priceUsd: i.priceUsd,
+            costBs: i.costBs || 0,
+            costUsd: i.costUsd || 0,
+            isWeight: i.isWeight
+        })),
         cartSubtotalUsd: cartSubtotalUsd,
-        discountType: discountData?.type || null,
-        discountValue: discountData?.value || 0,
-        discountAmountUsd: discountData?.amountUsd || 0,
-        totalUsd: cartTotalUsd,
-        totalBs: cartTotalBs,
-        totalCop: copEnabled && tasaCop > 0 ? cartTotalUsd * tasaCop : 0,
-        payments,
-        rate: effectiveRate,
-        tasaCop: copEnabled ? tasaCop : 0,
+        discountType:       discountData?.type      || null,
+        discountValue:      discountData?.value     || 0,
+        discountAmountUsd:  discountData?.amountUsd || 0,
+        totalUsd:  cartTotalUsd,
+        totalBs:   cartTotalBs,
+        totalCop:  copEnabled && tasaCop > 0 ? round2(cartTotalUsd * tasaCop) : 0,
+        payments:  normalizedPayments,          // ← Con currency + methodLabel
+        rate:      effectiveRate,
+        tasaCop:   copEnabled ? tasaCop : 0,
         copEnabled: copEnabled,
         rateSource: useAutoRate ? 'BCV Auto' : 'Manual',
         timestamp: new Date().toISOString(),
-        changeUsd: fiadoAmountUsd > 0 ? 0 : (changeBreakdown?.changeUsdGiven || 0),
-        changeBs: fiadoAmountUsd > 0 ? 0 : (changeBreakdown?.changeBsGiven || 0),
-        customerId: selectedCustomerId || null,
-        customerName: selectedCustomer ? selectedCustomer.name : 'Consumidor Final',
+        changeUsd: fiadoAmountUsd > 0 ? 0 : round2(changeBreakdown?.changeUsdGiven || 0),
+        changeBs:  fiadoAmountUsd > 0 ? 0 : round2(changeBreakdown?.changeBsGiven  || 0),
+        customerId:       selectedCustomerId || null,
+        customerName:     selectedCustomer ? selectedCustomer.name : 'Consumidor Final',
         customerDocument: selectedCustomer?.documentId || null,
-        customerPhone: selectedCustomer?.phone || null,
+        customerPhone:    selectedCustomer?.phone      || null,
         fiadoUsd: fiadoAmountUsd
     };
 
@@ -79,14 +100,18 @@ export async function processSaleTransaction({
     // Audit log
     const user = useAuthStore.getState().usuarioActivo;
     const tipo = fiadoAmountUsd > 0 ? 'VENTA_FIADO' : 'VENTA_COMPLETADA';
-    logEvent('VENTA', tipo, `Venta #${saleNumber} - $${cartTotalUsd.toFixed(2)} - ${cart.length} items - ${selectedCustomer?.name || 'Consumidor Final'}`, user, { saleId: finalPersistedSale.id, total: cartTotalUsd, items: cart.length });
+    logEvent('VENTA', tipo,
+        `Venta #${saleNumber} - $${cartTotalUsd.toFixed(2)} - ${cart.length} items - ${selectedCustomer?.name || 'Consumidor Final'}`,
+        user,
+        { saleId: finalPersistedSale.id, total: cartTotalUsd, items: cart.length }
+    );
 
-    // Deduct stock
+    // ── Deducir stock con precisión ──
     const updatedProducts = products.map(p => {
         const cartItemsForThisProduct = cart.filter(i => (i._originalId || i.id) === p.id);
         if (cartItemsForThisProduct.length > 0) {
             const totalDeducted = cartItemsForThisProduct.reduce((sum, item) => {
-                if (item.isWeight) return sum + item.qty;
+                if (item.isWeight)        return sum + item.qty;
                 if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
                 return sum + item.qty;
             }, 0);
@@ -98,25 +123,24 @@ export async function processSaleTransaction({
         return p;
     });
 
-    // Persist updated stock to disk
     await storageService.setItem('bodega_products_v1', updatedProducts);
-
 
     let updatedCustomer = null;
     let updatedCustomers = customers;
 
-    // Update customer debt via centralized logic
     if (selectedCustomer) {
-        const amount_favor_used = payments.filter(p => p.methodId === 'saldo_favor').reduce((sum, p) => sum + p.amountUsd, 0);
+        const amount_favor_used = normalizedPayments
+            .filter(p => p.methodId === 'saldo_favor')
+            .reduce((sum, p) => sum + p.amountUsd, 0);
 
         const transaccionOpts = {
-            usaSaldoFavor: amount_favor_used,
-            esCredito: fiadoAmountUsd > 0.009,
-            deudaGenerada: fiadoAmountUsd,
+            usaSaldoFavor:    amount_favor_used,
+            esCredito:        fiadoAmountUsd > 0.009,
+            deudaGenerada:    fiadoAmountUsd,
             vueltoParaMonedero: 0
         };
 
-        updatedCustomer = procesarImpactoCliente(selectedCustomer, transaccionOpts);
+        updatedCustomer  = procesarImpactoCliente(selectedCustomer, transaccionOpts);
         updatedCustomers = customers.map(c => c.id === selectedCustomer.id ? updatedCustomer : c);
 
         await storageService.setItem('bodega_customers_v1', updatedCustomers);

@@ -92,6 +92,8 @@ export const storageService = {
     async setItem(key, value) {
         try {
             await localforage.setItem(key, value);
+            // Anti-zombie: purgar localStorage para que el fallback nunca resucite datos viejos
+            localStorage.removeItem(key);
             if (typeof window !== "undefined") {
                 window.dispatchEvent(new CustomEvent("app_storage_update", { detail: { key } }));
             }

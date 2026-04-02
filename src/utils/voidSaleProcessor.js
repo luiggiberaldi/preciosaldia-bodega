@@ -57,6 +57,7 @@ export async function processVoidSale(sale, currentSales, currentProducts) {
     // 4. Guardar todo
     await storageService.setItem(SALES_KEY, updatedSales);
     await storageService.setItem(CUSTOMERS_KEY, updatedCustomers);
+    await storageService.setItem('bodega_products_v1', updatedProducts);
 
     const user = useAuthStore.getState().usuarioActivo;
     logEvent('VENTA', 'VENTA_ANULADA', `Venta #${sale.saleNumber || '?'} anulada - $${sale.totalUsd?.toFixed(2)}`, user, { saleId: sale.id });
