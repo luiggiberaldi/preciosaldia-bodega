@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Moon, Sun, BarChart3, WifiOff, X } from 'lucide-react';
 
 import SalesView from './views/SalesView';
 import DashboardView from './views/DashboardView';
 import { ProductsView } from './views/ProductsView';
 import SettingsView from './views/SettingsView';
-import ResetPasswordView from './views/ResetPasswordView';
+// ResetPasswordView removed - single-user app
 
 // Lazy-loaded views (no se usan al inicio)
 const CustomersView = lazy(() => import('./views/CustomersView'));
@@ -18,15 +18,12 @@ import { ProductProvider } from './context/ProductContext';
 import { CartProvider } from './context/CartContext';
 import PremiumGuard from './components/security/PremiumGuard';
 import TermsOverlay from './components/TermsOverlay';
-import OnboardingOverlay from './components/OnboardingOverlay';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useOfflineQueue } from './hooks/useOfflineQueue';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import CommandPalette from './components/CommandPalette';
-import SpotlightTour from './components/SpotlightTour';
-import LockScreen from './components/security/LockScreen';
+// LockScreen and useAutoLock removed - single-user app
 import { useAuthStore } from './hooks/store/useAuthStore';
-import { useAutoLock } from './hooks/useAutoLock';
 import { purgeOldEntries } from './services/auditService';
 import { useCloudSync } from './hooks/useCloudSync';
 import { supabaseCloud } from './config/supabaseCloud';
@@ -35,13 +32,18 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showIOSInstall, setShowIOSInstall] = useState(false);
+  const [mountedViews, setMountedViews] = useState({});
+
+  useEffect(() => {
+    setMountedViews(prev => ({...prev, [activeTab]: true}));
+  }, [activeTab]);
 
   // Inicializar Sincronización Realtime con Supabase
   useCloudSync();
 
   // Detectar iOS Safari (no standalone) para mostrar instrucciones manuales
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const isIOS = useMemo(() => /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream, []);
+  const isStandalone = useMemo(() => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone, []);
   const showIOSButton = isIOS && !isStandalone && !localStorage.getItem('ios_install_dismissed');
 
   // Admin Panel States
@@ -52,11 +54,13 @@ export default function App() {
   
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
+  const lastClickTimeRef = useRef(0);
+
   const { rates, loading, isOffline, updateData } = useRates();
   const { isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg, deviceId } = useSecurity();
   const { isOnline, cacheRates } = useOfflineQueue();
   useAutoBackup(isPremium, isDemo, deviceId);
-  useAutoLock(); // Auto-lock for ADMINs
+  // Auto-lock removed - single-user app
 
   // Purge old audit log entries on startup
   useEffect(() => { purgeOldEntries(); }, []);
@@ -77,15 +81,6 @@ export default function App() {
     if (outcome === 'accepted') setInstallPrompt(null);
   };
 
-  const [tourDone, setTourDone] = useState(
-    () => localStorage.getItem('pda_spotlight_done') === 'true'
-  );
-  
-  const SPOTLIGHT_STEPS = [
-    { target: '[data-tour="tab-ventas"]', title: 'Empieza a vender', text: 'Toca aquí para ir al Punto de Venta. Podrás cobrar en Bolívares o Dólares fácilmente.' },
-    { target: '[data-tour="tab-catalogo"]', title: 'Tu Inventario', text: 'Aquí podrás agregar y gestionar todos tus productos. Configura precios y cantidades.' },
-    { target: null, title: 'Búsqueda Global', text: 'Usa el atajo (Ctrl + K) o presiona ESC en cualquier momento para abrir el buscador rápido.' }
-  ];
 
   // Theme
   const [theme, setTheme] = useState(() => {
@@ -120,12 +115,12 @@ export default function App() {
   // Admin Panel Logic (Hidden — 10 clicks on top-left corner)
   const handleLogoClick = () => {
     const now = Date.now();
-    if (window.lastClickTime && (now - window.lastClickTime > 1000)) {
+    if (lastClickTimeRef.current && (now - lastClickTimeRef.current > 1000)) {
       setAdminClicks(1);
     } else {
       setAdminClicks(prev => prev + 1);
     }
-    window.lastClickTime = now;
+    lastClickTimeRef.current = now;
 
     if (adminClicks + 1 >= 10) {
       setShowAdminPanel(true);
@@ -160,41 +155,17 @@ export default function App() {
     };
   }, []);
 
-  // === Auth — condiciones para mostrar pantalla de PIN ===
-  const usuarioActivo = useAuthStore(s => s.usuarioActivo);
-  const requireLogin = useAuthStore(s => s.requireLogin ?? false);
-  const adminEmail = useAuthStore(s => s.adminEmail);
-  const adminPassword = useAuthStore(s => s.adminPassword);
-
-  const isCajero = usuarioActivo?.rol === 'CAJERO';
-  const isCloudConfigured = Boolean(adminEmail && adminPassword);
-  // El PIN solo bloquea si requireLogin está activado Y hay cuenta cloud registrada
-  const pinLoginEnabled = requireLogin && isCloudConfigured;
-
-  // Auto-login: cuando el PIN no aplica y no hay sesión, restaurar el admin local
-  // automáticamente. useEffect corre antes del primer paint visible → sin flash.
-  useEffect(() => {
-    if (!pinLoginEnabled && !usuarioActivo) {
-      const admins = useAuthStore.getState().usuarios.filter(u => u.rol === 'ADMIN');
-      if (admins.length > 0) {
-        useAuthStore.setState({ usuarioActivo: admins[0] });
-      }
-    }
-  }, [pinLoginEnabled, usuarioActivo]);
+  // === Single-user mode: owner is always admin ===
+  const isCajero = false;
 
   const ALL_TABS = [
     { id: 'inicio', label: 'Inicio', icon: Home },
     { id: 'ventas', label: 'Vender', icon: ShoppingCart },
     { id: 'catalogo', label: 'Inventario', icon: Store },
     { id: 'clientes', label: 'Contactos', icon: Users },
-    { id: 'reportes', label: 'Reportes', icon: BarChart3, adminOnly: true },
+    { id: 'reportes', label: 'Reportes', icon: BarChart3 },
   ];
-  const TABS = isCajero ? ALL_TABS.filter(t => !t.adminOnly) : ALL_TABS;
-
-  // Guard: si el PIN aplica y no hay sesión → pantalla de bloqueo
-  if (!usuarioActivo && pinLoginEnabled) return <LockScreen />;
-  // Guard: sin PIN y sin sesión → null mientras el useEffect restaura al admin (imperceptible, <1 frame)
-  if (!usuarioActivo) return null;
+  const TABS = ALL_TABS;
 
   return (
     <div className="font-sans antialiased bg-slate-50 dark:bg-black h-[100dvh] flex flex-col overflow-clip transition-colors duration-300">
@@ -202,8 +173,6 @@ export default function App() {
       {/* Terms and Conditions Overlay (First Use) */}
       <TermsOverlay />
 
-      {/* Tutorial Onboarding (First Use, after Terms) */}
-      <OnboardingOverlay isPremium={isPremium} />
 
       {/* Offline Banner */}
       {!isOnline && (
@@ -218,16 +187,6 @@ export default function App() {
 
 
 
-      {/* Tour Spotlight */}
-      {!tourDone && (
-         <SpotlightTour 
-            steps={SPOTLIGHT_STEPS} 
-            onComplete={() => {
-                localStorage.setItem('pda_spotlight_done', 'true');
-                setTourDone(true);
-            }} 
-         />
-      )}
 
       {/* Demo Expired Modal */}
       {demoExpiredMsg && (
@@ -301,7 +260,7 @@ export default function App() {
 
         {/* Lazy views — mount on first access, then stay persistent */}
         <Suspense fallback={<div className="flex-1 p-4 space-y-4"><div className="skeleton h-10 w-40" /><div className="skeleton h-32" /><div className="skeleton h-48" /></div>}>
-          {(activeTab === 'clientes' || document.querySelector('[data-view="clientes"]')) && (
+          {(activeTab === 'clientes' || mountedViews.clientes) && (
             <div data-view="clientes" className={`flex-1 flex flex-col ${activeTab === 'clientes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
                 <PremiumGuard featureName="Gestión de Clientes">
@@ -310,7 +269,7 @@ export default function App() {
               </ErrorBoundary>
             </div>
           )}
-          {(activeTab === 'reportes' || document.querySelector('[data-view="reportes"]')) && (
+          {(activeTab === 'reportes' || mountedViews.reportes) && (
             <div data-view="reportes" className={`flex-1 flex flex-col ${activeTab === 'reportes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
                 <PremiumGuard featureName="Reportes Históricos">

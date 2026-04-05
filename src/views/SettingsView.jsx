@@ -9,7 +9,7 @@ import { storageService } from '../utils/storageService';
 import localforage from 'localforage';
 import { showToast } from '../components/Toast';
 import PaymentMethodsManager from '../components/Settings/PaymentMethodsManager';
-import UsersManager from '../components/Settings/UsersManager';
+// UsersManager removed - single-user app
 import AuditLogViewer from '../components/Settings/AuditLogViewer';
 import { useSecurity } from '../hooks/useSecurity';
 import { generateDailyClosePDF } from '../utils/dailyCloseGenerator';
@@ -22,7 +22,7 @@ import ShareInventoryModal from '../components/ShareInventoryModal';
 import { useAudit } from '../hooks/useAudit';
 import SettingsTabNegocio from '../components/Settings/tabs/SettingsTabNegocio';
 import SettingsTabVentas from '../components/Settings/tabs/SettingsTabVentas';
-import SettingsTabUsuarios from '../components/Settings/tabs/SettingsTabUsuarios';
+// SettingsTabUsuarios removed - single-user app
 import SettingsTabSistema from '../components/Settings/tabs/SettingsTabSistema';
 
 
@@ -66,7 +66,6 @@ function SectionCard({ icon: Icon, title, subtitle, iconColor = 'text-slate-500'
 const TABS = [
     { id: 'negocio', label: 'Negocio', icon: Store },
     { id: 'ventas', label: 'Ventas', icon: CreditCard },
-    { id: 'usuarios', label: 'Usuarios', icon: Users, adminOnly: true },
     { id: 'sistema', label: 'Sistema', icon: Database },
 ];
 
@@ -80,9 +79,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
         tasaCop: calculatedTasaCop
     } = useProductContext();
 
-    const isAdmin = useAuthStore(s => s.usuarioActivo)?.rol === 'ADMIN';
-    const requireLogin = useAuthStore(s => s.requireLogin ?? false);
-    const setRequireLogin = useAuthStore(s => s.setRequireLogin);
+    const isAdmin = true; // Single-user mode: owner is always admin
     const adminEmail = useAuthStore(s => s.adminEmail);
     const adminPassword = useAuthStore(s => s.adminPassword);
     const setAdminCredentials = useAuthStore(s => s.setAdminCredentials);
@@ -121,17 +118,14 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const [businessRif, setBusinessRif] = useState(() => localStorage.getItem('business_rif') || '');
     const [paperWidth, setPaperWidth] = useState(() => localStorage.getItem('printer_paper_width') || '58');
     const [allowNegativeStock, setAllowNegativeStock] = useState(() => localStorage.getItem('allow_negative_stock') === 'true');
-    const [autoLockMinutes, setAutoLockMinutes] = useState(() => localStorage.getItem('admin_auto_lock_minutes') || '3');
 
-    // Filter tabs based on role
-    const visibleTabs = TABS.filter(t => !t.adminOnly || isAdmin);
+    const visibleTabs = TABS;
 
     // ─── HANDLERS ─────────────────────────────────────────
     const handleSaveBusinessData = () => {
         localStorage.setItem('business_name', businessName);
         localStorage.setItem('business_rif', businessRif);
         localStorage.setItem('printer_paper_width', paperWidth);
-        localStorage.setItem('admin_auto_lock_minutes', autoLockMinutes);
         forceHeartbeat();
         showToast('Datos del negocio guardados', 'success');
         auditLog('CONFIG', 'NEGOCIO_ACTUALIZADO', `Datos negocio: ${businessName || 'sin nombre'}`);
@@ -800,29 +794,6 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                         <SettingsTabVentas
                             allowNegativeStock={allowNegativeStock} setAllowNegativeStock={setAllowNegativeStock}
                             forceHeartbeat={forceHeartbeat}
-                            showToast={showToast}
-                            triggerHaptic={triggerHaptic}
-                        />
-                    )}
-
-                    {/* ═══ TAB: USUARIOS ═══ */}
-                    {activeTab === 'usuarios' && isAdmin && (
-                        <SettingsTabUsuarios
-                            isCloudConfigured={isCloudConfigured} adminEmail={adminEmail}
-                            requireLogin={requireLogin} setRequireLogin={setRequireLogin}
-                            autoLockMinutes={autoLockMinutes} setAutoLockMinutes={setAutoLockMinutes}
-                            importStatus={importStatus} statusMessage={statusMessage}
-                            isCloudLogin={isCloudLogin} setIsCloudLogin={setIsCloudLogin}
-                            inputPhone={inputPhone} setInputPhone={setInputPhone}
-                            inputEmail={inputEmail} setInputEmail={setInputEmail}
-                            emailError={emailError} setEmailError={setEmailError}
-                            inputPassword={inputPassword} setInputPassword={setInputPassword}
-                            passwordError={passwordError} setPasswordError={setPasswordError}
-                            showPassword={showPassword} setShowPassword={setShowPassword}
-                            isRecoveringPassword={isRecoveringPassword} setIsRecoveringPassword={setIsRecoveringPassword}
-                            handleSaveCloudAccount={handleSaveCloudAccount}
-                            handleResetPasswordRequest={handleResetPasswordRequest}
-                            setAdminCredentials={setAdminCredentials}
                             showToast={showToast}
                             triggerHaptic={triggerHaptic}
                         />
