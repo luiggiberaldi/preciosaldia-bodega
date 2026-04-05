@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, ChevronRight, DollarSign, Wallet, CheckCircle2, AlertTriangle, TrendingUp, ShoppingBag, Package, ArrowRight, Coins } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentIcon, toTitleCase } from '../../config/paymentMethods';
+import { round2, subR, mulR } from '../../utils/dinero';
 
 export default function CierreCajaWizard({
     isOpen,
@@ -31,12 +32,12 @@ export default function CierreCajaWizard({
     const expectedBs = paymentBreakdown['efectivo_bs']?.total || 0;
     const expectedCop = paymentBreakdown['efectivo_cop']?.total || 0;
 
-    const declaredUsd = parseFloat(actualUsd) || 0;
-    const declaredBs = parseFloat(actualBs) || 0;
-    const declaredCop = parseFloat(actualCop) || 0;
-    const diffUsd = declaredUsd - expectedUsd;
-    const diffBs = declaredBs - expectedBs;
-    const diffCop = declaredCop - expectedCop;
+    const declaredUsd = round2(parseFloat(actualUsd) || 0);
+    const declaredBs = round2(parseFloat(actualBs) || 0);
+    const declaredCop = round2(parseFloat(actualCop) || 0);
+    const diffUsd = subR(declaredUsd, expectedUsd);
+    const diffBs = subR(declaredBs, expectedBs);
+    const diffCop = subR(declaredCop, expectedCop);
 
     // Check if there were any COP transactions today
     const hasCopTransactions = copEnabled && (
@@ -45,7 +46,7 @@ export default function CierreCajaWizard({
     );
 
     // Total COP del dia (sum of all COP-currency payments)
-    const todayTotalCop = copEnabled && tasaCop > 0 ? todayTotalUsd * tasaCop : 0;
+    const todayTotalCop = copEnabled && tasaCop > 0 ? mulR(todayTotalUsd, tasaCop) : 0;
 
     // Semaforo
     const absDiffUsd = Math.abs(diffUsd);

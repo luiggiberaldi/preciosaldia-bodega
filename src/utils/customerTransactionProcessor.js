@@ -1,25 +1,32 @@
 import { storageService } from './storageService';
 import { procesarImpactoCliente } from './financialLogic';
+import { divR, mulR, round2 } from './dinero';
 
 /**
  * Procesa la lógica de abonar o endeudar a un cliente desde el TransactionModal.
  * Guarda en `bodega_customers_v1` y añade un registro en `bodega_sales_v1`.
  */
 export async function processCustomerTransaction({
-    transactionAmount, 
-    currencyMode, 
-    type, 
-    customer, 
-    paymentMethod, 
-    bcvRate, 
-    tasaCop, 
+    transactionAmount,
+    currencyMode,
+    type,
+    customer,
+    paymentMethod,
+    bcvRate,
+    tasaCop,
     copEnabled
 }) {
     // 1. Convert to float and USD
     const rawAmount = parseFloat(transactionAmount);
+    if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+        return { error: 'Monto inválido' };
+    }
     let amountUsd = rawAmount;
-    if (currencyMode === 'BS' && bcvRate > 0) amountUsd = rawAmount / bcvRate;
-    if (currencyMode === 'COP' && tasaCop > 0) amountUsd = rawAmount / tasaCop;
+    if (currencyMode === 'BS' && bcvRate > 0) amountUsd = divR(rawAmount, bcvRate);
+    if (currencyMode === 'COP') {
+        if (!tasaCop || tasaCop <= 0) return { error: 'Tasa COP no configurada' };
+        amountUsd = divR(rawAmount, tasaCop);
+    }
 
     // 2. Financial quadrant logic
     let transaccionOpts = {};
@@ -38,15 +45,19 @@ export async function processCustomerTransaction({
 
     // 4. Update sales storage
     const sales = await storageService.getItem('bodega_sales_v1', []);
-    const totalEnBs = currencyMode === 'BS' ? rawAmount : (rawAmount * bcvRate);
+    const nextSaleNumber = sales.reduce((mx, s) => Math.max(mx, s.saleNumber || 0), 0) + 1;
+    const totalEnBs = currencyMode === 'BS' ? rawAmount : mulR(rawAmount, bcvRate);
     const totalEnUsd = amountUsd;
-    const totalEnCop = currencyMode === 'COP' ? rawAmount : (amountUsd * tasaCop);
+    const totalEnCop = currencyMode === 'COP' ? rawAmount : mulR(amountUsd, tasaCop);
 
     if (type === 'ABONO') {
         const cobroRecord = {
             id: crypto.randomUUID(),
             timestamp: new Date().toISOString(),
             tipo: 'COBRO_DEUDA',
+            saleNumber: nextSaleNumber,
+            rate: bcvRate,
+            status: 'COMPLETADA',
             clienteId: customer.id,
             clienteName: customer.name,
             totalBs: totalEnBs,
@@ -63,12 +74,15 @@ export async function processCustomerTransaction({
             }],
             items: [{ name: `Abono de deuda: ${customer.name}`, qty: 1, priceUsd: totalEnUsd, costBs: 0 }]
         };
-        sales.push(cobroRecord);
+        sales.unshift(cobroRecord);
     } else if (type === 'CREDITO') {
         const fiadoRecord = {
             id: crypto.randomUUID(),
             timestamp: new Date().toISOString(),
             tipo: 'VENTA_FIADA',
+            saleNumber: nextSaleNumber,
+            rate: bcvRate,
+            status: 'COMPLETADA',
             clienteId: customer.id,
             clienteName: customer.name,
             totalBs: totalEnBs,
@@ -77,7 +91,7 @@ export async function processCustomerTransaction({
             fiadoUsd: totalEnUsd,
             items: [{ name: `Credito manual: ${customer.name}`, qty: 1, priceUsd: totalEnUsd, costBs: 0 }]
         };
-        sales.push(fiadoRecord);
+        sales.unshift(fiadoRecord);
     }
 
     await storageService.setItem('bodega_sales_v1', sales);

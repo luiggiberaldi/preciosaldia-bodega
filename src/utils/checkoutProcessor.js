@@ -2,7 +2,7 @@ import { storageService } from './storageService';
 import { procesarImpactoCliente } from './financialLogic';
 import { logEvent } from '../services/auditService';
 import { useAuthStore } from '../hooks/store/useAuthStore';
-import { round2, sumR, subR } from './dinero';
+import { round2, sumR, subR, divR, mulR } from './dinero';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -26,6 +26,13 @@ export async function processSaleTransaction({
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
+    if (isNaN(cartTotalUsd) || cartTotalUsd < 0 || isNaN(cartTotalBs) || cartTotalBs < 0) {
+        return { success: false, error: 'Integridad matemática comprometida' };
+    }
+    if (cartTotalUsd <= 0.01) {
+        return { success: false, error: 'No se pueden generar ventas de $0.00' };
+    }
+
     // ── Aritmética precisa con dinero.js (elimina IEEE 754 drift) ──
     const totalPaidUsd = sumR(payments.map(p => p.amountUsd));
     const remainingUsd = round2(Math.max(0, subR(cartTotalUsd, totalPaidUsd)));
@@ -33,14 +40,6 @@ export async function processSaleTransaction({
 
     if (!selectedCustomer && remainingUsd > 0.01) {
         return { success: false, error: 'Se requiere cliente para ventas fiadas' };
-    }
-
-    if (isNaN(cartTotalUsd) || cartTotalUsd < 0 || isNaN(totalPaidUsd) || totalPaidUsd < 0) {
-        return { success: false, error: 'Integridad matemática comprometida' };
-    }
-
-    if (cartTotalUsd <= 0.01) {
-        return { success: false, error: 'No se pueden generar ventas de $0.00' };
     }
 
     const fiadoAmountUsd = remainingUsd > 0.01 ? remainingUsd : 0;
@@ -73,7 +72,7 @@ export async function processSaleTransaction({
         discountAmountUsd:  discountData?.amountUsd || 0,
         totalUsd:  cartTotalUsd,
         totalBs:   cartTotalBs,
-        totalCop:  copEnabled && tasaCop > 0 ? round2(cartTotalUsd * tasaCop) : 0,
+        totalCop:  copEnabled && tasaCop > 0 ? mulR(cartTotalUsd, tasaCop) : 0,
         payments:  normalizedPayments,          // ← Con currency + methodLabel
         rate:      effectiveRate,
         tasaCop:   copEnabled ? tasaCop : 0,
@@ -91,65 +90,69 @@ export async function processSaleTransaction({
 
     Object.freeze(sale);
 
-    const existingSales = await storageService.getItem(SALES_KEY, []);
-    const saleNumber = existingSales.reduce((mx, s) => Math.max(mx, s.saleNumber || 0), 0) + 1;
-    const finalPersistedSale = Object.freeze({ ...sale, saleNumber });
+    const lockResult = await navigator.locks.request('pos_write_lock', async () => {
+        const existingSales = await storageService.getItem(SALES_KEY, []);
+        const saleNumber = existingSales.reduce((mx, s) => Math.max(mx, s.saleNumber || 0), 0) + 1;
+        const finalPersistedSale = Object.freeze({ ...sale, saleNumber });
 
-    await storageService.setItem(SALES_KEY, [finalPersistedSale, ...existingSales]);
+        await storageService.setItem(SALES_KEY, [finalPersistedSale, ...existingSales]);
 
-    // Audit log
-    const user = useAuthStore.getState().usuarioActivo;
-    const tipo = fiadoAmountUsd > 0 ? 'VENTA_FIADO' : 'VENTA_COMPLETADA';
-    logEvent('VENTA', tipo,
-        `Venta #${saleNumber} - $${cartTotalUsd.toFixed(2)} - ${cart.length} items - ${selectedCustomer?.name || 'Consumidor Final'}`,
-        user,
-        { saleId: finalPersistedSale.id, total: cartTotalUsd, items: cart.length }
-    );
+        // Audit log
+        const user = useAuthStore.getState().usuarioActivo;
+        const tipo = fiadoAmountUsd > 0 ? 'VENTA_FIADO' : 'VENTA_COMPLETADA';
+        logEvent('VENTA', tipo,
+            `Venta #${saleNumber} - $${cartTotalUsd.toFixed(2)} - ${cart.length} items - ${selectedCustomer?.name || 'Consumidor Final'}`,
+            user,
+            { saleId: finalPersistedSale.id, total: cartTotalUsd, items: cart.length }
+        );
 
-    // ── Deducir stock con precisión ──
-    const updatedProducts = products.map(p => {
-        const cartItemsForThisProduct = cart.filter(i => (i._originalId || i.id) === p.id);
-        if (cartItemsForThisProduct.length > 0) {
-            const totalDeducted = cartItemsForThisProduct.reduce((sum, item) => {
-                if (item.isWeight)        return sum + item.qty;
-                if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
-                return sum + item.qty;
-            }, 0);
+        // ── Deducir stock con precisión ──
+        const updatedProducts = products.map(p => {
+            const cartItemsForThisProduct = cart.filter(i => (i._originalId || i.id) === p.id);
+            if (cartItemsForThisProduct.length > 0) {
+                const totalDeducted = cartItemsForThisProduct.reduce((sum, item) => {
+                    if (item.isWeight)        return sum + item.qty;
+                    if (item._mode === 'unit') return sum + divR(item.qty, item._unitsPerPackage || 1);
+                    return sum + item.qty;
+                }, 0);
 
-            const allowNeg = localStorage.getItem('allow_negative_stock') === 'true';
-            const newStock = (p.stock ?? 0) - totalDeducted;
-            return { ...p, stock: allowNeg ? newStock : Math.max(0, newStock) };
+                const allowNeg = localStorage.getItem('allow_negative_stock') === 'true';
+                const newStock = (p.stock ?? 0) - totalDeducted;
+                return { ...p, stock: allowNeg ? newStock : Math.max(0, newStock) };
+            }
+            return p;
+        });
+
+        await storageService.setItem('bodega_products_v1', updatedProducts);
+
+        let updatedCustomer = null;
+        let updatedCustomers = customers;
+
+        if (selectedCustomer) {
+            const amount_favor_used = sumR(normalizedPayments
+                .filter(p => p.methodId === 'saldo_favor')
+                .map(p => p.amountUsd));
+
+            const transaccionOpts = {
+                usaSaldoFavor:    amount_favor_used,
+                esCredito:        fiadoAmountUsd > 0.009,
+                deudaGenerada:    fiadoAmountUsd,
+                vueltoParaMonedero: 0
+            };
+
+            updatedCustomer  = procesarImpactoCliente(selectedCustomer, transaccionOpts);
+            updatedCustomers = customers.map(c => c.id === selectedCustomer.id ? updatedCustomer : c);
+
+            await storageService.setItem('bodega_customers_v1', updatedCustomers);
         }
-        return p;
+
+        return {
+            success: true,
+            sale: finalPersistedSale,
+            updatedProducts,
+            updatedCustomers
+        };
     });
 
-    await storageService.setItem('bodega_products_v1', updatedProducts);
-
-    let updatedCustomer = null;
-    let updatedCustomers = customers;
-
-    if (selectedCustomer) {
-        const amount_favor_used = normalizedPayments
-            .filter(p => p.methodId === 'saldo_favor')
-            .reduce((sum, p) => sum + p.amountUsd, 0);
-
-        const transaccionOpts = {
-            usaSaldoFavor:    amount_favor_used,
-            esCredito:        fiadoAmountUsd > 0.009,
-            deudaGenerada:    fiadoAmountUsd,
-            vueltoParaMonedero: 0
-        };
-
-        updatedCustomer  = procesarImpactoCliente(selectedCustomer, transaccionOpts);
-        updatedCustomers = customers.map(c => c.id === selectedCustomer.id ? updatedCustomer : c);
-
-        await storageService.setItem('bodega_customers_v1', updatedCustomers);
-    }
-
-    return {
-        success: true,
-        sale: finalPersistedSale,
-        updatedProducts,
-        updatedCustomers
-    };
+    return lockResult;
 }

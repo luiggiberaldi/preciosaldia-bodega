@@ -1,5 +1,6 @@
 import { FinancialEngine } from '../core/FinancialEngine';
 import { getLocalISODate } from './dateHelpers';
+import { mulR, sumR } from './dinero';
 
 export function calculateReportsData(allSales, from, to, bcvRate, products) {
     // Ventas de Mercancía (para Totales, Profit, Top Productos)
@@ -23,8 +24,8 @@ export function calculateReportsData(allSales, from, to, bcvRate, products) {
         return dateStr >= from && dateStr <= to;
     });
 
-    const totalUsd = salesForStats.reduce((s, sale) => s + (sale.totalUsd || 0), 0);
-    const totalBs = salesForStats.reduce((s, sale) => s + (sale.totalBs || 0), 0);
+    const totalUsd = sumR(salesForStats.map(sale => sale.totalUsd || 0));
+    const totalBs = sumR(salesForStats.map(sale => sale.totalBs || 0));
     const totalItems = salesForStats.reduce((s, sale) => s + (sale.items ? sale.items.reduce((is, i) => is + i.qty, 0) : 0), 0);
     const profit = FinancialEngine.calculateAggregateProfit(salesForStats, bcvRate, products);
     const paymentBreakdown = FinancialEngine.calculatePaymentBreakdown(salesForCashFlow);
@@ -33,9 +34,9 @@ export function calculateReportsData(allSales, from, to, bcvRate, products) {
     const productMap = {};
     salesForStats.forEach(s => {
         s.items?.forEach(item => {
-            if (!productMap[item.name]) productMap[item.name] = { name: item.name, qty: 0, revenue: 0 };
-            productMap[item.name].qty += item.qty;
-            productMap[item.name].revenue += item.priceUsd * item.qty;
+            const key = item.id || item.name; if (!productMap[key]) productMap[key] = { name: item.name, qty: 0, revenue: 0 };
+            productMap[key].qty += item.qty;
+            productMap[key].revenue += mulR(item.priceUsd, item.qty);
         });
     });
     const topProducts = Object.values(productMap).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
@@ -100,8 +101,8 @@ export function groupSalesByCierreId(allSales, from, to) {
             const salesForStats = c.sales.filter(s => s.tipo === 'VENTA' || s.tipo === 'VENTA_FIADA');
             const salesForCashFlow = c.sales.filter(s => s.tipo === 'VENTA' || s.tipo === 'VENTA_FIADA' || s.tipo === 'COBRO_DEUDA' || s.tipo === 'PAGO_PROVEEDOR');
 
-            const totalUsd = salesForStats.reduce((acc, s) => acc + (s.totalUsd || 0), 0);
-            const totalBs = salesForStats.reduce((acc, s) => acc + (s.totalBs || 0), 0);
+            const totalUsd = sumR(salesForStats.map(s => s.totalUsd || 0));
+            const totalBs = sumR(salesForStats.map(s => s.totalBs || 0));
             const totalItems = salesForStats.reduce((acc, s) => acc + (s.items ? s.items.reduce((is, it) => is + it.qty, 0) : 0), 0);
             
             // Reconstruir desglose de pago de esta caja
@@ -118,7 +119,7 @@ export function groupSalesByCierreId(allSales, from, to) {
                 paymentBreakdown,
             };
         })
-        .sort((a, b) => b.cierreId - a.cierreId);
+        .sort((a, b) => String(b.cierreId).localeCompare(String(a.cierreId)));
 
     return result;
 }

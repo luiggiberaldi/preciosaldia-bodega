@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShoppingCart, Plus, Minus, X, CheckCircle, Package, Trash2, DollarSign, Percent } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
+import { mulR } from '../../utils/dinero';
 
 export default function CartPanel({
     cart,
@@ -87,7 +88,7 @@ export default function CartPanel({
                                     <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                                         <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 overflow-hidden ${isCustomProduct ? 'bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600' : 'bg-slate-50 dark:bg-slate-950'}`}>
                                             {item.image ? (
-                                                <img src={item.image} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
+                                                <img src={item.image} alt={item.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
                                             ) : isCustomProduct ? (
                                                 <DollarSign size={20} className="sm:w-[22px] sm:h-[22px]" />
                                             ) : (
@@ -99,15 +100,15 @@ export default function CartPanel({
                                             <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                                                 <p className="text-[10px] sm:text-[11px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-1 sm:px-1.5 rounded">${item.priceUsd.toFixed(2)}</p>
                                                 <p className="text-[10px] sm:text-[11px] font-medium text-slate-400">
-                                                    {item.exactBs != null ? formatBs(item.exactBs) : formatBs(item.priceUsd * effectiveRate)} Bs
+                                                    {item.exactBs != null ? formatBs(item.exactBs) : formatBs(mulR(item.priceUsd, effectiveRate))} Bs
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-end shrink-0 gap-1.5 sm:gap-2">
-                                        <p className="text-sm sm:text-base font-black text-slate-800 dark:text-white">${(item.priceUsd * item.qty).toFixed(2)}</p>
+                                        <p className="text-sm sm:text-base font-black text-slate-800 dark:text-white">${mulR(item.priceUsd, item.qty).toFixed(2)}</p>
                                         <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-100 dark:border-slate-700">
-                                            <button onClick={() => updateQty(item.id, item.isWeight ? -0.1 : -1)} className="w-7 sm:w-8 h-7 sm:h-8 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors rounded-l-md active:bg-slate-200 dark:active:bg-slate-700"><Minus size={14} strokeWidth={3} /></button>
+                                            <button aria-label="Quitar uno" onClick={() => updateQty(item.id, item.isWeight ? -0.1 : -1)} className="w-7 sm:w-8 h-7 sm:h-8 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors rounded-l-md active:bg-slate-200 dark:active:bg-slate-700"><Minus size={14} strokeWidth={3} /></button>
                                             
                                             {isEditing ? (
                                                 <input
@@ -129,10 +130,10 @@ export default function CartPanel({
                                                 </span>
                                             )}
 
-                                            <button onClick={() => updateQty(item.id, item.isWeight ? 0.1 : 1)} className="w-7 sm:w-8 h-7 sm:h-8 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-colors rounded-r-md active:bg-slate-200 dark:active:bg-slate-700"><Plus size={14} strokeWidth={3} /></button>
+                                            <button aria-label="Agregar uno" onClick={() => updateQty(item.id, item.isWeight ? 0.1 : 1)} className="w-7 sm:w-8 h-7 sm:h-8 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-colors rounded-r-md active:bg-slate-200 dark:active:bg-slate-700"><Plus size={14} strokeWidth={3} /></button>
                                         </div>
                                     </div>
-                                    <button onClick={() => removeFromCart(item.id)} className="absolute -top-1 -right-1 sm:top-2 sm:right-2 p-1.5 bg-red-50 dark:bg-red-900/40 text-red-500 sm:bg-transparent sm:text-slate-300 sm:hover:text-red-500 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity rounded-full sm:rounded-lg">
+                                    <button aria-label="Eliminar del carrito" onClick={() => removeFromCart(item.id)} className="absolute -top-1 -right-1 sm:top-2 sm:right-2 p-1.5 bg-red-50 dark:bg-red-900/40 text-red-500 sm:bg-transparent sm:text-slate-300 sm:hover:text-red-500 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity rounded-full sm:rounded-lg">
                                         <X size={12} className="sm:w-[14px] sm:h-[14px]" />
                                     </button>
                                 </div>

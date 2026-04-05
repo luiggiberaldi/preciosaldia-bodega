@@ -6,6 +6,7 @@ import { showToast } from '../components/Toast';
 import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, CheckCircle2 } from 'lucide-react';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, getPaymentIcon, toTitleCase } from '../config/paymentMethods';
+import { sumR } from '../utils/dinero';
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import SalesChart from '../components/Dashboard/SalesChart';
 import ConfirmModal from '../components/ConfirmModal';
@@ -18,8 +19,10 @@ import SyncStatus from '../components/SyncStatus';
 import { useProductContext } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import { useSecurity } from '../hooks/useSecurity';
-import { useAuthStore } from '../hooks/store/useAuthStore';
+// useAuthStore removed - single-user app
 import { useAudit } from '../hooks/useAudit';
+
+import { getLocalISODate } from '../utils/dateHelpers';
 
 import Skeleton from '../components/Skeleton';
 
@@ -27,13 +30,8 @@ const SALES_KEY = 'bodega_sales_v1';
 export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme, isActive, isDemo, demoTimeLeft }) {
     const { notifyCierrePendiente, requestPermission } = useNotifications();
     const { deviceId } = useSecurity();
-    const usuarioActivo = useAuthStore(s => s.usuarioActivo);
-    const isAdmin = !usuarioActivo || usuarioActivo.rol === 'ADMIN';
-    const authLogout = useAuthStore(s => s.logout);
-    const requireLogin = useAuthStore(s => s.requireLogin ?? false);
-    const adminEmail = useAuthStore(s => s.adminEmail);
-    const adminPassword = useAuthStore(s => s.adminPassword);
-    const isCloudConfigured = Boolean(adminEmail && adminPassword);
+    // Single-user mode: owner is always admin
+    const isAdmin = true;
     const { log: auditLog } = useAudit();
     const [sales, setSales] = useState([]);
     const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
@@ -57,6 +55,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const [showTopDeudas, setShowTopDeudas] = useState(false);
     const touchStartY = useRef(0);
     const scrollRef = useRef(null);
+    const hasRequestedPermRef = useRef(false);
 
     useEffect(() => {
         if (!isActive) return;
@@ -74,7 +73,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         };
         load();
         // Solicitar permiso de notificaciones al primer uso
-        requestPermission();
+        if (!hasRequestedPermRef.current) { hasRequestedPermRef.current = true; requestPermission(); }
         return () => { mounted = false; };
     }, [isActive]);
 
@@ -166,12 +165,6 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     };
 
     // ── Métricas del Día (memoized) ──
-    const getLocalISODate = (d = new Date()) => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
     const today = getLocalISODate();
 
     const todaySales = useMemo(() =>
@@ -208,8 +201,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             return saleLocalDay === today;
         });
     }, [sales, today]);
-    const todayTotalBs = useMemo(() => todaySales.reduce((sum, s) => sum + (s.totalBs || 0), 0), [todaySales]);
-    const todayTotalUsd = useMemo(() => todaySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0), [todaySales]);
+    const todayTotalBs = useMemo(() => sumR(todaySales.map(s => s.totalBs || 0)), [todaySales]);
+    const todayTotalUsd = useMemo(() => sumR(todaySales.map(s => s.totalUsd || 0)), [todaySales]);
     const todayItemsSold = useMemo(() => todaySales.reduce((sum, s) => sum + (s.items ? s.items.reduce((is, i) => is + i.qty, 0) : 0), 0), [todaySales]);
 
     // Notificar cierre de caja pendiente (>7pm con ventas o cobros sin cerrar)
@@ -226,7 +219,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             return saleLocalDay === today;
         });
     }, [sales, today]);
-    const todayExpensesUsd = useMemo(() => todayExpenses.reduce((sum, s) => sum + Math.abs(s.totalUsd || 0), 0), [todayExpenses]);
+    const todayExpensesUsd = useMemo(() => sumR(todayExpenses.map(s => Math.abs(s.totalUsd || 0))), [todayExpenses]);
 
     const todayProfit = useMemo(() =>
         FinancialEngine.calculateAggregateProfit(todaySales, bcvRate, products),
@@ -255,7 +248,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             return saleLocalDay === dateStr;
         });
         return { date: dateStr, total: daySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0), count: daySales.length };
-    }), [sales]);
+    }), [sales, today]);
 
     // Productos bajo stock
     const lowStockProducts = useMemo(() =>
@@ -437,20 +430,6 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
                 <div className="flex items-center gap-2">
                     <SyncStatus />
-                    {/* USER BADGE — solo visible si PIN activo + cuenta cloud configurada */}
-                    {requireLogin && isCloudConfigured && usuarioActivo && (
-                        <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full pl-3 pr-2 py-1 shadow-sm">
-                            <div className={`w-2 h-2 rounded-full ${usuarioActivo.rol === 'ADMIN' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 max-w-[80px] truncate">{usuarioActivo.nombre}</span>
-                            <button
-                                onClick={() => { triggerHaptic?.(); authLogout(); }}
-                                className="p-1 text-slate-400 hover:text-red-500 active:scale-90 transition-all rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 ml-1"
-                                title="Cerrar Sesión (Cambiar Usuario)"
-                            >
-                                <LockIcon size={12} strokeWidth={2.5} />
-                            </button>
-                        </div>
-                    )}
                     {/* GEAR ICON FOR SETTINGS */}
                     <button
                         onClick={() => { triggerHaptic(); onNavigate('ajustes'); }}

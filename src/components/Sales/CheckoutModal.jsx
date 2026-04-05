@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { X, Users, Receipt, ChevronDown, Wallet, Zap, UserPlus, Check, ArrowLeftRight, AlertTriangle } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { PAYMENT_ICONS, ICON_COMPONENTS } from '../../config/paymentMethods';
+import { round2, divR, mulR, subR, sumR } from '../../utils/dinero';
 
 /**
  * CheckoutModal — Zona de Cobro con Barras de Pago (Estilo Listo POS)
@@ -42,33 +43,34 @@ export default function CheckoutModal({
     const [confirmFiar, setConfirmFiar] = useState(false);
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+    const safeTasaCop = tasaCop > 0 ? tasaCop : 4150;
+    const safeRate = effectiveRate > 0 ? effectiveRate : 1;
 
-    // -- Cálculos bimoneda --
+    // -- Cálculos bimoneda (con aritmética segura) --
     const totalPaidUsd = useMemo(() => {
-        return paymentMethods.reduce((sum, m) => {
+        return sumR(paymentMethods.map(m => {
             const val = parseFloat(barValues[m.id]) || 0;
-            if (m.currency === 'USD') return sum + val;
-            if (m.currency === 'COP') return sum + (val / tasaCop);
-            return sum + (val / effectiveRate);
-        }, 0);
+            if (m.currency === 'USD') return round2(val);
+            if (m.currency === 'COP') return divR(val, safeTasaCop);
+            return divR(val, safeRate);
+        }));
     }, [barValues, paymentMethods, effectiveRate, tasaCop]);
 
     const totalPaidBs = useMemo(() => {
-        return paymentMethods.reduce((sum, m) => {
+        return sumR(paymentMethods.map(m => {
             const val = parseFloat(barValues[m.id]) || 0;
-            if (m.currency === 'BS') return sum + val;
-            if (m.currency === 'COP') return sum + ((val / tasaCop) * effectiveRate);
-            return sum + (val * effectiveRate);
-        }, 0);
+            if (m.currency === 'BS') return round2(val);
+            if (m.currency === 'COP') return mulR(divR(val, safeTasaCop), safeRate);
+            return mulR(val, safeRate);
+        }));
     }, [barValues, paymentMethods, effectiveRate, tasaCop]);
 
-    const remainingUsd = Math.max(0, cartTotalUsd - totalPaidUsd);
+    const remainingUsd = Math.max(0, subR(cartTotalUsd, totalPaidUsd));
     // Para remainingBs, tomamos la diferencia exacta de cartTotalBs - totalPaidBs para no perder decimales por tasa de cambio
-    const remainingBs = Math.max(0, cartTotalBs - totalPaidBs);
-    
-    const changeUsd = Math.max(0, Math.round((totalPaidUsd - cartTotalUsd) * 100) / 100);
-    // Similar a remaining Bs, changeBs debería reflejar el redondeado a 2 decimales natural en Bs.
-    const changeBs = Math.max(0, Math.round((totalPaidBs - cartTotalBs) * 100) / 100);
+    const remainingBs = Math.max(0, subR(cartTotalBs, totalPaidBs));
+
+    const changeUsd = Math.max(0, subR(totalPaidUsd, cartTotalUsd));
+    const changeBs = Math.max(0, subR(totalPaidBs, cartTotalBs));
     const isPaid = remainingUsd < 0.009;
 
     // -- Handlers --
@@ -87,7 +89,7 @@ export default function CheckoutModal({
         if (currency === 'USD') {
             val = remainingUsd > 0 ? Number(remainingUsd.toFixed(2)).toString() : null;
         } else if (currency === 'COP') {
-            val = remainingUsd > 0 ? Number((remainingUsd * tasaCop).toFixed(2)).toString() : null;
+            val = remainingUsd > 0 ? Number((remainingUsd * safeTasaCop).toFixed(2)).toString() : null;
         } else {
             val = remainingBs > 0 ? Number(remainingBs.toFixed(2)).toString() : null;
         }
@@ -102,7 +104,7 @@ export default function CheckoutModal({
         const payments = paymentMethods
             .filter(m => parseFloat(barValues[m.id]) > 0)
             .map(m => {
-                const amount = parseFloat(barValues[m.id]);
+                const amount = round2(parseFloat(barValues[m.id]));
                 return {
                     id: crypto.randomUUID(),
                     methodId: m.id,
@@ -110,16 +112,16 @@ export default function CheckoutModal({
                     currency: m.currency,
                     amountInput: amount,
                     amountInputCurrency: m.currency,
-                    amountUsd: m.currency === 'USD' ? amount : m.currency === 'COP' ? amount / tasaCop : amount / effectiveRate,
-                    amountBs: m.currency === 'BS' ? amount : m.currency === 'COP' ? (amount / tasaCop) * effectiveRate : amount * effectiveRate,
+                    amountUsd: m.currency === 'USD' ? amount : m.currency === 'COP' ? divR(amount, safeTasaCop) : divR(amount, safeRate),
+                    amountBs: m.currency === 'BS' ? amount : m.currency === 'COP' ? mulR(divR(amount, safeTasaCop), safeRate) : mulR(amount, safeRate),
                 };
             });
-        const defaultUsdChange = (!changeUsdGiven && !changeBsGiven) ? changeUsd : (parseFloat(changeUsdGiven) || 0);
-        const defaultBsChange = (!changeUsdGiven && !changeBsGiven) ? 0 : (parseFloat(changeBsGiven) || 0);
+        const defaultUsdChange = (!changeUsdGiven && !changeBsGiven) ? changeUsd : round2(parseFloat(changeUsdGiven) || 0);
+        const defaultBsChange = (!changeUsdGiven && !changeBsGiven) ? 0 : round2(parseFloat(changeBsGiven) || 0);
 
         onConfirmSale(payments, {
             changeUsdGiven: Math.min(defaultUsdChange, changeUsd),
-            changeBsGiven: Math.min(defaultBsChange, changeUsd * effectiveRate),
+            changeBsGiven: Math.min(defaultBsChange, changeBs),
         });
     }, [barValues, paymentMethods, effectiveRate, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd]);
 
@@ -384,7 +386,7 @@ export default function CheckoutModal({
                                                 const v = e.target.value;
                                                 const usd = Math.min(Math.max(0, parseFloat(v) || 0), changeUsd);
                                                 setChangeUsdGiven(v);
-                                                setChangeBsGiven(Math.max(0, (changeUsd - usd) * effectiveRate).toFixed(0));
+                                                setChangeBsGiven(Math.max(0, mulR(subR(changeUsd, usd), effectiveRate)).toFixed(0));
                                             }}
                                             className="w-full py-2 px-3 pr-10 rounded-lg border-2 border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-900 font-black text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30"
                                         />
@@ -402,10 +404,10 @@ export default function CheckoutModal({
                                             value={changeBsGiven}
                                             onChange={e => {
                                                 const v = e.target.value;
-                                                const bsTotal = changeUsd * effectiveRate;
+                                                const bsTotal = mulR(changeUsd, effectiveRate);
                                                 const bs = Math.min(Math.max(0, parseFloat(v) || 0), bsTotal);
                                                 setChangeBsGiven(v);
-                                                setChangeUsdGiven(Math.max(0, changeUsd - bs / effectiveRate).toFixed(2));
+                                                setChangeUsdGiven(Math.max(0, subR(changeUsd, divR(bs, effectiveRate))).toFixed(2));
                                             }}
                                             className="w-full py-2 px-3 pr-8 rounded-lg border-2 border-blue-200 dark:border-blue-700 bg-white dark:bg-slate-900 font-black text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30"
                                         />
@@ -421,7 +423,7 @@ export default function CheckoutModal({
                                         Todo $
                                     </button>
                                     <button
-                                        onClick={() => { setChangeUsdGiven('0'); setChangeBsGiven((changeUsd * effectiveRate).toFixed(0)); }}
+                                        onClick={() => { setChangeUsdGiven('0'); setChangeBsGiven(mulR(changeUsd, effectiveRate).toFixed(0)); }}
                                         className="flex-1 py-1.5 rounded-lg text-[9px] font-black bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 active:scale-95 transition-all border border-blue-200 dark:border-blue-800"
                                     >
                                         Todo Bs
