@@ -565,18 +565,39 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const handleFileChange = (event) => {
         const file = event.target.files[0];
         if (!file) return;
+        event.target.value = '';
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
                 setImportStatus('loading');
-                setStatusMessage('Restaurando cuenta entera...');
+                setStatusMessage('Validando archivo...');
                 const json = JSON.parse(e.target.result);
-                
-                if (!json.data) throw new Error('Formato invalido.');
-                // Usar storageService (instancia global) — NO createInstance()
+
+                if (!json.data) throw new Error('Formato invalido: falta campo "data".');
+
+                // ── FASE 1: LIMPIEZA TOTAL ──────────────────────────────────────────
+                // Escribimos directo a localforage (sin pasar por storageService)
+                // para evitar que el evento app_storage_update active el auto-save
+                // del ProductContext y sobreescriba las categorías recién importadas.
+                setStatusMessage('Limpiando datos del dispositivo...');
+                await localforage.clear();
+
+                // Limpiar localStorage de la app (preservar sesión de Supabase sb-*)
+                const appLsKeys = [
+                    'street_rate_bs', 'catalog_use_auto_usdt', 'catalog_custom_usdt_price',
+                    'catalog_show_cash_price', 'monitor_rates_v12', 'business_name', 'business_rif',
+                    'printer_paper_width', 'allow_negative_stock', 'cop_enabled', 'auto_cop_enabled',
+                    'tasa_cop', 'bodega_use_auto_rate', 'bodega_custom_rate', 'bodega_inventory_view',
+                    'premium_token', 'abasto-auth-storage',
+                ];
+                appLsKeys.forEach(k => localStorage.removeItem(k));
+
+                // ── FASE 2: RESTAURACIÓN (directo a localforage, sin eventos) ───────
+                setStatusMessage('Restaurando backup...');
+
                 if (json.version === '2.0' && json.data.idb) {
                     for (const [key, value] of Object.entries(json.data.idb)) {
-                        await storageService.setItem(key, value);
+                        await localforage.setItem(key, value);
                     }
                     if (json.data.ls) {
                         for (const [key, value] of Object.entries(json.data.ls)) {
@@ -584,16 +605,17 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                         }
                     }
                 } else {
-                    if (json.data.bodega_products_v1) {
-                        await storageService.setItem('bodega_products_v1', typeof json.data.bodega_products_v1 === 'string' ? JSON.parse(json.data.bodega_products_v1) : json.data.bodega_products_v1);
+                    // Compatibilidad legado (backups anteriores a v2.0)
+                    const legacyIdbMap = {
+                        bodega_products_v1: json.data.bodega_products_v1,
+                        bodega_accounts_v2: json.data.bodega_accounts_v2,
+                        my_categories_v1:   json.data.my_categories_v1,
+                    };
+                    for (const [key, value] of Object.entries(legacyIdbMap)) {
+                        if (!value) continue;
+                        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+                        await localforage.setItem(key, parsed);
                     }
-                    if (json.data.bodega_accounts_v2) {
-                        await storageService.setItem('bodega_accounts_v2', typeof json.data.bodega_accounts_v2 === 'string' ? JSON.parse(json.data.bodega_accounts_v2) : json.data.bodega_accounts_v2);
-                    }
-                    if (json.data.my_categories_v1) {
-                        await storageService.setItem('my_categories_v1', typeof json.data.my_categories_v1 === 'string' ? JSON.parse(json.data.my_categories_v1) : json.data.my_categories_v1);
-                    }
-                    
                     const legacyLsKeys = [
                         'street_rate_bs', 'catalog_use_auto_usdt', 'catalog_custom_usdt_price',
                         'catalog_show_cash_price', 'monitor_rates_v12', 'business_name', 'business_rif'
@@ -604,13 +626,14 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                 }
 
                 setImportStatus('success');
-                setStatusMessage('Clonacion finalizada. Reiniciando...');
-                auditLog('SISTEMA', 'BACKUP_IMPORTADO', 'Backup restaurado desde archivo');
+                setStatusMessage('Restauracion completa. Reiniciando...');
+                auditLog('SISTEMA', 'BACKUP_IMPORTADO', `Backup restaurado (${json.source || 'archivo'}) — ${Object.keys(json.data.idb || {}).join(', ')}`);
                 triggerHaptic?.();
-                
-                setTimeout(() => window.location.reload(), 1500);
+
+                // Reload inmediato — no damos tiempo al auto-save del contexto
+                setTimeout(() => window.location.reload(), 800);
             } catch (error) {
-                console.error(error);
+                console.error('[IMPORT ERROR]', error);
                 setImportStatus('error');
                 setStatusMessage('Error: El archivo esta corrupto o es invalido.');
             }

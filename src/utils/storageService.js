@@ -124,5 +124,34 @@ export const storageService = {
         } catch (error) {
             console.error(`[Storage Error] Borrando ${key}:`, error);
         }
+    },
+
+    /**
+     * Limpieza total para restauración desde backup.
+     * Borra todas las claves de la app en IndexedDB y localStorage.
+     * Preserva SOLO la sesión de Supabase (sb-*) para no desloguear al usuario.
+     */
+    async clearAllData() {
+        try {
+            // 1. Limpiar IndexedDB completo de la app
+            await localforage.clear();
+            console.log('[clearAllData] IndexedDB limpiado.');
+
+            // 2. Limpiar claves de app en localStorage (preservando sesión de auth)
+            const appLsKeys = [
+                'street_rate_bs', 'catalog_use_auto_usdt', 'catalog_custom_usdt_price',
+                'catalog_show_cash_price', 'monitor_rates_v12', 'business_name', 'business_rif',
+                'printer_paper_width', 'allow_negative_stock', 'cop_enabled', 'auto_cop_enabled',
+                'tasa_cop', 'bodega_use_auto_rate', 'bodega_custom_rate', 'bodega_inventory_view',
+                'premium_token', 'abasto-auth-storage',
+            ];
+            for (const key of appLsKeys) {
+                localStorage.removeItem(key);
+            }
+            console.log('[clearAllData] LocalStorage de la app limpiado.');
+        } catch (error) {
+            console.error('[Storage Error] Limpiando todo:', error);
+            throw error; // Propagar para que el importador aborte si falla la limpieza
+        }
     }
 };
