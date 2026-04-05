@@ -879,6 +879,15 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                 </div>
             )}
 
+            {/* INPUT OCULTO — requerido para que handleImportClick funcione */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleFileChange}
+                className="hidden"
+            />
+
             <ShareInventoryModal
                 isOpen={isShareOpen} 
                 onClose={() => setIsShareOpen(false)} 
