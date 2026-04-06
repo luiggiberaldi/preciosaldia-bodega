@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { processVoidSale } from '../utils/voidSaleProcessor';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, ShoppingCart, Store, Users, ChevronDown, ChevronUp, Key, Settings, LockIcon, CheckCircle2 } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, ShoppingCart, Store, Users, Settings } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
-import { getPaymentLabel, toTitleCase, getPaymentIcon, PAYMENT_ICONS } from '../config/paymentMethods';
+import DashboardStats from '../components/Dashboard/DashboardStats';
+import DashboardPaymentBreakdown from '../components/Dashboard/DashboardPaymentBreakdown';
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import SalesChart from '../components/Dashboard/SalesChart';
 import ConfirmModal from '../components/ConfirmModal';
@@ -13,7 +14,6 @@ import { generateTicketPDF, printThermalTicket } from '../utils/ticketGenerator'
 import { shareSaleWhatsApp } from '../utils/dashboardActions';
 import { generateDailyClosePDF } from '../utils/dailyCloseGenerator';
 import { useNotifications } from '../hooks/useNotifications';
-import AnimatedCounter from '../components/AnimatedCounter';
 import SyncStatus from '../components/SyncStatus';
 import { useProductContext } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
@@ -286,304 +286,34 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 gap-3 mb-5">
-                {/* Licencia Demo */}
-                {isDemo && demoTimeLeft && (
-                    <div className="col-span-2 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-4 shadow-sm relative overflow-hidden text-white flex items-center justify-between">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                        <div className="flex items-center gap-3 relative z-10">
-                            <div className="w-10 h-10 bg-black/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                                <Key size={20} className="text-amber-100" />
-                            </div>
-                            <div>
-                                <h3 className="text-[13px] font-bold text-amber-50 leading-tight">Licencia de Prueba</h3>
-                                <p className="text-xl font-black mt-0.5">{demoTimeLeft}</p>
-                            </div>
-                        </div>
-                        <div className="relative z-10 text-right">
-                            <button className="text-[10px] font-bold bg-white/20 hover:bg-white/30 transition-colors px-3 py-1.5 rounded-lg active:scale-95" onClick={() => window.open(`https://wa.me/584124051793?text=Hola! Quiero adquirir la licencia Premium de PreciosAlDía Bodega. Mi ID de instalación es: ${deviceId || 'N/A'}`.replace(/\s+/g, '%20'), '_blank')}>
-                                ADQUIRIR
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Ventas Hoy */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
-                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-50 dark:bg-emerald-900/10 rounded-full blur-2xl"></div>
-                    <div className="flex items-center justify-between mb-3 relative z-10">
-                        <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center shadow-inner">
-                            <span className="text-emerald-600 dark:text-emerald-400 font-black text-xl">$</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-lg tracking-wider">HOY</span>
-                    </div>
-                    <div className="relative z-10">
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">$<AnimatedCounter value={todayTotalUsd} /></span>
-                        </div>
-                        <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-0.5">{formatBs(todayTotalBs)} Bs</p>
-                        <p className="text-[11px] font-medium text-slate-400 mt-1">Ingresos brutos</p>
-                    </div>
-                </div>
-
-                {/* Transacciones */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="w-9 h-9 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center">
-                            <ShoppingBag size={18} className="text-indigo-500" />
-                        </div>
-                    </div>
-                    <p className="text-xl font-black text-slate-800 dark:text-white leading-none"><AnimatedCounter value={todaySales.length} /> <span className="text-xs font-bold text-slate-400">{todaySales.length === 1 ? 'venta' : 'ventas'}</span></p>
-                    <p className="text-[11px] text-slate-400 mt-1"><AnimatedCounter value={todayItemsSold} /> {todayItemsSold === 1 ? 'artículo vendido' : 'artículos vendidos'}</p>
-                </div>
-
-                {/* Egresos del Día */}
-                {todayExpensesUsd > 0 && (
-                    <div className="col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-orange-200 dark:border-orange-800/30 shadow-sm relative overflow-hidden">
-                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-orange-50 dark:bg-orange-900/10 rounded-full blur-2xl"></div>
-                        <div className="flex items-center justify-between relative z-10">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center shadow-inner">
-                                    <Package size={20} className="text-orange-500" />
-                                </div>
-                                <div>
-                                    <p className="text-[11px] font-medium text-slate-400">Egresos del dia (Proveedores)</p>
-                                    <p className="text-lg font-black text-orange-600 dark:text-orange-400">-$<AnimatedCounter value={todayExpensesUsd} /></p>
-                                </div>
-                            </div>
-                            <span className="text-xs font-bold text-orange-500 bg-orange-50 dark:bg-orange-900/20 px-2.5 py-1 rounded-lg">{todayExpenses.length} {todayExpenses.length === 1 ? 'pago' : 'pagos'}</span>
-                        </div>
-                    </div>
-                )}
-
-                {/* Ganancia Estimada */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
-                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-green-50 dark:bg-green-900/10 rounded-full blur-2xl"></div>
-                    <div className="flex items-center justify-between mb-3 relative z-10">
-                        <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center shadow-inner">
-                            <TrendingUp size={20} className="text-green-600 dark:text-green-400" strokeWidth={2.5} />
-                        </div>
-                    </div>
-                    <div className="relative z-10">
-                        <div className="flex items-baseline gap-1">
-                            <span className={`text-2xl font-black tracking-tight ${todayProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
-                                {todayProfit >= 0 ? '+' : ''}${bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}
-                            </span>
-                        </div>
-                        <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-0.5">{formatBs(todayProfit)} Bs</p>
-                        <p className="text-[11px] font-medium text-slate-400 mt-1">Ganancia estimada</p>
-                    </div>
-                </div>
-
-                {/* Tasa BCV */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                            <ArrowUpRight size={18} className="text-blue-500" />
-                        </div>
-                    </div>
-                    <p className="text-xl font-black text-slate-800 dark:text-white leading-none">{formatBs(bcvRate)} <span className="text-xs font-bold text-slate-400">Bs/$</span></p>
-                    <p className="text-[11px] text-slate-400 mt-1">Tasa BCV actual</p>
-                </div>
-
-                {/* BOTON CERRAR CAJA */}
-                <div className="col-span-2">
-                    {(todayCashFlow.length > 0 || todaySales.length > 0) ? (
-                        <button
-                            onClick={handleDailyClose}
-                            className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-2xl p-4 shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all flex items-center justify-between group"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                                    <LockIcon size={22} />
-                                </div>
-                                <div className="text-left">
-                                    <p className="text-sm font-black">Cerrar Caja</p>
-                                    <p className="text-[11px] font-medium text-white/70">${todayTotalUsd.toFixed(2)} | {todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'}</p>
-                                </div>
-                            </div>
-                            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center group-hover:translate-x-1 transition-transform">
-                                <LockIcon size={16} />
-                            </div>
-                        </button>
-                    ) : (
-                        <div className="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex items-center gap-3">
-                            <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
-                                <CheckCircle2 size={20} className="text-emerald-500" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Sin ventas pendientes</p>
-                                <p className="text-[11px] text-slate-400 dark:text-slate-500">La caja esta limpia</p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Deudas Pendientes */}
-                {totalDeudas.count > 0 && (
-                    <div
-                        onClick={() => { setShowTopDeudas(!showTopDeudas); triggerHaptic && triggerHaptic(); }}
-                        className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-red-100 dark:border-red-800/30 shadow-sm relative overflow-hidden col-span-2 cursor-pointer active:scale-[0.99] transition-all"
-                    >
-                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-50 dark:bg-red-900/10 rounded-full blur-2xl"></div>
-                        <div className="flex items-center justify-between relative z-10">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center shadow-inner">
-                                    <Users size={20} className="text-red-500" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-red-400 uppercase">Deudas por cobrar</p>
-                                    <p className="text-xl font-black text-red-500">${totalDeudas.totalUsd.toFixed(2)}</p>
-                                </div>
-                            </div>
-                            <div className="text-right flex items-center gap-2">
-                                <div>
-                                    <p className="text-sm font-bold text-slate-400">{totalDeudas.count} {totalDeudas.count === 1 ? 'cliente' : 'clientes'}</p>
-                                    {bcvRate > 0 && <p className="text-[10px] text-slate-400">{formatBs(totalDeudas.totalUsd * bcvRate)} Bs</p>}
-                                </div>
-                                {showTopDeudas ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-                            </div>
-                        </div>
-
-                        {showTopDeudas && (
-                            <div className="mt-3 pt-3 border-t border-red-100 dark:border-red-800/20 space-y-2 relative z-10" style={{ animation: 'fadeIn 0.2s ease' }}>
-                                {totalDeudas.top5.map((c, i) => (
-                                    <div key={c.id} className="flex items-center justify-between py-1.5">
-                                        <div className="flex items-center gap-2.5 min-w-0">
-                                            <span className="text-[10px] font-black text-red-300 w-4 text-center shrink-0">{i + 1}</span>
-                                            <div className="w-7 h-7 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
-                                                <span className="text-xs font-black text-red-400">{c.name.charAt(0).toUpperCase()}</span>
-                                            </div>
-                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{c.name}</p>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="text-sm font-black text-red-500">${(c.deuda || 0).toFixed(2)}</p>
-                                            {bcvRate > 0 && <p className="text-[9px] text-red-400/60">{formatBs((c.deuda || 0) * bcvRate)} Bs</p>}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
+            <DashboardStats
+                isDemo={isDemo}
+                demoTimeLeft={demoTimeLeft}
+                deviceId={deviceId}
+                todayTotalUsd={todayTotalUsd}
+                todayTotalBs={todayTotalBs}
+                todaySales={todaySales}
+                todayItemsSold={todayItemsSold}
+                todayExpenses={todayExpenses}
+                todayExpensesUsd={todayExpensesUsd}
+                todayProfit={todayProfit}
+                bcvRate={bcvRate}
+                todayCashFlow={todayCashFlow}
+                totalDeudas={totalDeudas}
+                showTopDeudas={showTopDeudas}
+                setShowTopDeudas={setShowTopDeudas}
+                triggerHaptic={triggerHaptic}
+                onDailyClose={handleDailyClose}
+            />
 
             {/* Pago por Metodo */}
-            {Object.keys(paymentBreakdown).length > 0 && (() => {
-                const entries = Object.entries(paymentBreakdown).filter(([, d]) => d.total > 0);
-                const fiadoMethods = entries.filter(([, d]) => d.currency === 'FIADO');
-                const bsMethods = entries.filter(([, d]) => d.currency === 'BS' || (!d.currency));
-                const usdMethods = entries.filter(([, d]) => d.currency === 'USD');
-                const copMethods = entries.filter(([, d]) => d.currency === 'COP');
-                const subtotalBs = bsMethods.reduce((s, [, d]) => s + d.total, 0);
-                const subtotalUsd = usdMethods.reduce((s, [, d]) => s + d.total, 0);
-                const subtotalCop = copMethods.reduce((s, [, d]) => s + d.total, 0);
-                const fmtCop = (v) => v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-                const renderMethod = ([method, data]) => {
-                    const label = toTitleCase(getPaymentLabel(method, data.label));
-                    const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
-                    let totalBsEquiv = data.total;
-                    let pct = 0;
-                    let displayAmount = `${formatBs(data.total)} Bs`;
-
-                    if (data.currency === 'FIADO') {
-                        totalBsEquiv = data.total * bcvRate;
-                        pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0;
-                        displayAmount = `$ ${data.total.toFixed(2)}`;
-                    } else if (data.currency === 'USD') {
-                        totalBsEquiv = data.total * bcvRate;
-                        pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0;
-                        displayAmount = `$ ${data.total.toFixed(2)}`;
-                    } else if (data.currency === 'COP') {
-                        totalBsEquiv = (data.total / (tasaCop || 1)) * bcvRate;
-                        pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0;
-                        displayAmount = `${fmtCop(data.total)} COP`;
-                    } else {
-                        pct = todayTotalBs > 0 ? (data.total / todayTotalBs * 100) : 0;
-                    }
-
-                    return (
-                        <div key={method}>
-                            <div className="flex justify-between text-sm mb-1">
-                                <span className="text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5">
-                                    {PayIcon && <PayIcon size={14} className="text-slate-400" />}
-                                    {label}
-                                </span>
-                                <div className="text-right">
-                                    <span className="font-bold text-slate-700 dark:text-white">
-                                        {displayAmount}
-                                    </span>
-                                    {data.currency === 'FIADO' && (
-                                        <div className="text-[10px] text-slate-400 font-medium">
-                                            {formatBs(totalBsEquiv)} Bs
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            {data.currency !== 'FIADO' && (
-                                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                                </div>
-                            )}
-                        </div>
-                    );
-                };
-
-                return (
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative z-10" style={{ animation: 'fadeIn 0.3s ease' }}>
-                        <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
-                            <DollarSign size={12} /> Desglose por Metodo
-                        </h3>
-
-                        {fiadoMethods.length > 0 && (
-                            <div className="mb-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Por Cobrar</span>
-                                    <span className="text-xs font-black text-amber-600 dark:text-amber-400">${fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span>
-                                </div>
-                                <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
-                                    <div className="pl-3 space-y-3">{fiadoMethods.map(renderMethod)}</div>
-                                </div>
-                            </div>
-                        )}
-
-                        {bsMethods.length > 0 && (
-                            <div className="mb-3">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Bolivares</span>
-                                    <span className="text-xs font-black text-blue-600 dark:text-blue-400">{formatBs(subtotalBs)} Bs</span>
-                                </div>
-                                <div className="space-y-3 pl-1 border-l-2 border-blue-200 dark:border-blue-800/40">
-                                    <div className="pl-3 space-y-3">{bsMethods.map(renderMethod)}</div>
-                                </div>
-                            </div>
-                        )}
-                        {usdMethods.length > 0 && (
-                            <div className={copMethods.length > 0 ? 'mb-3' : ''}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Dolares</span>
-                                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">${subtotalUsd.toFixed(2)}</span>
-                                </div>
-                                <div className="space-y-3 pl-1 border-l-2 border-emerald-200 dark:border-emerald-800/40">
-                                    <div className="pl-3 space-y-3">{usdMethods.map(renderMethod)}</div>
-                                </div>
-                            </div>
-                        )}
-                        {copEnabled && copMethods.length > 0 && (
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pesos Colombianos</span>
-                                    <span className="text-xs font-black text-amber-600 dark:text-amber-400">{fmtCop(subtotalCop)} COP</span>
-                                </div>
-                                <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
-                                    <div className="pl-3 space-y-3">{copMethods.map(renderMethod)}</div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                );
-            })()}
+            <DashboardPaymentBreakdown
+                paymentBreakdown={paymentBreakdown}
+                todayTotalBs={todayTotalBs}
+                bcvRate={bcvRate}
+                copEnabled={copEnabled}
+                tasaCop={tasaCop}
+            />
 
             {/* Gráfica semanal */}
             <SalesChart
