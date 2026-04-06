@@ -24,6 +24,14 @@ const RANGE_OPTIONS = [
     { id: 'custom', label: 'Personalizado' },
 ];
 
+// Extracted component to avoid creating components during render
+function SaleMethodIcon({ iconId }) {
+    if (iconId === '_clock') return <Clock size={20} className="text-slate-500" />;
+    if (iconId === '_shuffle') return <Shuffle size={20} className="text-slate-500" />;
+    const Icon = getPaymentIcon(iconId) || PAYMENT_ICONS[iconId];
+    return Icon ? <Icon size={20} className="text-slate-500" /> : <span className="text-xl">$</span>;
+}
+
 
 export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive }) {
     const { products, setProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
@@ -604,23 +612,23 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
 function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, onRecycleSale }) {
     const d = new Date(s.timestamp);
     let methodLabel = 'Efectivo';
-    let PayMethodIcon = PAYMENT_ICONS['efectivo_bs'];
+    let payMethodIconId = 'efectivo_bs';
 
     if (s.tipo === 'VENTA_FIADA') {
         methodLabel = 'Por Cobrar';
-        PayMethodIcon = Clock;
+        payMethodIconId = '_clock';
     } else if (s.payments && s.payments.length === 1) {
         methodLabel = toTitleCase(s.payments[0].methodLabel);
         const m = getPaymentMethod(s.payments[0].methodId);
-        if (m) PayMethodIcon = getPaymentIcon(m.id) || m.Icon || null;
+        if (m) payMethodIconId = m.id;
     } else if (s.payments && s.payments.length > 1) {
         methodLabel = 'Pago Mixto';
-        PayMethodIcon = Shuffle;
+        payMethodIconId = '_shuffle';
     } else if (s.paymentMethod) {
         const m = getPaymentMethod(s.paymentMethod);
         if (m) {
             methodLabel = toTitleCase(m.label);
-            PayMethodIcon = getPaymentIcon(m.id) || m.Icon || null;
+            payMethodIconId = m.id;
         }
     }
 
@@ -657,7 +665,7 @@ function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, on
                 onClick={onToggle}
             >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isCanceled ? 'bg-red-100 opacity-50' : 'bg-slate-50 dark:bg-slate-700 shadow-sm'}`}>
-                    {isCanceled ? <Ban size={20} className="text-red-400" /> : (PayMethodIcon ? <PayMethodIcon size={20} className="text-slate-500" /> : <span className="text-xl">$</span>)}
+                    {isCanceled ? <Ban size={20} className="text-red-400" /> : <SaleMethodIcon iconId={payMethodIconId} />}
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className={`text-sm font-bold flex items-center gap-1.5 truncate ${isCanceled ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>

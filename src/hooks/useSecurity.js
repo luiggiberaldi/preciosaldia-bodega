@@ -1,40 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { storageService } from '../utils/storageService';
 import { supabase } from '../core/supabaseClient';
+import { encodeToken, decodeToken } from '../security/tokenCrypto';
+import { generateFingerprint } from '../security/deviceFingerprint';
+import { useLicenseMonitoring } from './useLicenseMonitoring';
+import { useDemoCountdown } from './useDemoCountdown';
 
 const APP_VERSION = '1.0.0';
 const PRODUCT_ID = 'bodega';
 
-const DEMO_DURATION_MS = 168 * 60 * 60 * 1000; // 168 horas (7 días)
-
-// FIX 2: Ofuscación XOR + btoa para tokens en localStorage
-// WARNING: This is basic obfuscation to prevent casual tampering by employees.
-// It is NOT cryptographically secure from a determined attacker.
-const XOR_KEY = 'PDA_SEC_2026';
-
-const encodeToken = (str) => {
-    try {
-        const xored = str.split('').map((c, i) =>
-            String.fromCharCode(
-                c.charCodeAt(0) ^ XOR_KEY.charCodeAt(i % XOR_KEY.length)
-            )
-        ).join('');
-        return btoa(unescape(encodeURIComponent(xored)));
-    } catch { return str; }
-};
-
-const decodeToken = (encoded) => {
-    try {
-        const xored = decodeURIComponent(escape(atob(encoded)));
-        return xored.split('').map((c, i) =>
-            String.fromCharCode(
-                c.charCodeAt(0) ^ XOR_KEY.charCodeAt(i % XOR_KEY.length)
-            )
-        ).join('');
-    } catch { return encoded; }
-};
-
-
+const DEMO_DURATION_MS = 168 * 60 * 60 * 1000; // 168 horas (7 dias)
 
 export function useSecurity() {
     const [deviceId, setDeviceId] = useState('');
@@ -42,63 +17,50 @@ export function useSecurity() {
     const [loading, setLoading] = useState(true);
     const [isDemo, setIsDemo] = useState(false);
     const [demoExpires, setDemoExpires] = useState(null);
-    const [demoExpiredMsg, setDemoExpiredMsg] = useState('');
-    const [demoTimeLeft, setDemoTimeLeft] = useState('');
-    // FIX 3: demoUsed como estado, leído desde IndexedDB
+    // FIX 3: demoUsed como estado, leido desde IndexedDB
     const [demoUsed, setDemoUsed] = useState(false);
+    const [integrityWarning, setIntegrityWarning] = useState(false);
+    const lastIntegrityCheckRef = useRef(0);
 
-    // Calcular tiempo restante formateado
-    const updateTimeLeft = useCallback((expiresAt) => {
-        if (!expiresAt) { setDemoTimeLeft(''); return; }
-        const diff = expiresAt - Date.now();
-        if (diff <= 0) { setDemoTimeLeft(''); return; }
+    // Demo countdown hook
+    const {
+        demoTimeLeft,
+        demoExpiredMsg,
+        setDemoExpiredMsg,
+        dismissExpiredMsg,
+    } = useDemoCountdown({
+        isDemo,
+        demoExpiresAt: demoExpires,
+        onExpired: () => {
+            setIsPremium(false);
+            setIsDemo(false);
+        },
+    });
 
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-        if (days > 0) setDemoTimeLeft(`${days}d ${hours}h`);
-        else if (hours > 0) setDemoTimeLeft(`${hours}h ${mins}m`);
-        else setDemoTimeLeft(`${mins}m`);
-    }, []);
+    // License monitoring hook
+    useLicenseMonitoring({
+        deviceId,
+        isPremium,
+        isDemo,
+        onRevoked: (msg) => {
+            setIsPremium(false);
+            setIsDemo(false);
+            setDemoExpiredMsg(msg);
+            setLoading(false);
+        },
+        onPermanentActivated: () => {
+            setIsPremium(true);
+            setIsDemo(false);
+            setDemoExpires(null);
+        },
+        onDemoActivated: (expiresAt) => {
+            setIsPremium(true);
+            setIsDemo(true);
+            setDemoExpires(expiresAt);
+        },
+    });
 
     useEffect(() => {
-        // 1. Obtener o Generar Device ID a través de fingerprinting
-        const generateFingerprint = async () => {
-            const nav = window.navigator;
-            const screen = window.screen;
-
-            const components = [
-                nav.userAgent,
-                nav.language,
-                nav.hardwareConcurrency || 1,
-                nav.deviceMemory || 1,
-                screen.width,
-                screen.height,
-                screen.colorDepth,
-                new Date().getTimezoneOffset()
-            ].join('|');
-
-            if (!window.crypto || !window.crypto.subtle) {
-                // Fallback (solo en http sin SSL)
-                let hash = 0;
-                for (let i = 0; i < components.length; i++) {
-                    hash = ((hash << 5) - hash) + components.charCodeAt(i);
-                    hash |= 0;
-                }
-                const hex = Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
-                return `PDA-${hex}`;
-            }
-
-            // Mismo hardware = mismo hash SHA-256
-            const encoder = new TextEncoder();
-            const data = encoder.encode(components);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase().substring(0, 8);
-            return `PDA-${hex}`;
-        };
-
         const initDeviceId = async () => {
             let storedId = localStorage.getItem('pda_device_id');
             if (!storedId) {
@@ -126,134 +88,17 @@ export function useSecurity() {
         });
     }, []);
 
-    // Heartbeat + chequeo de revocación en tiempo real
-    useEffect(() => {
-        if (!deviceId || !import.meta.env.VITE_SUPABASE_URL) return;
-
-        // Función de chequeo rápido de estado
-        const verifyStatus = async () => {
-            try {
-                const { data: license, error } = await supabase
-                    .from('licenses')
-                    .select('type, active, expires_at')
-                    .eq('device_id', deviceId)
-                    .eq('product_id', PRODUCT_ID)
-                    .maybeSingle();
-
-                if (license && (license.active === false || license.type === 'revoked') && isPremium) {
-                    // Revocado
-                    localStorage.removeItem('pda_premium_token');
-                    setIsPremium(false);
-                    setIsDemo(false);
-                    setDemoExpiredMsg("Tu licencia ha sido desactivada. Contacta al administrador.");
-                } else if (license && license.active === true) {
-                    // Verificar si demo venció por fecha
-                    if (license.type === 'demo7' && license.expires_at) {
-                        const expiresAt = new Date(license.expires_at).getTime();
-                        if (Date.now() >= expiresAt && isPremium) {
-                            localStorage.removeItem('pda_premium_token');
-                            setIsPremium(false);
-                            setIsDemo(false);
-                            setDemoExpiredMsg("Tu licencia temporal ha finalizado. Esperamos que hayas disfrutado la experiencia completa.");
-                            setLoading(false);
-                            return;
-                        }
-                    }
-
-                    // Si el backend cambio el tipo de licencia, actualizar estado local sin recargar
-                    if (license.type === 'permanent' && (!isPremium || isDemo)) {
-                        // Demo (o Expirado) -> Permanente: actualizar token y estado
-                        const token = { deviceId, type: 'permanent' };
-                        localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
-                        setIsPremium(true);
-                        setIsDemo(false);
-                        setDemoExpires(null);
-                        setDemoTimeLeft('');
-                    } else if (license.type === 'demo7' && (!isPremium || !isDemo) && license.expires_at) {
-                        // Permanente (o Expirado) -> Demo: actualizar token y estado
-                        const expiresAt = new Date(license.expires_at).getTime();
-                        if (Date.now() < expiresAt) {
-                            const token = { deviceId, type: 'demo7', expires: expiresAt, isDemo: true };
-                            localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
-                            setIsPremium(true);
-                            setIsDemo(true);
-                            setDemoExpires(expiresAt);
-                        }
-                    }
-                }
-            } catch (e) { }
-        };
-
-        const sendHeartbeat = async () => {
-            verifyStatus();
-            try {
-                const clientName = localStorage.getItem('business_name') || localStorage.getItem('restaurant_name') || '';
-                await supabase.rpc('heartbeat_device', { p_device_id: deviceId, p_product_id: PRODUCT_ID, p_client_name: clientName });
-            } catch (e) { }
-        };
-
-        // 1. Ejecutar heartbeat al montar y cada 4 horas
-        sendHeartbeat();
-        const heartbeatInterval = setInterval(sendHeartbeat, 4 * 60 * 60 * 1000);
-
-        // 2. Poll de estado cada 1 minuto para revocaciones rapidas
-        const statusInterval = setInterval(verifyStatus, 60 * 1000);
-
-        // 3. Revisar apenas el usuario regrese a la app
-        const handleVisibility = () => {
-            if (document.visibilityState === 'visible') verifyStatus();
-        };
-        document.addEventListener('visibilitychange', handleVisibility);
-
-        // 4. Supabase Realtime para deteccion instantanea
-        let subscription = null;
-        try {
-            subscription = supabase
-                .channel(`licenses_sync_${deviceId}`)
-                .on('postgres_changes', {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'licenses',
-                    filter: `device_id=eq.${deviceId}`,
-                }, () => {
-                    verifyStatus();
-                })
-                .subscribe();
-        } catch (e) { }
-
-        return () => {
-            clearInterval(heartbeatInterval);
-            clearInterval(statusInterval);
-            document.removeEventListener('visibilitychange', handleVisibility);
-            if (subscription) subscription.unsubscribe();
-        };
-    }, [isPremium, isDemo, deviceId]);
-
-    // Countdown timer para demo
-    useEffect(() => {
-        if (!isDemo || !demoExpires) return;
-        updateTimeLeft(demoExpires);
-        const interval = setInterval(() => {
-            const diff = demoExpires - Date.now();
-            if (diff <= 0) {
-                // Demo expiró en tiempo real
-                clearInterval(interval);
-                localStorage.removeItem('pda_premium_token');
-                setIsPremium(false);
-                setIsDemo(false);
-                setDemoTimeLeft('');
-                setDemoExpiredMsg("Tu licencia temporal ha finalizado. Esperamos que hayas disfrutado la experiencia completa.");
-            } else {
-                updateTimeLeft(demoExpires);
-            }
-        }, 60000); // Cada minuto
-        return () => clearInterval(interval);
-    }, [isDemo, demoExpires, updateTimeLeft]);
-
-    // FIX 4: Integrity check periódico cada 30 minutos
+    // FIX 4: Integrity check periodico cada 30 minutos
     useEffect(() => {
         if (!deviceId) return;
+        const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown between checks
+
         const interval = setInterval(async () => {
+            // Cooldown: skip if less than 5 minutes since last check
+            const now = Date.now();
+            if (now - lastIntegrityCheckRef.current < COOLDOWN_MS) return;
+            lastIntegrityCheckRef.current = now;
+
             const raw = localStorage.getItem('pda_premium_token');
 
             // Si localStorage fue borrado, intentar restaurar desde servidor
@@ -267,16 +112,19 @@ export function useSecurity() {
                         .maybeSingle();
 
                     if (remoteLicense?.active === true) {
-                        // Restaurar desde servidor
-                        window.location.reload();
+                        // Restaurar desde servidor — re-run license check instead of reload
+                        console.warn('[Security] Token missing but license active on server. Re-checking license.');
+                        setIntegrityWarning(true);
+                        checkLicense(deviceId);
                         return;
                     }
                 } catch { }
-                // Si no hay licencia activa en servidor y estaba premium → revocar
+                // Si no hay licencia activa en servidor y estaba premium -> revocar
                 if (isPremium) {
+                    console.warn('[Security] Token missing and no active server license. Revoking premium.');
                     setIsPremium(false);
                     setIsDemo(false);
-                    window.location.reload();
+                    setIntegrityWarning(true);
                 }
                 return;
             }
@@ -286,20 +134,22 @@ export function useSecurity() {
                 try {
                     const token = decodeToken(raw);
                     const obj = JSON.parse(token);
-                    // Si es demo y ya expiró
+                    // Si es demo y ya expiro
                     if (obj?.type === 'demo7' && obj?.expires && Date.now() >= obj.expires) {
                         localStorage.removeItem('pda_premium_token');
                         setIsPremium(false);
                         setIsDemo(false);
-                        window.location.reload();
+                        setDemoExpiredMsg("Tu licencia temporal ha finalizado. Esperamos que hayas disfrutado la experiencia completa.");
+                        console.warn('[Security] Demo token expired during integrity check.');
                     }
                 } catch {
-                    // Token corrupto → verificar contra servidor
+                    // Token corrupto -> verificar contra servidor
                     if (isPremium) {
                         localStorage.removeItem('pda_premium_token');
                         setIsPremium(false);
                         setIsDemo(false);
-                        window.location.reload();
+                        setIntegrityWarning(true);
+                        console.warn('[Security] Corrupt token detected. Revoking premium state.');
                     }
                 }
             }
@@ -376,7 +226,7 @@ export function useSecurity() {
                     if (remoteLicense && remoteLicense.active === false) {
                         revokedRemotely = true;
                     }
-                } catch (e) { /* Sin red → confiar en token local */ }
+                } catch (e) { /* Sin red -> confiar en token local */ }
 
                 if (revokedRemotely) {
                     localStorage.removeItem('pda_premium_token');
@@ -416,7 +266,7 @@ export function useSecurity() {
             setIsPremium(false);
         }
 
-        // FIX 5: Guardar backup en sessionStorage si licencia válida
+        // FIX 5: Guardar backup en sessionStorage si licencia valida
         if (isPremiumConfirmed) {
             try {
                 sessionStorage.setItem(
@@ -426,7 +276,7 @@ export function useSecurity() {
             } catch { }
         }
 
-        // Migración silenciosa: asegurar registro en Supabase via RPC seguro
+        // Migracion silenciosa: asegurar registro en Supabase via RPC seguro
         if (isPremiumConfirmed) {
             const migrateToSupabase = async () => {
                 try {
@@ -455,7 +305,7 @@ export function useSecurity() {
     };
 
     /**
-     * Activa la demo de 7 días sin necesidad de código.
+     * Activa la demo de 7 dias sin necesidad de codigo.
      * Solo puede usarse UNA VEZ por dispositivo.
      */
     const activateDemo = async () => {
@@ -486,7 +336,7 @@ export function useSecurity() {
                 return { success: false, status: 'DEMO_USED' };
             }
         } catch (e) {
-            // Sin red → solo validar local
+            // Sin red -> solo validar local
         }
 
         const expires = Date.now() + DEMO_DURATION_MS;
@@ -525,13 +375,13 @@ export function useSecurity() {
     };
 
     /**
-     * Desbloquea con código de activación.
-     * Consulta Supabase para determinar si es permanente o temporal (7/30 días).
+     * Desbloquea con codigo de activacion.
+     * Consulta Supabase para determinar si es permanente o temporal (7/30 dias).
      */
     const unlockApp = async (inputCode) => {
         try {
             const cleanCode = (inputCode || "").trim().toUpperCase().replace(/O/g, '0');
-            // FIX: Validar el código directamente contra la base de datos para ignorar fallos de Edge Functions
+            // FIX: Validar el codigo directamente contra la base de datos para ignorar fallos de Edge Functions
             const { data: license, error } = await supabase
                 .from('licenses')
                 .select('type, active, expires_at, code')
@@ -544,7 +394,7 @@ export function useSecurity() {
             }
 
             const { type, active, expires_at } = license;
-            
+
             if (!active) {
                 return { success: false, status: 'LICENSE_REVOKED' };
             }
@@ -575,7 +425,7 @@ export function useSecurity() {
             setIsPremium(true);
             setIsDemo(false);
             return { success: true, status: 'PREMIUM_ACTIVATED' };
-            
+
         } catch (err) {
             console.error('Error validating license:', err);
             return { success: false, status: 'SERVER_ERROR' };
@@ -615,5 +465,7 @@ export function useSecurity() {
         // FIX 3: demoUsed desde estado (IndexedDB)
         demoUsed,
         forceHeartbeat,
+        integrityWarning,
+        dismissIntegrityWarning: () => setIntegrityWarning(false),
     };
 }

@@ -23,10 +23,8 @@ import { useOfflineQueue } from './hooks/useOfflineQueue';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import CommandPalette from './components/CommandPalette';
 // LockScreen and useAutoLock removed - single-user app
-import { useAuthStore } from './hooks/store/useAuthStore';
 import { purgeOldEntries } from './services/auditService';
 import { useCloudSync } from './hooks/useCloudSync';
-import { supabaseCloud } from './config/supabaseCloud';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
@@ -56,7 +54,7 @@ export default function App() {
 
   const lastClickTimeRef = useRef(0);
 
-  const { rates, loading, isOffline, updateData } = useRates();
+  const { rates } = useRates();
   const { isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg, deviceId } = useSecurity();
   const { isOnline, cacheRates } = useOfflineQueue();
   useAutoBackup(isPremium, isDemo, deviceId);
@@ -154,9 +152,6 @@ export default function App() {
       window.removeEventListener('focusout', handleFocusBack);
     };
   }, []);
-
-  // === Single-user mode: owner is always admin ===
-  const isCajero = false;
 
   const ALL_TABS = [
     { id: 'inicio', label: 'Inicio', icon: Home },

@@ -18,6 +18,8 @@ export const useAuthStore = create(
             })(),
             usuarios: DEFAULT_USERS,
             requireLogin: false, // Login opcional, por defecto desactivado
+            failedAttempts: 0,
+            lockUntil: null,
             adminEmail: '',
             adminPassword: '',
 
@@ -26,7 +28,14 @@ export const useAuthStore = create(
             login: async (pinInput, userId) => {
                 // Simular un pequeño retardo para feedback visual (UX)
                 await new Promise(r => setTimeout(r, 400));
-                
+
+                // Brute force protection
+                const now = Date.now();
+                if (get().lockUntil && now < get().lockUntil) {
+                    const secsLeft = Math.ceil((get().lockUntil - now) / 1000);
+                    return { success: false, error: `Bloqueado. Intente en ${secsLeft}s` };
+                }
+
                 const { usuarios } = get();
                 
                 let userEncontrado;
@@ -38,13 +47,16 @@ export const useAuthStore = create(
                 }
 
                 if (userEncontrado) {
-                    set({ usuarioActivo: userEncontrado });
+                    set({ usuarioActivo: userEncontrado, failedAttempts: 0, lockUntil: null });
                     localStorage.setItem('abasto-device-session', JSON.stringify(userEncontrado));
                     logEvent('AUTH', 'LOGIN', `${userEncontrado.nombre} inicio sesion`, userEncontrado);
-                    return true;
+                    return { success: true };
                 }
-                
-                return false;
+
+                const attempts = get().failedAttempts + 1;
+                const lockUntil = attempts >= 5 ? Date.now() + 30000 : null; // 30s lockout after 5 fails
+                set({ failedAttempts: attempts, lockUntil });
+                return { success: false };
             },
 
             logout: () => {

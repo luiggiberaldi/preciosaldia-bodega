@@ -1,6 +1,6 @@
 import { FinancialEngine } from '../core/FinancialEngine';
 import { getLocalISODate } from './dateHelpers';
-import { mulR, sumR } from './dinero';
+import { mulR, sumR, round2 } from './dinero';
 
 export function calculateReportsData(allSales, from, to, bcvRate, products) {
     // Ventas de Mercancía (para Totales, Profit, Top Productos)
@@ -46,7 +46,7 @@ export function calculateReportsData(allSales, from, to, bcvRate, products) {
     salesForStats.forEach(s => {
         const day = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
         if (!map[day]) map[day] = { date: day, total: 0, count: 0 };
-        map[day].total += s.totalUsd || 0;
+        map[day].total = round2(map[day].total + (s.totalUsd || 0));
         map[day].count++;
     });
     const salesByDay = Object.values(map).sort((a, b) => a.date.localeCompare(b.date));

@@ -11,7 +11,6 @@ const SYNC_KEYS = [
     'monitor_rates_v12',
     'bodega_accounts_v2',
     'abasto_audit_log_v1',
-    'abasto-auth-storage',
     'bodega_custom_rate',
     'bodega_use_auto_rate',
     'tasa_cop',
@@ -86,6 +85,8 @@ async function _applyFromCloud(docId, collection, payload) {
     isSyncingFromCloud = true;
     try {
         if (collection === 'local') {
+            // Ignorar payload nulo/undefined para no escribir "undefined" en localStorage
+            if (payload == null) return;
             const stringPayload = typeof payload === 'string' ? payload : JSON.stringify(payload);
             originalSetItem(docId, stringPayload);   // Escribe sin pasar por el interceptor
             window.dispatchEvent(new StorageEvent('storage', {

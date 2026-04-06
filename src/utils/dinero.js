@@ -17,9 +17,8 @@
  */
 export const round2 = (n) => {
     if (!Number.isFinite(n)) return 0;
-    // Corrección: sumamos un epsilon antes de multiplicar para que
-    // valores como 1.005 * 100 = 100.5 (no 100.49999...)
-    return Math.round((n + Number.EPSILON) * 100) / 100;
+    const sign = n < 0 ? -1 : 1;
+    return sign * Math.round((Math.abs(n) + Number.EPSILON) * 100) / 100;
 };
 
 /**
@@ -29,7 +28,8 @@ export const round2 = (n) => {
  */
 export const round4 = (n) => {
     if (!Number.isFinite(n)) return 0;
-    return Math.round((n + Number.EPSILON) * 10000) / 10000;
+    const sign = n < 0 ? -1 : 1;
+    return sign * Math.round((Math.abs(n) + Number.EPSILON) * 10000) / 10000;
 };
 
 /**

@@ -23,7 +23,7 @@ export const ProductShareModal = ({ isOpen, onClose, product, rates, accounts, s
     if (!product) return null;
 
     // Cálculos
-    const valBs = product.priceUsdt * rates.bcv.price;
+    const valBs = product.priceUsdt * (rates?.bcv?.price || 1);
 
     // Lógica Street Rate (Calibrada)
     // Si hay tasa calibrada (>0), el precio efectivo es Bs / TasaCalibrada
@@ -59,11 +59,11 @@ export const ProductShareModal = ({ isOpen, onClose, product, rates, accounts, s
 
         // Referencias explícitas
         if (config.showRefBcv) {
-            const refBcv = valBs / rates.bcv.price;
+            const refBcv = rates?.bcv?.price ? valBs / rates.bcv.price : product.priceUsdt;
             lines.push(`Ref. BCV: $${formatUsd(refBcv).replace('$', '')}`);
         }
         if (config.showRefEuro) {
-            const refEur = valBs / rates.euro.price;
+            const refEur = rates?.euro?.price ? valBs / rates.euro.price : product.priceUsdt;
             lines.push(`Ref. Euro: €${formatUsd(refEur).replace('$', '').replace('€', '')}`);
         }
 
@@ -102,7 +102,8 @@ export const ProductShareModal = ({ isOpen, onClose, product, rates, accounts, s
 
         // Helper: Convert DataURL to File
         const dataURLtoFile = (dataurl, filename) => {
-            let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+            let arr = dataurl.split(','), mimeMatch = arr[0].match(/:(.*?);/),
+                mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream',
                 bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
             while (n--) u8arr[n] = bstr.charCodeAt(n);
             return new File([u8arr], filename, { type: mime });

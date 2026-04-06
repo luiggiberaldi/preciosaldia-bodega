@@ -12,6 +12,7 @@ import { useWallet } from '../hooks/useWallet';
 import { BODEGA_CATEGORIES, UNITS, CATEGORY_COLORS } from '../config/categories';
 import ProductCard from '../components/Products/ProductCard';
 import ProductFormModal from '../components/Products/ProductFormModal';
+import ProductsToolbar from '../components/Products/ProductsToolbar';
 import ConfirmModal from '../components/ConfirmModal';
 import CategoryManagerModal from '../components/Products/CategoryManagerModal';
 import BulkPriceAdjustModal from '../components/Products/BulkPriceAdjustModal';
@@ -21,8 +22,10 @@ import Skeleton from '../components/Skeleton';
 import SwipeableItem from '../components/SwipeableItem';
 import { useInventoryVelocity } from '../hooks/useInventoryVelocity';
 import { useProductFiltering } from '../hooks/useProductFiltering';
+import { useProductForm } from '../hooks/useProductForm';
+import { useProductSorting } from '../hooks/useProductSorting';
 import { buildProductPayload } from '../utils/productProcessor';
-import { useAuthStore } from '../hooks/store/useAuthStore';
+// useAuthStore removed - single-user app
 import { useAudit } from '../hooks/useAudit';
 
 export const ProductsView = ({ rates, triggerHaptic }) => {
@@ -39,7 +42,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         tasaCop,
         adjustStock: baseAdjustStock
     } = useProductContext();
-    const isCajero = useAuthStore(s => s.usuarioActivo)?.rol === 'CAJERO';
+    const isCajero = false; // Single-user mode: owner has full access
     const { log: auditLog } = useAudit();
 
     // Envolver adjustStock para incluir registro de movimiento + haptic
@@ -82,8 +85,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [activeCategory, setActiveCategory] = useState('todos');
     const [currentPage, setCurrentPage] = useState(1);
     const [viewMode, setViewMode] = useState(() => localStorage.getItem('bodega_inventory_view') || 'grid');
-    const [sortField, setSortField] = useState(null);
-    const [sortDir, setSortDir] = useState('asc');
+    const { sortField, sortDir, handleSort: baseSortHandler } = useProductSorting();
+    const handleSort = (field) => baseSortHandler(field, setCurrentPage);
     const [itemsPerPage, setItemsPerPage] = useState(() => {
         const mode = localStorage.getItem('bodega_inventory_view') || 'grid';
         return mode === 'list' ? 25 : (window.innerWidth >= 1024 ? 12 : 8);
@@ -103,16 +106,6 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         setCurrentPage(1);
         setItemsPerPage(next === 'list' ? 25 : (window.innerWidth >= 1024 ? 12 : 8));
         triggerHaptic && triggerHaptic();
-    };
-
-    const handleSort = (field) => {
-        if (sortField === field) {
-            setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortField(field);
-            setSortDir('asc');
-        }
-        setCurrentPage(1);
     };
 
     // Selección múltiple para etiquetas
@@ -145,28 +138,29 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     };
 
     // Form State (Product Edit/Create)
-    const [editingId, setEditingId] = useState(null);
-    const [name, setName] = useState('');
-    const [barcode, setBarcode] = useState('');
-    const [priceUsd, setPriceUsd] = useState('');
-    const [priceBs, setPriceBs] = useState('');
-    const [costUsd, setCostUsd] = useState('');
-    const [costBs, setCostBs] = useState('');
-    const [stock, setStock] = useState('');
-    const [unit, setUnit] = useState('unidad');
-    const [unitsPerPackage, setUnitsPerPackage] = useState('');
-    const [sellByUnit, setSellByUnit] = useState(false);
-    const [unitPriceUsd, setUnitPriceUsd] = useState('');
-    const [category, setCategory] = useState('otros');
-    const [lowStockAlert, setLowStockAlert] = useState('5');
-    const [image, setImage] = useState(null);
-    // New packaging states
-    const [packagingType, setPackagingType] = useState('suelto');
-    const [stockInLotes, setStockInLotes] = useState('');
-    const [granelUnit, setGranelUnit] = useState('kg');
-    
-    // UI states
-    const [isFormShaking, setIsFormShaking] = useState(false);
+    const {
+        editingId, setEditingId,
+        name, setName,
+        barcode, setBarcode,
+        priceUsd, setPriceUsd,
+        priceBs, setPriceBs,
+        costUsd, setCostUsd,
+        costBs, setCostBs,
+        stock, setStock,
+        unit, setUnit,
+        unitsPerPackage, setUnitsPerPackage,
+        sellByUnit, setSellByUnit,
+        unitPriceUsd, setUnitPriceUsd,
+        category, setCategory,
+        lowStockAlert, setLowStockAlert,
+        image, setImage,
+        packagingType, setPackagingType,
+        stockInLotes, setStockInLotes,
+        granelUnit, setGranelUnit,
+        isFormShaking, setIsFormShaking,
+        resetForm,
+        populateForm,
+    } = useProductForm();
     const fileInputRef = useRef(null);
     const categoryScrollRef = useRef(null);
 
@@ -292,52 +286,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     const handleEdit = async (product) => {
         triggerHaptic && triggerHaptic();
-        setEditingId(product.id);
-        setName(product.name);
-        setBarcode(product.barcode || '');
-
-        const currentPriceUsd = product.priceUsdt || 0;
-        setPriceUsd(currentPriceUsd > 0 ? currentPriceUsd.toString() : '');
-        setPriceBs(currentPriceUsd > 0 ? (currentPriceUsd * effectiveRate).toFixed(2) : '');
-
-        const currentCostUsd = product.costUsd || (product.costBs ? product.costBs / effectiveRate : 0);
-        setCostUsd(currentCostUsd > 0 ? currentCostUsd.toFixed(2) : '');
-
-        const currentCostBs = product.costBs || (product.costUsd ? product.costUsd * effectiveRate : 0);
-        setCostBs(currentCostBs > 0 ? currentCostBs.toFixed(2) : '');
-
-        setStock(product.stock ?? '');
-        setUnit(product.unit || 'unidad');
-        setUnitsPerPackage(product.unitsPerPackage || '');
-        setSellByUnit(product.sellByUnit || false);
-        setUnitPriceUsd(product.unitPriceUsd ? product.unitPriceUsd.toString() : '');
-        setCategory(product.category || 'otros');
-        setLowStockAlert(product.lowStockAlert ?? 5);
-        setImage(product.image);
-
-        // Derive packagingType from legacy unit
-        const u = product.unit || 'unidad';
-        if (product.packagingType) {
-            setPackagingType(product.packagingType);
-        } else if (u === 'paquete') {
-            setPackagingType('lote');
-        } else if (u === 'kg' || u === 'litro') {
-            setPackagingType('granel');
-            setGranelUnit(u);
-        } else {
-            setPackagingType('suelto');
-        }
-
-        // Stock in lotes
-        if (product.stockInLotes) {
-            setStockInLotes(product.stockInLotes.toString());
-        } else if (u === 'paquete' && product.unitsPerPackage && product.stock) {
-            setStockInLotes(Math.floor(product.stock / (product.unitsPerPackage || 1)).toString());
-        } else {
-            setStockInLotes('');
-        }
-
-        if (u === 'kg' || u === 'litro') setGranelUnit(u);
+        populateForm(product, effectiveRate);
 
         setIsModalOpen(true);
 
@@ -374,8 +323,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     };
 
     const handleClose = () => {
-        setName(''); setBarcode(''); setPriceUsd(''); setPriceBs(''); setCostUsd(''); setCostBs(''); setStock(''); setUnit('unidad'); setUnitsPerPackage(''); setSellByUnit(false); setUnitPriceUsd(''); setCategory('otros'); setLowStockAlert('5'); setImage(null); setEditingId(null); setIsModalOpen(false);
-        setPackagingType('suelto'); setStockInLotes(''); setGranelUnit('kg');
+        resetForm();
+        setIsModalOpen(false);
         setProductMovements([]);
     };
 
@@ -431,106 +380,28 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-3 sm:p-6 overflow-y-auto">
 
-            {/* Header — Fila 1: Título + Acciones */}
-            <div className="shrink-0 mb-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                        <Store size={22} className="text-brand shrink-0" />
-                        <h2 className="text-lg sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight truncate">Inventario</h2>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                        {products.length > 0 && !isCajero && (
-                            <>
-                                <button onClick={() => { triggerHaptic && triggerHaptic(); setIsBulkPriceOpen(true); }}
-                                    className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 rounded-xl transition-all active:scale-95" title="Ajuste Masivo de Precios">
-                                    <Percent size={16} strokeWidth={2.5} />
-                                </button>
-                                <button onClick={() => { triggerHaptic && triggerHaptic(); setIsDeleteAllModalOpen(true); }}
-                                    className="p-2 bg-red-100 dark:bg-red-900/30 text-red-500 dark:text-red-400 rounded-xl transition-all active:scale-95" title="Borrar Todo">
-                                    <Trash2 size={16} strokeWidth={2.5} />
-                                </button>
-                            </>
-                        )}
-                        {!isCajero && (
-                        <button onClick={() => { triggerHaptic && triggerHaptic(); setIsModalOpen(true); }}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl shadow-md shadow-brand/20 transition-all active:scale-95 font-bold text-sm" title="Agregar">
-                            <Plus size={16} strokeWidth={2.5} />
-                            <span className="hidden sm:inline">Nuevo</span>
-                        </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Fila 2: Stats clicables + View Toggle */}
-                <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2.5 py-1 rounded-full">
-                        {products.length} productos
-                    </span>
-                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 hidden sm:block" />
-                    <button 
-                        onClick={() => { triggerHaptic && triggerHaptic(); setSelectedIds(new Set(products.map(p => p.id))); showToast('Todo el inventario seleccionado', 'success'); }}
-                        className="text-[10px] font-bold bg-brand/10 text-brand px-2.5 py-1 rounded-full flex items-center gap-1 cursor-pointer hover:bg-brand/20 transition-colors active:scale-95"
-                    >
-                        <CheckSquare size={12} /> <span className="hidden sm:inline">Seleccionar todo</span><span className="sm:hidden">Todos</span>
-                    </button>
-                    {lowStockCount > 0 && (
-                        <>
-                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
-                            <button
-                                onClick={() => { handleSetActiveCategory('bajo-stock'); triggerHaptic && triggerHaptic(); }}
-                                className="text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-full flex items-center gap-1 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors">
-                                ⚠️ {lowStockCount} bajo stock
-                            </button>
-                        </>
-                    )}
-                    <div className="ml-auto" />
-                    <button
-                        onClick={toggleViewMode}
-                        className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-brand hover:border-brand-light transition-all active:scale-95"
-                        title={viewMode === 'grid' ? 'Cambiar a vista lista' : 'Cambiar a vista cuadrícula'}
-                    >
-                        {viewMode === 'grid' ? <List size={16} /> : <LayoutGrid size={16} />}
-                    </button>
-                </div>
-
-                {/* Category Filter Pills — horizontal scroll with fade */}
-                <div className="relative">
-                    <div ref={categoryScrollRef} className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-hide scroll-smooth snap-x">
-                        {categories.map(cat => (
-                            <button
-                                key={cat.id}
-                                onClick={() => { handleSetActiveCategory(cat.id); triggerHaptic && triggerHaptic(); }}
-                                className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all snap-start border ${activeCategory === cat.id
-                                    ? 'bg-brand text-white shadow-sm shadow-brand/20 border-brand'
-                                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 active:scale-95'
-                                    }`}
-                            >
-                                {cat.label}
-                            </button>
-                        ))}
-                        <button
-                            onClick={() => { triggerHaptic && triggerHaptic(); setIsCategoryManagerOpen(true); }}
-                            className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-transparent active:scale-95 flex items-center gap-1 snap-start"
-                        >
-                            <Pencil size={12} /> Editar
-                        </button>
-                    </div>
-                    {/* Right fade indicator for scroll */}
-                    <div className="pointer-events-none absolute right-0 top-0 bottom-1.5 w-8 bg-gradient-to-l from-slate-50 dark:from-slate-950 to-transparent sm:hidden" />
-                </div>
-
-                {/* Search Bar — slimmer on mobile */}
-                <div className="relative">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar producto..."
-                        value={searchTerm}
-                        onChange={(e) => handleSetSearchTerm(e.target.value)}
-                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 sm:py-3 pl-9 sm:pl-12 pr-4 text-sm text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 shadow-sm"
-                    />
-                </div>
-            </div>
+            {/* Header — Toolbar */}
+            <ProductsToolbar
+                products={products}
+                categories={categories}
+                activeCategory={activeCategory}
+                searchTerm={searchTerm}
+                viewMode={viewMode}
+                selectedIds={selectedIds}
+                lowStockCount={lowStockCount}
+                isCajero={isCajero}
+                categoryScrollRef={categoryScrollRef}
+                handleSetSearchTerm={handleSetSearchTerm}
+                handleSetActiveCategory={handleSetActiveCategory}
+                toggleViewMode={toggleViewMode}
+                setSelectedIds={setSelectedIds}
+                setIsModalOpen={setIsModalOpen}
+                setIsBulkPriceOpen={setIsBulkPriceOpen}
+                setIsDeleteAllModalOpen={setIsDeleteAllModalOpen}
+                setIsCategoryManagerOpen={setIsCategoryManagerOpen}
+                triggerHaptic={triggerHaptic}
+                onSelectAllToast={() => showToast('Todo el inventario seleccionado', 'success')}
+            />
 
             {/* --- ACTION BAR SELECCION --- */}
             {selectedIds.size > 0 && (
@@ -623,7 +494,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                         onShare={setShareProduct}
                                         onEdit={handleEdit}
                                         onDelete={handleDelete}
-                                        readOnly={isCajero}
+                                        readOnly={false}
                                         daysRemaining={
                                             salesVelocityMap[p.id] > 0 && (p.stock ?? 0) > 0
                                                 ? Math.round((p.stock ?? 0) / salesVelocityMap[p.id])
@@ -865,14 +736,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
 
             <ShareInventoryModal
-                isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} products={products} categories={categories}
-                onImport={({ products: imported, categories: importedCats }) => {
-                    if (importedCats && importedCats.length > 0) {
-                        setCategories(importedCats);
-                    }
-                    setProducts(imported);
-                    showToast('Inventario importado correctamente', 'success');
-                }}
+                isOpen={isShareOpen}
+                onClose={() => setIsShareOpen(false)}
             />
             <BulkPriceAdjustModal
                 isOpen={isBulkPriceOpen}

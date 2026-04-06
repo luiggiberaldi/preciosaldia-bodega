@@ -107,7 +107,6 @@ export const storageService = {
                 if (typeof window !== "undefined") {
                     window.dispatchEvent(new CustomEvent("app_storage_update", { detail: { key } }));
                 }
-                pushCloudSync(key, value);
             } catch (e) {
                 console.error(`[Storage Error CRÍTICO] Ni IndexedDB ni LocalStorage funcionan para ${key}`, e);
             }

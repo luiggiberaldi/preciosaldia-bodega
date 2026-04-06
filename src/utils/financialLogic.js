@@ -1,3 +1,5 @@
+import { round2 } from './dinero';
+
 export function procesarImpactoCliente(clienteInicial, transaccion) {
     // CLONAR PARA INMUTABILIDAD
     let cliente = { ...clienteInicial };
@@ -24,7 +26,7 @@ export function procesarImpactoCliente(clienteInicial, transaccion) {
             // PRIORITY: DEBT FIRST
             if (deudaActual >= vueltoParaMonedero) {
                 // Paga parte de la deuda
-                cliente.deuda = parseFloat((deudaActual - vueltoParaMonedero).toFixed(2));
+                cliente.deuda = round2(deudaActual - vueltoParaMonedero);
                 // Nada al favor real, todo se consumió en deuda
             } else {
                 // Paga toda la deuda y sobra
@@ -42,11 +44,11 @@ export function procesarImpactoCliente(clienteInicial, transaccion) {
     const saldoNeto = (cliente.favor || 0) - (cliente.deuda || 0);
 
     if (saldoNeto >= 0) {
-        cliente.favor = parseFloat(saldoNeto.toFixed(2));
+        cliente.favor = round2(saldoNeto);
         cliente.deuda = 0;
     } else {
         cliente.favor = 0;
-        cliente.deuda = parseFloat(Math.abs(saldoNeto).toFixed(2));
+        cliente.deuda = round2(Math.abs(saldoNeto));
     }
 
     return cliente;

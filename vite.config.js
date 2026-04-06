@@ -87,6 +87,10 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom'],
           icons: ['lucide-react'],
+          supabase: ['@supabase/supabase-js'],
+          storage: ['localforage', 'zustand'],
+          pdf: ['jspdf'],
+          canvas: ['html2canvas'],
         }
       }
     }

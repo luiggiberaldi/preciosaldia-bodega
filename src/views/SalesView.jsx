@@ -5,7 +5,6 @@ import { useSounds } from '../hooks/useSounds';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
-import { getActivePaymentMethods } from '../config/paymentMethods';
 import { showToast } from '../components/Toast';
 import { ShoppingCart, X, DollarSign, CheckCircle2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -27,23 +26,21 @@ import AperturaCajaModal from '../components/Dashboard/AperturaCajaModal';
 
 import ConfirmModal from '../components/ConfirmModal';
 import Confetti from '../components/Confetti';
-import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useSalesKeyboard } from '../hooks/useSalesKeyboard';
+import { buildReceiptWhatsAppUrl } from '../components/Sales/ReceiptShareHelper';
 
-const SALES_KEY = 'bodega_sales_v1';
+// Extracted hooks
+import { useSalesData } from '../hooks/useSalesData';
+import { useCheckoutFlow } from '../hooks/useCheckoutFlow';
 
-export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }) {
+export default function SalesView({ triggerHaptic, isActive }) {
     const { playAdd, playRemove, playCheckout, playError } = useSounds();
-    const { notifySaleComplete, notifyLowStock } = useNotifications();
+    const { notifyLowStock } = useNotifications();
 
     // ── Global Context ──────────────────────────────────────
     const { products, setProducts, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
 
     // ── State ──────────────────────────────────────
-    const [customers, setCustomers] = useState([]);
-    const [paymentMethods, setPaymentMethods] = useState([]);
-    const [isLoadingLocal, setIsLoadingLocal] = useState(true);
-    const isLoading = isLoadingProducts || isLoadingLocal;
     const [showConfetti, setShowConfetti] = useState(false);
     const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
     const [showCustomAmountModal, setShowCustomAmountModal] = useState(false);
@@ -51,7 +48,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
     // Apertura Caja
     const [isAperturaOpen, setIsAperturaOpen] = useState(false);
-    const [todayAperturaData, setTodayAperturaData] = useState(null);
 
     // Cart (from global context)
     const { cart, setCart, cartRef, pendingNavigate, setPendingNavigate, discount, setDiscount } = useCart();
@@ -78,10 +74,21 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     // Cart Navigation State
     const [cartSelectedIndex, setCartSelectedIndex] = useState(-1);
 
+    // ── Sales Data Hook ─────────────────────────────
+    const {
+        customers, setCustomers,
+        paymentMethods,
+        isLoadingLocal,
+        salesData, setSalesData,
+        todayAperturaData, setTodayAperturaData,
+    } = useSalesData({ setCart, cartRef, setProducts, isActive });
+
+    const isLoading = isLoadingProducts || isLoadingLocal;
+
     // Auto-select last item when cart length changes (if user was already interacting with the cart)
     useEffect(() => {
-        if (cart.length > 0 && cartSelectedIndex !== -1) {
-            setCartSelectedIndex(Math.min(cartSelectedIndex, cart.length - 1));
+        if (cart.length > 0) {
+            setCartSelectedIndex(prev => prev === -1 ? prev : Math.min(prev, cart.length - 1));
         } else if (cart.length === 0) {
             setCartSelectedIndex(-1);
         }
@@ -90,7 +97,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     // Voice
     const handleSetSearchTerm = (text) => { setSearchTerm(text); setSelectedIndex(0); };
     const { isRecording, isProcessingAudio, startRecording, stopRecording } = useVoiceSearch({
-        onResult: (text) => { 
+        onResult: (text) => {
             if (!text) return;
             const normalizedTerm = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const bestMatches = products.filter(p => {
@@ -148,11 +155,11 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             const pluCode = parseInt(pastedText.substring(2, 7), 10).toString();
             const weightKg = parseInt(pastedText.substring(7, 12), 10) / 1000;
             const p = products.find(p => p.id === pluCode || p.barcode?.includes(pluCode) || p.barcode?.includes(pastedText.substring(0, 7)));
-            if (p) { 
-                addToCart({ ...p, isWeight: true }, weightKg); 
+            if (p) {
+                addToCart({ ...p, isWeight: true }, weightKg);
                 // Limpiamos el texto que se acaba de pegar
                 setTimeout(() => setSearchTerm(''), 10);
-                return; 
+                return;
             }
         }
 
@@ -172,7 +179,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const searchResults = useMemo(() => {
         if (deferredSearchTerm.length < 1) return [];
         const normalizedTerm = deferredSearchTerm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        
+
         return products.filter(p => {
             if (p.barcode?.includes(deferredSearchTerm)) return true;
             const normalizedName = p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -184,17 +191,17 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         ? products
         : products.filter(p => p.category === selectedCategory), [selectedCategory, products]);
 
-    const { 
-        subtotalUsd: cartSubtotalUsd, 
+    const {
+        subtotalUsd: cartSubtotalUsd,
         subtotalBs: cartSubtotalBs,
-        discountAmountUsd, 
-        discountAmountBs, 
-        totalUsd: cartTotalUsd, 
-        totalBs: cartTotalBs 
-    } = useMemo(() => 
+        discountAmountUsd,
+        discountAmountBs,
+        totalUsd: cartTotalUsd,
+        totalBs: cartTotalBs
+    } = useMemo(() =>
         FinancialEngine.buildCartTotals(cart, discount, effectiveRate, copEnabled ? tasaCop : 0)
     , [cart, discount, effectiveRate, copEnabled, tasaCop]);
-    
+
     // Variables estáticas para pasar a los componentes hijos
     const discountData = {
         active: discount?.value > 0,
@@ -205,7 +212,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     };
 
     // ── Current cash float (for soft change warning in CheckoutModal) ──
-    const [salesData, setSalesData] = useState([]);
     const currentFloat = useMemo(() => {
         const todayStr = getLocalISODate(new Date());
         const todayOpen = salesData.filter(s => {
@@ -224,8 +230,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
     const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
-    // Search Deferred Value for Performance (moved to top of memos)
-
     // Persist cart (With Debounce to avoid blocking UI on rapid scans)
     const isCartInitialized = useRef(false);
     useEffect(() => {
@@ -237,43 +241,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         return () => clearTimeout(timer);
     }, [cart]);
 
-    // Load data
-    useEffect(() => {
-        let mounted = true;
-        const load = async () => {
-            const [savedCustomers, methods, savedCart, savedSales] = await Promise.all([
-                storageService.getItem('bodega_customers_v1', []),
-                getActivePaymentMethods(),
-                storageService.getItem('bodega_pending_cart_v1', []),
-                storageService.getItem(SALES_KEY, [])
-            ]);
-            if (mounted) { setSalesData(savedSales); }
-            if (mounted) {
-                setCustomers(savedCustomers);
-                setPaymentMethods(methods);
-                
-                // Only set cart if it's currently empty (don't overwrite if user somehow added items before load)
-                if (savedCart && savedCart.length > 0 && cartRef.current.length === 0) {
-                    setCart(savedCart);
-                }
-
-                // Check Apertura (timezone-safe)
-                const todayStr = getLocalISODate(new Date());
-                const apertura = savedSales.find(s => {
-                    if (s.tipo !== 'APERTURA_CAJA' || s.cajaCerrada) return false;
-                    const saleDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : todayStr;
-                    return saleDay === todayStr;
-                });
-                setTodayAperturaData(apertura || null);
-                
-                setIsLoadingLocal(false);
-
-            }
-        };
-        load();
-        return () => { mounted = false; };
-    }, []);
-
     // Handle pending navigation from recycled cart (replaces old localStorage approach)
     useEffect(() => {
         if (pendingNavigate && cart.length > 0 && isActive) {
@@ -284,62 +251,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     // Auto-focus search
     useEffect(() => { if (!isLoading && searchInputRef.current) searchInputRef.current.focus(); }, [isLoading]);
 
-    // Refresh products, payment methods, and customers when tab becomes active (consolidates window focus + isActive)
-    const handleReloadContent = useCallback(() => {
-        if (!isActive) return;
-        Promise.all([
-            storageService.getItem('bodega_products_v1', []),
-            getActivePaymentMethods(),
-            storageService.getItem('bodega_customers_v1', []),
-            storageService.getItem(SALES_KEY, [])
-        ]).then(([savedProducts, methods, savedCustomers, savedSales]) => {
-            setProducts(savedProducts);
-            setPaymentMethods(methods);
-            setCustomers(savedCustomers);
-            setSalesData(savedSales);
-            
-            // Recalculate Apertura (uses imported getLocalISODate)
-            const todayStr = getLocalISODate(new Date());
-            
-            const apertura = savedSales.find(s => {
-                if (s.tipo !== 'APERTURA_CAJA' || s.cajaCerrada) return false;
-                const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : todayStr;
-                return saleLocalDay === todayStr;
-            });
-            setTodayAperturaData(apertura || null);
-        });
-    }, [isActive, setProducts]);
-
-    useEffect(() => {
-        handleReloadContent();
-    }, [handleReloadContent]);
-
-    // Recargar cuando la app vuelve desde el background en móviles (PWA) o cuando hay un cambio en el storage
-    useEffect(() => {
-        const onVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                handleReloadContent();
-            }
-        };
-
-        const onStorageUpdate = (e) => {
-            if (e.detail && e.detail.key === SALES_KEY) {
-                // Pequeño timeout para dar margen a que IndexedDB haya persistido los datos
-                setTimeout(handleReloadContent, 50);
-            }
-        };
-
-        document.addEventListener('visibilitychange', onVisibilityChange);
-        window.addEventListener('focus', handleReloadContent);
-        window.addEventListener('app_storage_update', onStorageUpdate);
-        
-        return () => {
-            document.removeEventListener('visibilitychange', onVisibilityChange);
-            window.removeEventListener('focus', handleReloadContent);
-            window.removeEventListener('app_storage_update', onStorageUpdate);
-        };
-    }, [handleReloadContent]);
-
     // Return focus after closing modals
     useEffect(() => { if (!showCheckout && !showReceipt && searchInputRef.current) searchInputRef.current.focus(); }, [showCheckout, showReceipt]);
 
@@ -349,12 +260,22 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             if (e.key === 'F9') { e.preventDefault(); if (cart.length > 0 && !showCheckout && !showReceipt) setShowCheckout(true); }
             if (e.key === 'Escape') {
                 if (showCheckout) { setShowCheckout(false); setSelectedCustomerId(''); }
-                if (showReceipt) { setShowReceipt(null); setSelectedCustomerId(''); }
+                else if (showReceipt) { setShowReceipt(null); setSelectedCustomerId(''); }
             }
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
     }, [cart, showCheckout, showReceipt]);
+
+    // ── Checkout Flow Hook ──────────────────────────
+    const { handleCheckout, handleCreateCustomer, handleSaveApertura } = useCheckoutFlow({
+        cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd,
+        selectedCustomerId, customers, setCustomers, products, setProducts,
+        effectiveRate, tasaCop, copEnabled, discountData, useAutoRate,
+        setSalesData, setShowReceipt, setShowCheckout, setSelectedCustomerId,
+        setCart, setCartSelectedIndex, setShowConfetti, setTodayAperturaData, setIsAperturaOpen,
+        playCheckout, playError, notifyLowStock, triggerHaptic
+    });
 
     // ── Callbacks ─────────────────────────────────
     const addToCart = useCallback((product, qtyOverride = null, forceMode = null) => {
@@ -450,11 +371,11 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         });
         handleSetSearchTerm('');
         setHierarchyPending(null);
-        
+
         // --- LISTO POS Flow: blur search to enter cart mode and auto-select ---
         setTimeout(() => {
             searchInputRef.current?.blur();
-            setCartSelectedIndex(0); // Ensure cart item is selected and ready for + / - 
+            setCartSelectedIndex(0); // Ensure cart item is selected and ready for + / -
         }, 50);
     }, [triggerHaptic, effectiveRate]);
 
@@ -532,58 +453,10 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         }
     };
 
-
-
-    const handleCheckout = async (payments, changeBreakdown) => {
-        triggerHaptic && triggerHaptic();
-
-        const opts = {
-            cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd, payments, changeBreakdown,
-            selectedCustomerId, customers, products, effectiveRate, tasaCop, copEnabled,
-            discountData, useAutoRate
-        };
-
-        const result = await processSaleTransaction(opts);
-        
-        if (!result.success) {
-            console.error('Abortando venta:', result.error);
-            showToast(result.error, result.error.includes('No se pueden') ? 'warning' : 'error');
-            playError();
-            return;
-        }
-
-        // Apply state updates using the returned optimized datasets
-        setProducts(result.updatedProducts);
-        
-        if (result.updatedCustomers) {
-            setCustomers(result.updatedCustomers);
-        }
-
-        setSalesData(prev => [result.sale, ...prev]);
-
-        setShowReceipt(result.sale); 
-        playCheckout(); 
-        setShowConfetti(true);
-        notifyLowStock(result.updatedProducts);
-        
-        setCart([]); 
-        setShowCheckout(false); 
-        setSelectedCustomerId(''); 
-        setCartSelectedIndex(-1);
-    };
-
-    const handleCreateCustomer = async (name, documentId, phone) => {
-        const newCustomer = { id: crypto.randomUUID(), name, documentId: documentId || '', phone: phone || '', deuda: 0, favor: 0, createdAt: new Date().toISOString() };
-        const updated = [...customers, newCustomer];
-        setCustomers(updated);
-        await storageService.setItem('bodega_customers_v1', updated);
-        return newCustomer;
-    };
-
     const handleAddCustomAmount = (amount, currency) => {
         let amountUsd = 0;
         let exactBsToStore = null;
-        
+
         if (currency === 'USD') {
             amountUsd = parseFloat(amount.toFixed(2));
             // exactBsToStore remains null to float with effectiveRate
@@ -598,7 +471,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         }
 
         if (amountUsd <= 0) return;
-        
+
         const customProduct = {
             id: `custom_${Date.now()}`,
             name: 'Venta Libre',
@@ -619,9 +492,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     // KEYBOARD SHORTCUTS (LISTO POS Port)
     // ==========================================
     useSalesKeyboard({
-        todayAperturaData, showCheckout, showReceipt, hierarchyPending, weightPending, 
-        showClearCartConfirm, showCustomAmountModal, showRateConfig, showKeyboardHelp, 
-        showDiscountModal, searchInputRef, setCartSelectedIndex, setShowClearCartConfirm, 
+        todayAperturaData, showCheckout, showReceipt, hierarchyPending, weightPending,
+        showClearCartConfirm, showCustomAmountModal, showRateConfig, showKeyboardHelp,
+        showDiscountModal, searchInputRef, setCartSelectedIndex, setShowClearCartConfirm,
         cartRef, setShowCheckout, cartSelectedIndex, updateQty, removeFromCart
     });
 
@@ -633,33 +506,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             </div>
         );
     }
-    const handleSaveApertura = async (data) => {
-        try {
-            const today = new Date().toISOString();
-            const aperturaRecord = {
-                id: `apertura_${Date.now()}`,
-                tipo: 'APERTURA_CAJA',
-                openingUsd: data.openingUsd,
-                openingBs: data.openingBs,
-                timestamp: today,
-                cajaCerrada: false
-            };
-
-            const existingSales = await storageService.getItem(SALES_KEY, []);
-            const updatedSales = [...existingSales, aperturaRecord];
-            
-            await storageService.setItem(SALES_KEY, updatedSales);
-            setTodayAperturaData(aperturaRecord);
-            setIsAperturaOpen(false);
-            showToast('Caja abierta exitosamente', 'success');
-            if (triggerHaptic) triggerHaptic();
-
-        } catch (error) {
-            console.error('Error al guardar apertura:', error);
-            showToast('Error al abrir la caja', 'error');
-            if (playError) playError();
-        }
-    };
 
     // ── Render ─────────────────────────────────────
     return (
@@ -676,9 +522,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             />
 
             {!todayAperturaData ? (
-                <CajaCerradaOverlay 
-                    cartCount={cartRef.current.length}
-                    onOpenApertura={() => setIsAperturaOpen(true)} 
+                <CajaCerradaOverlay
+                    cartCount={cart.length}
+                    onOpenApertura={() => setIsAperturaOpen(true)}
                 />
             ) : (
                 <>
@@ -758,7 +604,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             <div className="lg:hidden">
                 {/* Floating Action Button */}
                 {cart.length > 0 && !isCartSheetOpen && !showCheckout && !showReceipt && (
-                    <button 
+                    <button
                         onClick={() => { triggerHaptic && triggerHaptic(); setIsCartSheetOpen(true); }}
                         className="fixed bottom-[max(5rem,env(safe-area-inset-bottom)+4.5rem)] left-4 right-4 bg-emerald-500 hover:bg-emerald-600 text-white p-4 rounded-2xl shadow-xl shadow-emerald-500/30 flex items-center justify-between z-40 active:scale-95 transition-all animate-in slide-in-from-bottom"
                     >
@@ -822,7 +668,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                 <CheckoutModal
                     onClose={() => { setShowCheckout(false); setSelectedCustomerId(''); }}
                     cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
-                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} 
+                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs}
                     discountData={discountData} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}
@@ -884,9 +730,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
 
             {/* Keyboard Shortcuts Help Modal (Desktop Only) */}
-            <KeyboardHelpModal 
-                isOpen={showKeyboardHelp} 
-                onClose={() => setShowKeyboardHelp(false)} 
+            <KeyboardHelpModal
+                isOpen={showKeyboardHelp}
+                onClose={() => setShowKeyboardHelp(false)}
             />
 
             {/* Apertura Caja Modal */}

@@ -647,5 +647,6 @@ export const generarEtiquetas = async (productos, effectiveRate, copEnabled, tas
             console.error("Error printing from iframe:", e);
             window.open(blobUrl, '_blank');
         }
+        setTimeout(() => { try { document.body.removeChild(iframe); } catch(e) {} }, 5000);
     };
 };

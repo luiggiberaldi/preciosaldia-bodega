@@ -17,7 +17,8 @@ export default function DiscountModal({
     useEffect(() => {
         // Auto focus input on mount for fast typing
         // Small delay ensures modal transition is done
-        setTimeout(() => inputRef.current?.focus(), 150);
+        const id = setTimeout(() => inputRef.current?.focus(), 150);
+        return () => clearTimeout(id);
     }, []);
 
     const numValue = parseFloat(value) || 0;

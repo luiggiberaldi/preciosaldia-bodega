@@ -11,7 +11,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('🔴 Calculator Error:', error, errorInfo);
+    console.error('🔴 App Error:', error, errorInfo);
   }
 
   render() {
@@ -22,15 +22,22 @@ class ErrorBoundary extends React.Component {
             <div className="text-6xl mb-4">⚠️</div>
             <h2 className="text-xl font-bold text-red-500 mb-2">Error de Carga</h2>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-              La calculadora no pudo cargar correctamente. Esto puede deberse a datos corruptos o problemas de compatibilidad.
+              La aplicación no pudo cargar correctamente. Esto puede deberse a datos corruptos o problemas de compatibilidad.
             </p>
-            <button 
+            <button
+              onClick={() => {
+                this.setState({ hasError: false });
+              }}
+              className="px-6 py-3 bg-brand text-slate-900 rounded-xl font-bold hover:brightness-110 transition-all mb-3"
+            >
+              Reintentar
+            </button>
+            <button
               onClick={() => {
                 localStorage.removeItem('calc_history');
-                localStorage.removeItem('bodega_accounts_v2');
                 window.location.reload();
-              }} 
-              className="px-6 py-3 bg-brand text-slate-900 rounded-xl font-bold hover:brightness-110 transition-all"
+              }}
+              className="px-6 py-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:brightness-110 transition-all"
             >
               Limpiar y Recargar
             </button>

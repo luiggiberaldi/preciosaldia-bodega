@@ -167,8 +167,7 @@ export class FinancialEngine {
                         };
                     }
 
-                    // Use pre-computed amountUsd/amountBs; fallback with sale rate (NEVER hardcoded)
-                    const saleRate = sale.rate || 1;
+                    const saleRate = sale.rate || (sale.payments?.[0]?.amountUsd ? divR(sale.payments?.[0]?.amountBs, sale.payments?.[0]?.amountUsd) : 1) || 1;
                     const amountUsd = p.amountUsd !== undefined
                         ? round2(p.amountUsd)
                         : (p.currency === 'USD' ? round2(p.amount) : divR(p.amount, saleRate));
@@ -196,7 +195,7 @@ export class FinancialEngine {
             // Instead of silently zeroing anomalous change, we FLAG the sale
             // but still register the full change amount for mathematical accuracy.
             // The UI can read sale._changeAnomaly to display a warning badge.
-            const saleRate = sale.rate || 1;
+            const saleRate = sale.rate || sale.payments?.[0]?.amountBs / sale.payments?.[0]?.amountUsd || 1;
             const isChangeAnomalousUsd = safeChangeUsd > 100 && safeChangeUsd > (round2(sale.totalUsd || 0) * 5);
             const isChangeAnomalousBs = safeChangeBs > mulR(100, saleRate) && safeChangeBs > (round2(sale.totalBs || 0) * 5);
             
@@ -208,7 +207,7 @@ export class FinancialEngine {
                     console.warn(`[FinancialEngine] Anomalia de vuelto detectada en venta ${sale.id}: changeUsd=${safeChangeUsd}, changeBs=${safeChangeBs}, totalUsd=${sale.totalUsd}`);
                 }
             }
-            
+
             // If the sale was completely free/zero, any outgoing change is a glitch
             if (round2(sale.totalUsd || 0) === 0 && round2(sale.totalBs || 0) === 0) {
                 safeChangeUsd = 0;
@@ -263,7 +262,7 @@ export class FinancialEngine {
         let discountAmountUsd = 0;
         if (discountData && discountData.value > 0) {
             if (discountData.type === 'percentage') {
-                discountAmountUsd = mulR(subtotalUsd, (discountData.value / 100));
+                discountAmountUsd = mulR(subtotalUsd, divR(discountData.value, 100));
             } else if (discountData.type === 'fixed') {
                 discountAmountUsd = round2(discountData.value);
             }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { X, TrendingUp, TrendingDown, Percent, Check, AlertTriangle } from 'lucide-react';
 import { logEvent } from '../../services/auditService';
 import { useAuthStore } from '../../hooks/store/useAuthStore';
@@ -19,6 +19,11 @@ export default function BulkPriceAdjustModal({
     const [selectedCategory, setSelectedCategory] = useState('todos');
     const [isApplying, setIsApplying] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const timeoutRefs = useRef([]);
+
+    useEffect(() => {
+        return () => timeoutRefs.current.forEach(id => clearTimeout(id));
+    }, []);
 
     const effectivePercent = direction === 'up' ? percent : -percent;
     const multiplier = 1 + effectivePercent / 100;
@@ -48,7 +53,7 @@ export default function BulkPriceAdjustModal({
         setIsApplying(true);
 
         // Small delay for UX feel
-        setTimeout(() => {
+        timeoutRefs.current.push(setTimeout(() => {
             setProducts(prev =>
                 prev.map(p => {
                     const isTarget = selectedCategory === 'todos' || p.category === selectedCategory;
@@ -74,11 +79,11 @@ export default function BulkPriceAdjustModal({
             const user = useAuthStore.getState().usuarioActivo;
             logEvent('INVENTARIO', 'AJUSTE_MASIVO_PRECIOS', `Ajuste masivo ${label} en ${affectedProducts.length} productos (cat: ${selectedCategory})`, user);
 
-            setTimeout(() => {
+            timeoutRefs.current.push(setTimeout(() => {
                 setShowSuccess(false);
                 handleClose();
-            }, 1200);
-        }, 400);
+            }, 1200));
+        }, 400));
     };
 
     const handleClose = () => {

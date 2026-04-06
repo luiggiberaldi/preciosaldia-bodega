@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { Clock, Send, Ban, ChevronDown, ChevronUp, Trash2, Shuffle, Recycle, Receipt, Printer, LockIcon } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
-import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, getPaymentIcon, toTitleCase } from '../../config/paymentMethods';
+import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../../config/paymentMethods';
 import EmptyState from '../EmptyState';
 
 export default function SalesHistory({
-    sales,
     recentSales,
     bcvRate,
     totalSalesCount,

@@ -5,7 +5,6 @@ import { formatBs, formatUsd } from '../utils/calculatorUtils';
  */
 export const MessageService = {
     /**
-    /**
      * Builds the payment message string.
      * @param {object} params
      * @param {number|string} params.amountTop
@@ -31,6 +30,12 @@ export const MessageService = {
 
         const rateTo = currencies.find(c => c.id === to)?.rate;
         const rateFrom = currencies.find(c => c.id === from)?.rate;
+
+        if (!selectedAccount) {
+            const valTop = safeParse(amountTop);
+            const greeting = clientName ? `Hola ${clientName},` : 'Hola,';
+            return `${greeting} el total es $${valTop.toFixed(2)}.\n\n[Datos de cuenta no cargados]\n\nGenerado con PreciosAlDía`;
+        }
 
         const isBsAccount = selectedAccount.currency === 'VES';
         const automaticRefRate = rates.bcv.price;
@@ -107,11 +112,6 @@ export const MessageService = {
                 greeting = `Hola${namePart},`;
                 intro = `el total es ${amountStr}. Aquí tienes los datos de pago:`;
                 break;
-        }
-
-        if (!selectedAccount) {
-            // Fallback más limpio si falla la data
-            return `${greeting} ${intro}\n\n[Datos de cuenta no cargados]\n\nGenerado con PreciosAlDía`;
         }
 
         let details = '';

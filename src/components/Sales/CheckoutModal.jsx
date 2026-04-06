@@ -1,12 +1,13 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { X, Users, Receipt, ChevronDown, Wallet, Zap, UserPlus, Check, ArrowLeftRight, AlertTriangle } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { X, Users, Receipt, Wallet, ArrowLeftRight, AlertTriangle } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
-import { PAYMENT_ICONS, ICON_COMPONENTS } from '../../config/paymentMethods';
-import { round2, divR, mulR, subR, sumR } from '../../utils/dinero';
+import { mulR, divR, subR } from '../../utils/dinero';
+import { useCheckoutCalculations } from '../../hooks/useCheckoutCalculations';
+import CheckoutPaymentBars from './CheckoutPaymentBars';
+import CheckoutCustomerPicker from './CheckoutCustomerPicker';
 
 /**
  * CheckoutModal — Zona de Cobro con Barras de Pago (Estilo Listo POS)
- * Cada método de pago tiene su propia barra con input + botón TOTAL.
  */
 export default function CheckoutModal({
     onClose,
@@ -29,216 +30,39 @@ export default function CheckoutModal({
     currentFloatUsd = 0,
     currentFloatBs = 0
 }) {
-    // -- State: un valor por barra --
-    const [barValues, setBarValues] = useState({});
-    
-    const [showCustomerPicker, setShowCustomerPicker] = useState(false);
-    const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
-    const [newClientName, setNewClientName] = useState('');
-    const [newClientDocument, setNewClientDocument] = useState('');
-    const [newClientPhone, setNewClientPhone] = useState('');
-    const [savingClient, setSavingClient] = useState(false);
-    const [changeUsdGiven, setChangeUsdGiven] = useState('');
-    const [changeBsGiven, setChangeBsGiven] = useState('');
     const [confirmFiar, setConfirmFiar] = useState(false);
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
-    const safeTasaCop = tasaCop > 0 ? tasaCop : 4150;
-    const safeRate = effectiveRate > 0 ? effectiveRate : 1;
 
-    // -- Cálculos bimoneda (con aritmética segura) --
-    const totalPaidUsd = useMemo(() => {
-        return sumR(paymentMethods.map(m => {
-            const val = parseFloat(barValues[m.id]) || 0;
-            if (m.currency === 'USD') return round2(val);
-            if (m.currency === 'COP') return divR(val, safeTasaCop);
-            return divR(val, safeRate);
-        }));
-    }, [barValues, paymentMethods, effectiveRate, tasaCop]);
+    const {
+        barValues,
+        totalPaidUsd,
+        remainingUsd,
+        remainingBs,
+        changeUsd,
+        changeBs,
+        isPaid,
+        changeUsdGiven,
+        changeBsGiven,
+        setChangeUsdGiven,
+        setChangeBsGiven,
+        handleBarChange,
+        fillBar,
+        handleConfirm,
+    } = useCheckoutCalculations({
+        paymentMethods,
+        effectiveRate,
+        tasaCop,
+        cartTotalUsd,
+        cartTotalBs,
+        triggerHaptic,
+        onConfirmSale,
+    });
 
-    const totalPaidBs = useMemo(() => {
-        return sumR(paymentMethods.map(m => {
-            const val = parseFloat(barValues[m.id]) || 0;
-            if (m.currency === 'BS') return round2(val);
-            if (m.currency === 'COP') return mulR(divR(val, safeTasaCop), safeRate);
-            return mulR(val, safeRate);
-        }));
-    }, [barValues, paymentMethods, effectiveRate, tasaCop]);
-
-    const remainingUsd = Math.max(0, subR(cartTotalUsd, totalPaidUsd));
-    // Para remainingBs, tomamos la diferencia exacta de cartTotalBs - totalPaidBs para no perder decimales por tasa de cambio
-    const remainingBs = Math.max(0, subR(cartTotalBs, totalPaidBs));
-
-    const changeUsd = Math.max(0, subR(totalPaidUsd, cartTotalUsd));
-    const changeBs = Math.max(0, subR(totalPaidBs, cartTotalBs));
-    const isPaid = remainingUsd < 0.009;
-
-    // -- Handlers --
-    const handleBarChange = useCallback((methodId, value) => {
-        // Solo números y punto decimal
-        let v = value.replace(',', '.');
-        if (!/^[0-9.]*$/.test(v)) return;
-        const dots = v.match(/\./g);
-        if (dots && dots.length > 1) return;
-        setBarValues(prev => ({ ...prev, [methodId]: v }));
-    }, []);
-
-    const fillBar = useCallback((methodId, currency) => {
-        triggerHaptic && triggerHaptic();
-        let val;
-        if (currency === 'USD') {
-            val = remainingUsd > 0 ? Number(remainingUsd.toFixed(2)).toString() : null;
-        } else if (currency === 'COP') {
-            val = remainingUsd > 0 ? Number((remainingUsd * safeTasaCop).toFixed(2)).toString() : null;
-        } else {
-            val = remainingBs > 0 ? Number(remainingBs.toFixed(2)).toString() : null;
-        }
-        if (val) {
-            setBarValues(prev => ({ ...prev, [methodId]: val }));
-        }
-    }, [remainingUsd, remainingBs, triggerHaptic, tasaCop]);
-
-    // Construir payments[] desde barValues al confirmar
-    const handleConfirm = useCallback(() => {
-        triggerHaptic && triggerHaptic();
-        const payments = paymentMethods
-            .filter(m => parseFloat(barValues[m.id]) > 0)
-            .map(m => {
-                const amount = round2(parseFloat(barValues[m.id]));
-                return {
-                    id: crypto.randomUUID(),
-                    methodId: m.id,
-                    methodLabel: m.label,
-                    currency: m.currency,
-                    amountInput: amount,
-                    amountInputCurrency: m.currency,
-                    amountUsd: m.currency === 'USD' ? amount : m.currency === 'COP' ? divR(amount, safeTasaCop) : divR(amount, safeRate),
-                    amountBs: m.currency === 'BS' ? amount : m.currency === 'COP' ? mulR(divR(amount, safeTasaCop), safeRate) : mulR(amount, safeRate),
-                };
-            });
-        const defaultUsdChange = (!changeUsdGiven && !changeBsGiven) ? changeUsd : round2(parseFloat(changeUsdGiven) || 0);
-        const defaultBsChange = (!changeUsdGiven && !changeBsGiven) ? 0 : round2(parseFloat(changeBsGiven) || 0);
-
-        onConfirmSale(payments, {
-            changeUsdGiven: Math.min(defaultUsdChange, changeUsd),
-            changeBsGiven: Math.min(defaultBsChange, changeBs),
-        });
-    }, [barValues, paymentMethods, effectiveRate, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd]);
-
-    // Saldo a favor
     const handleSaldoFavor = useCallback(() => {
         triggerHaptic && triggerHaptic();
         if (onUseSaldoFavor) onUseSaldoFavor();
     }, [onUseSaldoFavor, triggerHaptic]);
-
-    // Crear cliente inline
-    const handleCreateClient = async () => {
-        if (!newClientName.trim() || !onCreateCustomer) return;
-        setSavingClient(true);
-        try {
-            const newCustomer = await onCreateCustomer(newClientName.trim(), newClientDocument.trim(), newClientPhone.trim());
-            setSelectedCustomerId(newCustomer.id);
-            setNewClientName('');
-            setNewClientDocument('');
-            setNewClientPhone('');
-            setShowNewCustomerForm(false);
-            setShowCustomerPicker(false);
-        } finally {
-            setSavingClient(false);
-        }
-    };
-
-    // Agrupar métodos por moneda
-    const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
-    const methodsBs = paymentMethods.filter(m => m.currency === 'BS');
-    const methodsCop = paymentMethods.filter(m => m.currency === 'COP');
-
-    // -- Estilos de barra por moneda --
-    const sectionStyles = {
-        USD: {
-            bg: 'bg-emerald-50/50 dark:bg-emerald-950/20',
-            border: 'border-emerald-100 dark:border-emerald-900/50',
-            title: 'text-emerald-800 dark:text-emerald-300',
-            titleBg: 'bg-emerald-100 dark:bg-emerald-900/50',
-            titleIcon: 'text-emerald-600 dark:text-emerald-400',
-            inputBorder: 'border-emerald-200 dark:border-emerald-800 focus:border-emerald-500 focus:ring-emerald-500/20',
-            inputActive: 'border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-950/30',
-            btnBg: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 active:bg-emerald-300',
-        },
-        BS: {
-            bg: 'bg-blue-50/50 dark:bg-blue-950/20',
-            border: 'border-blue-100 dark:border-blue-900/50',
-            title: 'text-blue-800 dark:text-blue-300',
-            titleBg: 'bg-blue-100 dark:bg-blue-900/50',
-            titleIcon: 'text-blue-600 dark:text-blue-400',
-            inputBorder: 'border-blue-200 dark:border-blue-800 focus:border-blue-500 focus:ring-blue-500/20',
-            inputActive: 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-950/30',
-            btnBg: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 active:bg-blue-300',
-        },
-        COP: {
-            bg: 'bg-amber-50/50 dark:bg-amber-950/20',
-            border: 'border-amber-100 dark:border-amber-900/50',
-            title: 'text-amber-800 dark:text-amber-300',
-            titleBg: 'bg-amber-100 dark:bg-amber-900/50',
-            titleIcon: 'text-amber-600 dark:text-amber-400',
-            inputBorder: 'border-amber-200 dark:border-amber-800 focus:border-amber-500 focus:ring-amber-500/20',
-            inputActive: 'border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30',
-            btnBg: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 active:bg-amber-300',
-        },
-    };
-
-    const renderPaymentBar = (method, styles) => {
-        const val = barValues[method.id] || '';
-        const hasValue = parseFloat(val) > 0;
-        const equivUsd = method.currency === 'BS' && hasValue
-            ? (parseFloat(val) / effectiveRate).toFixed(2)
-            : method.currency === 'COP' && hasValue
-            ? (parseFloat(val) / tasaCop).toFixed(2)
-            : null;
-
-        return (
-            <div key={method.id} className="mb-3 last:mb-0">
-                <div className="flex items-center gap-2 mb-1 ml-0.5">
-                    {(() => { const MIcon = method.Icon || PAYMENT_ICONS[method.id] || ICON_COMPONENTS[method.icon]; return MIcon ? <MIcon size={16} className={hasValue ? '' : 'text-slate-400'} /> : <span className="text-base">{method.icon}</span>; })()}
-                    <span className={`text-[11px] font-bold uppercase tracking-wide ${hasValue ? styles.title : 'text-slate-400 dark:text-slate-500'}`}>
-                        {method.label}
-                    </span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                        <input
-                            type="text"
-                            inputMode="decimal"
-                            value={val}
-                            onChange={e => handleBarChange(method.id, e.target.value)}
-                            placeholder="0.00"
-                            className={`w-full py-3 px-4 pr-14 rounded-xl border-2 text-lg font-bold outline-none transition-all ${hasValue
-                                ? styles.inputActive
-                                : `bg-white dark:bg-slate-900 ${styles.inputBorder}`
-                                } text-slate-800 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700 focus:ring-4`}
-                        />
-                        <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black px-2 py-0.5 rounded-md border ${hasValue
-                            ? `${styles.titleBg} ${styles.title} ${styles.border}`
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
-                            }`}>
-                            {method.currency === 'USD' ? '$' : method.currency === 'COP' ? 'COP' : 'Bs'}
-                        </span>
-                    </div>
-                    <button
-                        onClick={() => fillBar(method.id, method.currency)}
-                        className={`shrink-0 py-3 px-3.5 rounded-xl font-black text-xs transition-all active:scale-95 flex items-center gap-1 ${styles.btnBg}`}
-                    >
-                        <Zap size={14} fill="currentColor" /> Total
-                    </button>
-                </div>
-                {equivUsd && (
-                    <p className="text-[11px] font-bold text-blue-500 dark:text-blue-400 mt-1 ml-1">
-                        ≈ ${equivUsd}
-                    </p>
-                )}
-            </div>
-        );
-    };
 
     return (
         <div className="fixed inset-0 z-50 bg-white dark:bg-slate-950 flex flex-col overflow-hidden">
@@ -291,48 +115,16 @@ export default function CheckoutModal({
                     </div>
                 </div>
 
-                {/* -- SECCION DOLARES ($) -- */}
-                {methodsUsd.length > 0 && (
-                    <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.USD.bg} ${sectionStyles.USD.border} p-3`}>
-                        <h3 className={`text-[11px] font-black uppercase tracking-widest mb-3 flex items-center gap-2 ${sectionStyles.USD.title}`}>
-                            <span className={`p-1 rounded-lg ${sectionStyles.USD.titleBg}`}>💲</span>
-                            Dólares ($)
-                        </h3>
-                        {methodsUsd.map(m => renderPaymentBar(m, sectionStyles.USD))}
-                    </div>
-                )}
-
-                {/* -- SECCION BOLIVARES (Bs) -- */}
-                {methodsBs.length > 0 && (
-                    <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.BS.bg} ${sectionStyles.BS.border} p-3`}>
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${sectionStyles.BS.title}`}>
-                                <span className={`p-1 rounded-lg ${sectionStyles.BS.titleBg}`}>💵</span>
-                                Bolívares (Bs)
-                            </h3>
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${sectionStyles.BS.titleBg} ${sectionStyles.BS.title}`}>
-                                Tasa: {formatBs(effectiveRate)}
-                            </span>
-                        </div>
-                        {methodsBs.map(m => renderPaymentBar(m, sectionStyles.BS))}
-                    </div>
-                )}
-
-                {/* -- SECCION PESOS (COP) -- */}
-                {copEnabled && methodsCop.length > 0 && (
-                    <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.COP.bg} ${sectionStyles.COP.border} p-3`}>
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${sectionStyles.COP.title}`}>
-                                <span className={`p-1 rounded-lg ${sectionStyles.COP.titleBg}`}>🟡</span>
-                                Pesos (COP)
-                            </h3>
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${sectionStyles.COP.titleBg} ${sectionStyles.COP.title}`}>
-                                Tasa: {formatBs(tasaCop)}
-                            </span>
-                        </div>
-                        {methodsCop.map(m => renderPaymentBar(m, sectionStyles.COP))}
-                    </div>
-                )}
+                {/* -- PAYMENT BARS -- */}
+                <CheckoutPaymentBars
+                    paymentMethods={paymentMethods}
+                    barValues={barValues}
+                    effectiveRate={effectiveRate}
+                    tasaCop={tasaCop}
+                    copEnabled={copEnabled}
+                    onBarChange={handleBarChange}
+                    onFillBar={fillBar}
+                />
 
                 {/* -- BANNER VUELTO / RESTANTE -- */}
                 <div className="px-3 py-2">
@@ -340,32 +132,28 @@ export default function CheckoutModal({
                         ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
                         : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800'
                         }`}>
-                        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isPaid ? 'text-emerald-500' : 'text-orange-500'
-                            }`}>
+                        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
                             {isPaid ? 'Vuelto' : 'Resta por Cobrar'}
                         </p>
                         <div className="flex items-end justify-between">
                             <div className="flex flex-col">
-                                <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'
-                                    }`}>
+                                <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`}>
                                     ${isPaid ? changeUsd.toFixed(2) : remainingUsd.toFixed(2)}
                                 </span>
                             </div>
                             <div className="flex flex-col text-right">
-                                <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'
-                                    }`}>
+                                <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
                                     Bs {formatBs(isPaid ? changeBs : remainingBs)}
                                 </span>
                                 {copEnabled && (
-                                    <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'
-                                        }`}>
+                                    <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
                                         COP {isPaid ? (changeUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (remainingUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
                                 )}
                             </div>
                         </div>
 
-                        {/* DESGLOSE DE VUELTO — solo visible cuando hay vuelto */}
+                        {/* DESGLOSE DE VUELTO */}
                         {isPaid && changeUsd > 0.009 && (
                             <div className="mt-3 pt-3 border-t border-emerald-200 dark:border-emerald-800 space-y-2">
                                 <p className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1">
@@ -373,9 +161,7 @@ export default function CheckoutModal({
                                     Desglosar vuelto
                                 </p>
 
-                                {/* Fila: input USD + input Bs */}
                                 <div className="flex items-center gap-2">
-                                    {/* Input USD */}
                                     <div className="relative flex-1">
                                         <input
                                             type="number"
@@ -395,7 +181,6 @@ export default function CheckoutModal({
 
                                     <span className="text-slate-400 font-black text-xs shrink-0">+</span>
 
-                                    {/* Input Bs */}
                                     <div className="relative flex-1">
                                         <input
                                             type="number"
@@ -439,8 +224,8 @@ export default function CheckoutModal({
                                                 Precaución: El vuelto excede el fondo de caja registrado.
                                             </p>
                                             <p className="text-[9px] font-medium text-orange-500 leading-tight mt-0.5">
-                                                Fondo actual: 
-                                                <span className="font-bold ml-1">${currentFloatUsd.toFixed(2)}</span> y 
+                                                Fondo actual:
+                                                <span className="font-bold ml-1">${currentFloatUsd.toFixed(2)}</span> y
                                                 <span className="font-bold ml-1">Bs {formatBs(currentFloatBs)}</span>
                                             </p>
                                         </div>
@@ -451,125 +236,14 @@ export default function CheckoutModal({
                     </div>
                 </div>
 
-                {/* -- CLIENTE (colapsable) -- */}
-                <div className="px-3 py-2">
-                    <button
-                            onClick={() => setShowCustomerPicker(!showCustomerPicker)}
-                            className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors"
-                        >
-                            <div className="flex items-center gap-2">
-                                <Users size={16} className="text-slate-400" />
-                                <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                                    {selectedCustomer ? selectedCustomer.name : 'Consumidor Final'}
-                                </span>
-                            </div>
-                            <ChevronDown size={16} className={`text-slate-400 transition-transform ${showCustomerPicker ? 'rotate-180' : ''}`} />
-                        </button>
-                        {showCustomerPicker && (
-                            <div className="mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-lg max-h-40 overflow-y-auto">
-                                <button
-                                    onClick={() => { setSelectedCustomerId(''); setShowCustomerPicker(false); }}
-                                    className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${!selectedCustomerId ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                >
-                                    Consumidor Final
-                                </button>
-
-                                {/* Separador */}
-                                <div className="border-t border-slate-100 dark:border-slate-800" />
-
-                                {/* Botón/Form nuevo cliente */}
-                                {!showNewCustomerForm ? (
-                                    <button
-                                        onClick={() => setShowNewCustomerForm(true)}
-                                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
-                                    >
-                                        <UserPlus size={14} />
-                                        Nuevo cliente...
-                                    </button>
-                                ) : (
-                                    <div className="p-4 space-y-3 bg-slate-50 dark:bg-slate-900/50 animate-in fade-in slide-in-from-top-1 duration-150">
-                                        <div className="space-y-3 rounded-xl border border-emerald-100 dark:border-emerald-900/30 p-3 bg-emerald-50/50 dark:bg-emerald-900/10">
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-emerald-700 dark:text-emerald-500 uppercase mb-1">Nombre del cliente *</label>
-                                                <input
-                                                    autoFocus
-                                                    type="text"
-                                                    placeholder="Ej: Juan Pérez"
-                                                    value={newClientName}
-                                                    onChange={e => setNewClientName(e.target.value)}
-                                                    onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
-                                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Cédula / RIF (Opcional)</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Ej: V-12345678"
-                                                    value={newClientDocument}
-                                                    onChange={e => setNewClientDocument(e.target.value.toUpperCase())}
-                                                    onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
-                                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all uppercase"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Teléfono (Opcional)</label>
-                                                <div className="w-full flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus-within:ring-2 focus-within:ring-emerald-500/50 transition-all overflow-hidden">
-                                                    <span className="px-3 py-2.5 text-xs font-black text-blue-500 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 shrink-0 select-none">+58</span>
-                                                    <input
-                                                        type="tel"
-                                                        placeholder="0412 1234567"
-                                                        value={newClientPhone}
-                                                        onChange={e => {
-                                                            const clean = e.target.value.replace(/^\+?58/, '');
-                                                            setNewClientPhone(clean);
-                                                        }}
-                                                        onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
-                                                        className="flex-1 bg-transparent px-3 py-2.5 text-sm text-slate-700 dark:text-white outline-none placeholder:text-slate-400 font-medium"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2 pt-1">
-                                            <button
-                                                onClick={() => { setShowNewCustomerForm(false); setNewClientName(''); setNewClientDocument(''); setNewClientPhone(''); }}
-                                                className="flex-1 py-2 text-sm font-bold text-slate-600 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all"
-                                            >
-                                                Cancelar
-                                            </button>
-                                            <button
-                                                onClick={handleCreateClient}
-                                                disabled={!newClientName.trim() || savingClient}
-                                                className="flex-1 py-2 text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl disabled:opacity-50 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
-                                            >
-                                                <Check size={16} />
-                                                {savingClient ? 'Guardando...' : 'Crear y Usar'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Separador */}
-                                <div className="border-t border-slate-100 dark:border-slate-800" />
-
-                                {customers.map(c => (
-                                    <button
-                                        key={c.id}
-                                        onClick={() => { setSelectedCustomerId(c.id); setShowCustomerPicker(false); }}
-                                        className={`w-full text-left px-4 py-2.5 text-sm font-medium border-t border-slate-100 dark:border-slate-800 transition-colors ${selectedCustomerId === c.id ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                    >
-                                        {c.name}
-                                        {c.deuda !== 0 && (
-                                            <span className={`ml-2 text-xs font-bold ${c.deuda > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                                {c.deuda > 0 ? `Debe $${c.deuda.toFixed(2)}` : `Favor $${Math.abs(c.deuda).toFixed(2)}`}
-                                                {effectiveRate > 0 && ` (${formatBs(Math.abs(c.deuda) * effectiveRate)} Bs)`}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                {/* -- CLIENTE -- */}
+                <CheckoutCustomerPicker
+                    customers={customers}
+                    selectedCustomerId={selectedCustomerId}
+                    setSelectedCustomerId={setSelectedCustomerId}
+                    effectiveRate={effectiveRate}
+                    onCreateCustomer={onCreateCustomer}
+                />
 
                 {/* Saldo a Favor */}
                 {selectedCustomer?.deuda < -0.01 && remainingUsd > 0.01 && (
@@ -617,8 +291,6 @@ export default function CheckoutModal({
             {confirmFiar && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setConfirmFiar(false)}>
                     <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 max-w-sm sm:max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
-                        
-                        {/* Header */}
                         <div className="flex items-center gap-4 mb-5">
                             <div className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center shrink-0">
                                 <AlertTriangle size={24} className="text-amber-600 sm:w-7 sm:h-7" />
@@ -629,7 +301,6 @@ export default function CheckoutModal({
                             </div>
                         </div>
 
-                        {/* Monto destacado */}
                         <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-2xl p-4 sm:p-5 mb-5">
                             <div className="text-center mb-3">
                                 <p className="text-[11px] sm:text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Monto a fiar</p>
@@ -660,7 +331,6 @@ export default function CheckoutModal({
                             </div>
                         </div>
 
-                        {/* Botones */}
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setConfirmFiar(false)}

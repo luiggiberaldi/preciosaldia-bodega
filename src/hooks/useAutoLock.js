@@ -36,7 +36,7 @@ export function useAutoLock() {
         timeoutRef.current = setTimeout(() => {
             performLock('inactividad');
         }, ms);
-    }, [usuarioActivo, performLock]);
+    }, [usuarioActivo, performLock, isLoginRequired]);
 
     useEffect(() => {
         // Solo importa si es ADMIN y el login es requerido

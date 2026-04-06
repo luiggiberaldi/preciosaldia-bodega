@@ -110,7 +110,7 @@ export async function generateDailyClosePDF({
         ['Artículos vendidos', `${todayItemsSold}`],
         ['Ingresos brutos ($)', `$${todayTotalUsd.toFixed(2)}`],
         ['Ingresos brutos (Bs)', `Bs ${formatBs(todayTotalBs)}`],
-        ['Ganancia estimada ($)', `$${(todayProfit / bcvRate).toFixed(2)}`],
+        ['Ganancia estimada ($)', `$${(bcvRate > 0 ? (todayProfit / bcvRate) : 0).toFixed(2)}`],
         ['Ganancia estimada (Bs)', `Bs ${formatBs(todayProfit)}`],
         ['Tasa BCV', `Bs ${formatBs(bcvRate)} / $1`],
     ];

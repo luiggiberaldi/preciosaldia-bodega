@@ -39,7 +39,7 @@ export function ProductProvider({ children, rates }) {
         return localStorage.getItem('tasa_cop') || '';
     });
 
-    const effectiveRate = useAutoRate ? rates.bcv?.price : (parseFloat(customRate) > 0 ? parseFloat(customRate) : rates.bcv?.price);
+    const effectiveRate = (useAutoRate ? rates.bcv?.price : (parseFloat(customRate) > 0 ? parseFloat(customRate) : rates.bcv?.price)) || 1;
     
     // Calcula el COP efectivo. rates.autoCopRate es calculado en useRates basado en TRM y la Brecha USDT/BCV.
     const tasaCop = autoCopEnabled && rates.autoCopRate?.price 

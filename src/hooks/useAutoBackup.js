@@ -4,13 +4,18 @@ import { storageService } from '../utils/storageService';
 const BACKUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 const BACKUP_KEY = 'bodega_autobackup_v1';
 
-// Claves criticas que se respaldan
+// Claves criticas que se respaldan — backup completo
 const CRITICAL_KEYS = [
     'bodega_products_v1',
-    'bodega_customers_v1',
+    'my_categories_v1',
     'bodega_sales_v1',
+    'bodega_customers_v1',
+    'bodega_suppliers_v1',
+    'bodega_supplier_invoices_v1',
+    'bodega_accounts_v2',
+    'bodega_pending_cart_v1',
     'bodega_payment_methods_v1',
-    'monitor_rates_v12',
+    'abasto_audit_log_v1',
 ];
 import { supabase } from '../core/supabaseClient';
 

@@ -12,8 +12,6 @@ import PaymentMethodsManager from '../components/Settings/PaymentMethodsManager'
 // UsersManager removed - single-user app
 import AuditLogViewer from '../components/Settings/AuditLogViewer';
 import { useSecurity } from '../hooks/useSecurity';
-import { generateDailyClosePDF } from '../utils/dailyCloseGenerator';
-import { useNotifications } from '../hooks/useNotifications';
 import { supabaseCloud } from '../config/supabaseCloud';
 import AnimatedCounter from '../components/AnimatedCounter';
 import { useProductContext } from '../context/ProductContext';
@@ -24,43 +22,10 @@ import SettingsTabNegocio from '../components/Settings/tabs/SettingsTabNegocio';
 import SettingsTabVentas from '../components/Settings/tabs/SettingsTabVentas';
 // SettingsTabUsuarios removed - single-user app
 import SettingsTabSistema from '../components/Settings/tabs/SettingsTabSistema';
+import { Toggle, SectionCard } from '../components/Settings/SettingsUI';
+import { useCloudBackup } from '../hooks/useCloudBackup';
+import { useDataImportExport } from '../hooks/useDataImportExport';
 
-
-// ───────────────────────────────────────────────────── Toggle
-function Toggle({ enabled, onChange, color = 'emerald' }) {
-    const colors = {
-        emerald: enabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600',
-        amber: enabled ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600',
-        indigo: enabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600',
-        rose: enabled ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-600',
-    };
-    return (
-        <button
-            onClick={onChange}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${colors[color]}`}
-        >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-        </button>
-    );
-}
-
-// ───────────────────────────────────────────────────── Section Card
-function SectionCard({ icon: Icon, title, subtitle, iconColor = 'text-slate-500', children }) {
-    return (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-50 dark:border-slate-800/50 flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center ${iconColor}`}>
-                    <Icon size={18} />
-                </div>
-                <div>
-                    <h3 className="text-sm font-black text-slate-800 dark:text-white">{title}</h3>
-                    {subtitle && <p className="text-[10px] text-slate-400 mt-0.5">{subtitle}</p>}
-                </div>
-            </div>
-            <div className="p-5 space-y-4">{children}</div>
-        </div>
-    );
-}
 
 // ───────────────────────────────────────────────────── Tab Config
 const TABS = [
@@ -90,28 +55,19 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const [activeTab, setActiveTab] = useState('negocio');
     const [idCopied, setIdCopied] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
-    const [importStatus, setImportStatus] = useState(null);
-    const [statusMessage, setStatusMessage] = useState('');
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [deleteInput, setDeleteInput] = useState('');
 
     // Credenciales Locales
     const [inputEmail, setInputEmail] = useState(adminEmail || '');
     const [inputPassword, setInputPassword] = useState(adminPassword || '');
     const isCloudConfigured = Boolean(adminEmail && adminPassword);
     const [isCloudLogin, setIsCloudLogin] = useState(true);
-    
+
     // UI states for Auth form
     const [inputPhone, setInputPhone] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
-
-    // Device limit & data conflict states
-    const [deviceLimitError, setDeviceLimitError] = useState(null); // { devices: [...] }
-    const [blockedDevices, setBlockedDevices] = useState([]);
-    const [dataConflictPending, setDataConflictPending] = useState(null); // { email, cloudBackup, localBackup }
 
     // Business Data
     const [businessName, setBusinessName] = useState(() => localStorage.getItem('business_name') || '');
@@ -120,6 +76,52 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const [allowNegativeStock, setAllowNegativeStock] = useState(() => localStorage.getItem('allow_negative_stock') === 'true');
 
     const visibleTabs = TABS;
+
+    // ─── Cloud backup hook ────────────────────────────────
+    const {
+        importStatus,
+        setImportStatus,
+        statusMessage,
+        setStatusMessage,
+        deviceLimitError,
+        setDeviceLimitError,
+        blockedDevices,
+        setBlockedDevices,
+        dataConflictPending,
+        setDataConflictPending,
+        handleSaveCloudAccount,
+        handleDataConflictChoice,
+        handleUnlinkOldestDevice,
+    } = useCloudBackup({
+        deviceId,
+        auditLog,
+        forceHeartbeat,
+        triggerHaptic,
+        inputEmail,
+        inputPassword,
+        inputPhone,
+        isCloudLogin,
+        businessName,
+        setAdminCredentials,
+        setEmailError,
+        setPasswordError,
+    });
+
+    // ─── Data import/export hook ──────────────────────────
+    const {
+        showDeleteConfirm,
+        setShowDeleteConfirm,
+        deleteInput,
+        setDeleteInput,
+        handleExport,
+        handleFileChange,
+        handleDeleteAllData,
+    } = useDataImportExport({
+        auditLog,
+        triggerHaptic,
+        setImportStatus,
+        setStatusMessage,
+    });
 
     // ─── HANDLERS ─────────────────────────────────────────
     const handleSaveBusinessData = () => {
@@ -132,508 +134,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
         triggerHaptic?.();
     };
 
-    const handleSaveCloudAccount_DEPRECATED = async () => {
-        // Esta función fue reemplazada por la versión completa más abajo
-        // Se deja como referencia. Ver handleSaveCloudAccount debajo.
-    };
-
-    // ─── HELPER: Apply a cloud backup to local storage ───────────────────────
-    // IMPORTANTE: usa storageService.setItem (instancia global de localforage)
-    // NO usar localforage.createInstance() — genera una instancia separada que la app no lee
-    const applyCloudBackup = async (cloudBackup) => {
-        if (!cloudBackup?.data) {
-            console.error('[applyCloudBackup] Backup inválido o sin datos:', cloudBackup);
-            throw new Error('El backup de la nube está vacío o es inválido.');
-        }
-        if (cloudBackup.version === '2.0' && cloudBackup.data.idb) {
-            const idbEntries = Object.entries(cloudBackup.data.idb);
-            console.log(`[applyCloudBackup] Restaurando ${idbEntries.length} keys de IDB...`);
-            for (const [key, value] of idbEntries) {
-                await storageService.setItem(key, value);
-                console.log(`[applyCloudBackup] ✓ ${key}`);
-            }
-        } else {
-            console.warn('[applyCloudBackup] Formato no reconocido, intentando restauración legacy...');
-        }
-        if (cloudBackup.data.ls) {
-            for (const [key, value] of Object.entries(cloudBackup.data.ls)) {
-                localStorage.setItem(key, value);
-            }
-        }
-        console.log('[applyCloudBackup] Restauración completa.');
-    };
-
-    // ─── HELPER: Collect local backup payload ────────────────────────────────
-    const collectLocalBackup = async () => {
-        const idbKeys = [
-            'bodega_products_v1', 'my_categories_v1',
-            'bodega_sales_v1', 'bodega_customers_v1',
-            'bodega_suppliers_v1', 'bodega_supplier_invoices_v1',
-            'bodega_accounts_v2', 'bodega_pending_cart_v1',
-            'payment_methods_v1', 'payment_methods_v2',
-            'abasto_audit_log_v1'
-        ];
-        const idbData = {};
-        for (const key of idbKeys) {
-            const data = await storageService.getItem(key, null);
-            if (data !== null) idbData[key] = data;
-        }
-        const lsKeys = [
-            'premium_token', 'street_rate_bs', 'catalog_use_auto_usdt',
-            'catalog_custom_usdt_price', 'catalog_show_cash_price',
-            'monitor_rates_v12', 'business_name', 'business_rif',
-            'printer_paper_width', 'allow_negative_stock', 'cop_enabled',
-            'auto_cop_enabled', 'tasa_cop', 'bodega_use_auto_rate',
-            'bodega_custom_rate', 'bodega_inventory_view', 'abasto-auth-storage'
-        ];
-        const lsData = {};
-        for (const key of lsKeys) {
-            const val = localStorage.getItem(key);
-            if (val !== null) lsData[key] = val;
-        }
-        return {
-            timestamp: new Date().toISOString(),
-            version: '2.0',
-            appName: 'TasasAlDia_Bodegas_Cloud',
-            data: { idb: idbData, ls: lsData }
-        };
-    };
-
-    // ─── HELPER: Upload local backup to cloud ────────────────────────────────
-    const uploadLocalBackup = async (email, backupData) => {
-        // 1. Respaldo Legacy Blobs
-        const { error } = await supabaseCloud
-            .from('cloud_backups')
-            .upsert({
-                email: email.toLowerCase(),
-                backup_data: backupData,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'email' });
-        if (error) throw error;
-
-        // 2. Inyección Inicial en Nuevo Sistema Realtime Sync
-        try {
-            const { data: { session } } = await supabaseCloud.auth.getSession();
-            if (session?.user?.id) {
-                const syncPayloads = [];
-                for (const [key, value] of Object.entries(backupData.data.idb || {})) {
-                    syncPayloads.push({
-                        user_id: session.user.id,
-                        collection: 'store',
-                        doc_id: key,
-                        data: { payload: value },
-                        updated_at: new Date().toISOString()
-                    });
-                }
-                // Incluir localStorage en P2P
-                for (const [key, value] of Object.entries(backupData.data.ls || {})) {
-                    let finalVal = value;
-                    try { finalVal = JSON.parse(value); } catch(e) {} // Parsear localStorage (strings) a objetos si es posible
-                    syncPayloads.push({
-                        user_id: session.user.id,
-                        collection: 'local',
-                        doc_id: key,
-                        data: { payload: finalVal },
-                        updated_at: new Date().toISOString()
-                    });
-                }
-                if (syncPayloads.length > 0) {
-                    await supabaseCloud.from('sync_documents').upsert(syncPayloads, { onConflict: 'user_id,collection,doc_id' });
-                }
-            }
-        } catch(syncErr) {
-            console.warn('[Realtime Sync Init] Fallo inicializando sync_documents:', syncErr);
-        }
-    };
-
-    // ─── HELPER: Register or update device in account_devices ─────────────────
-    const registerDevice = async (email) => {
-        await supabaseCloud.from('account_devices').upsert({
-            email: email.toLowerCase(),
-            device_id: deviceId || 'UNKNOWN',
-            device_alias: `Dispositivo ${navigator.platform || 'Web'}`,
-            last_seen: new Date().toISOString()
-        }, { onConflict: 'email,device_id' });
-    };
-
-    // ─── HANDLER: Data conflict resolution ──────────────────────────────────
-    const handleDataConflictChoice = async (choice) => {
-        if (!dataConflictPending) return;
-        const { email, cloudBackup, localBackup } = dataConflictPending;
-        setDataConflictPending(null);
-        setImportStatus('loading');
-        setStatusMessage('Aplicando tu elección...');
-        try {
-            if (choice === 'cloud') {
-                // Restore cloud data to this device
-                await applyCloudBackup(cloudBackup);
-                showToast('Datos de la nube restaurados. Reiniciando...', 'success');
-                setTimeout(() => window.location.reload(), 1500);
-            } else {
-                // Upload local data to cloud (overwrite)
-                await uploadLocalBackup(email, localBackup);
-                showToast('Datos locales guardados en la nube', 'success');
-            }
-            setAdminCredentials(email, inputPassword);
-            auditLog('NUBE', 'CONFLICTO_RESUELTO', `Conflicto datos resuelto: usuario eligió ${choice}`);
-            setImportStatus(null);
-        } catch (err) {
-            showToast(err.message || 'Error al resolver el conflicto', 'error');
-            setImportStatus('error');
-        }
-    };
-
-    // ─── HANDLER: Desvincular dispositivo más antiguo y reintentar ────────────
-    const handleUnlinkOldestDevice = async () => {
-        if (!blockedDevices.length || !inputEmail) return;
-        setImportStatus('loading');
-        setStatusMessage('Desvinculando dispositivo más antiguo...');
-        try {
-            // Sort by created_at ascending, remove the oldest
-            const oldest = [...blockedDevices].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
-            await supabaseCloud.from('account_devices')
-                .delete()
-                .eq('email', inputEmail.toLowerCase())
-                .eq('device_id', oldest.device_id);
-            setDeviceLimitError(null);
-            setBlockedDevices([]);
-            showToast(`"${oldest.device_alias}" desvinculado. Volviendo a conectar...`, 'success');
-            await handleSaveCloudAccount();
-        } catch (err) {
-            showToast(err.message || 'Error al desvincular', 'error');
-            setImportStatus('error');
-        }
-    };
-
-    const handleSaveCloudAccount = async () => {
-        // Reset errors
-        setEmailError('');
-        setPasswordError('');
-        setDeviceLimitError(null);
-        setBlockedDevices([]);
-
-        let hasError = false;
-        if (!inputEmail.includes('@')) {
-            setEmailError('Formato de correo no válido');
-            hasError = true;
-        }
-        if (inputPassword.length < 6) {
-            setPasswordError('Mínimo 6 caracteres para mayor seguridad');
-            hasError = true;
-        }
-        if (!isCloudLogin && !inputPhone.trim()) {
-            showToast('El teléfono es obligatorio para registrarse', 'error');
-            hasError = true;
-        }
-        if (hasError) {
-            triggerHaptic?.();
-            return;
-        }
-
-        const emailToUse = inputEmail.trim().toLowerCase();
-
-        try {
-            setImportStatus('loading');
-            setStatusMessage('Autenticando en la nube...');
-
-            // ── 1. Supabase Auth ────────────────────────────────────────────────
-            if (supabaseCloud) {
-                if (isCloudLogin) {
-                    const { error: err } = await supabaseCloud.auth.signInWithPassword({
-                        email: emailToUse,
-                        password: inputPassword,
-                    });
-                    if (err) throw new Error('Error al iniciar sesión: ' + err.message);
-                } else {
-                    const { data, error: err } = await supabaseCloud.auth.signUp({
-                        email: emailToUse,
-                        password: inputPassword,
-                        options: { data: { full_name: businessName || 'Bodega', phone: inputPhone } },
-                    });
-                    if (err) {
-                        if (err.message.includes('already registered') || err.message.includes('User already registered')) {
-                            throw new Error('Este correo ya está registrado. Selecciona "Entrar".');
-                        }
-                        throw new Error('Error en el registro: ' + err.message);
-                    }
-                    if (data?.user?.identities?.length === 0) throw new Error('Este correo ya está registrado. Selecciona "Entrar".');
-                    if (data?.user && !data.session) {
-                        showToast('Por favor, revisa tu correo y confirma tu cuenta.', 'success');
-                        setImportStatus('awaiting_email_confirmation');
-                        setStatusMessage('Por favor confirma tu correo...');
-                        return;
-                    }
-                }
-            }
-
-            // ── 2. Control de dispositivos (máx. 2) ─────────────────────────────
-            setStatusMessage('Verificando dispositivos autorizados...');
-            const { data: existingDevices, error: devErr } = await supabaseCloud
-                .from('account_devices')
-                .select('*')
-                .eq('email', emailToUse)
-                .order('created_at', { ascending: true });
-
-            if (!devErr && existingDevices) {
-                const myDeviceRegistered = existingDevices.find(d => d.device_id === (deviceId || 'UNKNOWN'));
-                const activeCount = existingDevices.length;
-
-                if (!myDeviceRegistered && activeCount >= 2) {
-                    // ❌ Límite alcanzado - mostrar error con opción de desvincular
-                    setDeviceLimitError({ devices: existingDevices });
-                    setBlockedDevices(existingDevices);
-                    setImportStatus('error');
-                    setStatusMessage('Límite de dispositivos alcanzado.');
-                    triggerHaptic?.();
-                    return;
-                }
-            }
-
-            // ── 3. Fetch backup en la nube ───────────────────────────────────────
-            setStatusMessage('Consultando backup en la nube...');
-            const { data: cloudRow } = await supabaseCloud
-                .from('cloud_backups')
-                .select('backup_data')
-                .eq('email', emailToUse)
-                .maybeSingle();
-
-            const cloudBackup = cloudRow?.backup_data || null;
-
-            // ── 4. Recolectar datos locales ──────────────────────────────────────
-            const localBackup = await collectLocalBackup();
-            const hasLocalData = Object.keys(localBackup.data.idb).length > 0;
-            const hasCloudData = cloudBackup && cloudBackup.data;
-
-            if (isCloudLogin && hasCloudData && hasLocalData) {
-                // ⚠️ Conflicto: ambos tienen datos → preguntar al usuario
-                setDataConflictPending({ email: emailToUse, cloudBackup, localBackup });
-                await registerDevice(emailToUse);
-                setAdminCredentials(emailToUse, inputPassword);
-                setImportStatus(null);
-                setStatusMessage('');
-                auditLog('NUBE', 'LOGIN_NUBE', `Login exitoso: ${emailToUse}`);
-                return; // Modal de conflicto se muestra, usuario elige
-            }
-
-            if (isCloudLogin && hasCloudData && !hasLocalData) {
-                // 🆕 Dispositivo nuevo/vacío: restaurar automáticamente
-                setStatusMessage('Restaurando backup de la nube...');
-                await applyCloudBackup(cloudBackup);
-                await registerDevice(emailToUse);
-                setAdminCredentials(emailToUse, inputPassword);
-                showToast('Datos restaurados automáticamente desde la nube', 'success');
-                auditLog('NUBE', 'RESTORE_AUTO', `Backup restaurado automaticamente para: ${emailToUse}`);
-                triggerHaptic?.();
-                setImportStatus('success');
-                setStatusMessage('Restauración completa. Reiniciando...');
-                setTimeout(() => window.location.reload(), 1500);
-                return;
-            }
-
-            // ── 5. Subir datos locales a la nube (flujo normal) ─────────────────
-            setStatusMessage('Guardando y sincronizando datos locales...');
-            if (supabaseCloud) {
-                await uploadLocalBackup(emailToUse, localBackup);
-
-                // Registrar licencia inicial (Estación Maestra)
-                try {
-                    await supabaseCloud.from('cloud_licenses').upsert({
-                        email: emailToUse,
-                        device_id: deviceId || 'UNKNOWN_DEVICE',
-                        license_type: 'trial',
-                        days_remaining: 15,
-                        business_name: businessName || 'Bodega',
-                        phone: inputPhone || '',
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'email' });
-                } catch (licErr) {
-                    console.warn('Licencia cloud skip:', licErr);
-                }
-
-                await registerDevice(emailToUse);
-            }
-
-            setAdminCredentials(emailToUse, inputPassword);
-            showToast(isCloudLogin ? 'Sesión iniciada y sincronizada' : 'Cuenta confirmada y sincronizada', 'success');
-            auditLog('NUBE', isCloudLogin ? 'LOGIN_NUBE' : 'REGISTRO_NUBE', `Sincronización completa: ${emailToUse}`);
-            triggerHaptic?.();
-            setImportStatus(null);
-
-        } catch (error) {
-            console.error('Error sincronizando con la nube:', error);
-            showToast(error.message || 'Hubo un error contactando la nube', 'error');
-            setImportStatus('error');
-        }
-    };
-
-
-    const handleResetPasswordRequest = async () => {
-        setEmailError('');
-        if (!inputEmail.includes('@')) {
-            setEmailError('Ingresa un correo válido');
-            return;
-        }
-
-        setImportStatus('loading');
-        setStatusMessage('Enviando enlace...');
-        try {
-            const appUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-            const { error } = await supabaseCloud.auth.resetPasswordForEmail(inputEmail.toLowerCase().trim(), {
-                redirectTo: appUrl,
-            });
-            if (error) throw error;
-            showToast('Enlace enviado. Revisa tu correo para continuar.', 'success');
-            setIsRecoveringPassword(false);
-            setImportStatus(null);
-            setStatusMessage('');
-        } catch (error) {
-            console.error('Error al resetear password:', error);
-            showToast(error.message || 'Error al enviar recuperación', 'error');
-            setImportStatus('error');
-            setStatusMessage('Error al enviar correo.');
-        }
-    };
-
-    const handleExport = async () => {
-        try {
-            setImportStatus('loading');
-            setStatusMessage('Generando backup completo...');
-            
-            const idbKeys = [
-                'bodega_products_v1', 'my_categories_v1', 
-                'bodega_sales_v1', 'bodega_customers_v1',
-                'bodega_suppliers_v1', 'bodega_supplier_invoices_v1',
-                'bodega_accounts_v2', 'bodega_pending_cart_v1',
-                'payment_methods_v1', 'payment_methods_v2'
-            ];
-            const idbData = {};
-            for (const key of idbKeys) {
-                const data = await storageService.getItem(key, null);
-                if (data !== null) idbData[key] = data;
-            }
-
-            const lsKeys = [
-                'premium_token', 'street_rate_bs', 'catalog_use_auto_usdt', 
-                'catalog_custom_usdt_price', 'catalog_show_cash_price', 
-                'monitor_rates_v12', 'business_name', 'business_rif',
-                'printer_paper_width', 'allow_negative_stock', 'cop_enabled',
-                'auto_cop_enabled', 'tasa_cop', 'bodega_use_auto_rate',
-                'bodega_custom_rate', 'bodega_inventory_view'
-            ];
-            const lsData = {};
-            for (const key of lsKeys) {
-                const val = localStorage.getItem(key);
-                if (val !== null) lsData[key] = val;
-            }
-
-            const backupData = {
-                timestamp: new Date().toISOString(),
-                version: '2.0',
-                appName: 'TasasAlDia_Bodegas',
-                data: { idb: idbData, ls: lsData }
-            };
-
-            const blob = new Blob([JSON.stringify(backupData)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `backup_tasasaldia_completo_${new Date().toISOString().slice(0, 10)}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            setStatusMessage('Backup completo descargado.');
-            setImportStatus('success');
-            auditLog('SISTEMA', 'BACKUP_EXPORTADO', 'Backup completo exportado');
-            setTimeout(() => setImportStatus(null), 3000);
-        } catch (error) {
-            console.error(error);
-            setStatusMessage('Error al generar backup.');
-            setImportStatus('error');
-        }
-    };
-
     const handleImportClick = () => fileInputRef.current?.click();
-
-    const handleFileChange = (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        event.target.value = '';
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                setImportStatus('loading');
-                setStatusMessage('Validando archivo...');
-                const json = JSON.parse(e.target.result);
-
-                if (!json.data) throw new Error('Formato invalido: falta campo "data".');
-
-                // ── FASE 1: LIMPIEZA TOTAL ──────────────────────────────────────────
-                // Escribimos directo a localforage (sin pasar por storageService)
-                // para evitar que el evento app_storage_update active el auto-save
-                // del ProductContext y sobreescriba las categorías recién importadas.
-                setStatusMessage('Limpiando datos del dispositivo...');
-                await localforage.clear();
-
-                // Limpiar localStorage de la app (preservar sesión de Supabase sb-*)
-                const appLsKeys = [
-                    'street_rate_bs', 'catalog_use_auto_usdt', 'catalog_custom_usdt_price',
-                    'catalog_show_cash_price', 'monitor_rates_v12', 'business_name', 'business_rif',
-                    'printer_paper_width', 'allow_negative_stock', 'cop_enabled', 'auto_cop_enabled',
-                    'tasa_cop', 'bodega_use_auto_rate', 'bodega_custom_rate', 'bodega_inventory_view',
-                    'premium_token', 'abasto-auth-storage',
-                ];
-                appLsKeys.forEach(k => localStorage.removeItem(k));
-
-                // ── FASE 2: RESTAURACIÓN (directo a localforage, sin eventos) ───────
-                setStatusMessage('Restaurando backup...');
-
-                if (json.version === '2.0' && json.data.idb) {
-                    for (const [key, value] of Object.entries(json.data.idb)) {
-                        await localforage.setItem(key, value);
-                    }
-                    if (json.data.ls) {
-                        for (const [key, value] of Object.entries(json.data.ls)) {
-                            localStorage.setItem(key, value);
-                        }
-                    }
-                } else {
-                    // Compatibilidad legado (backups anteriores a v2.0)
-                    const legacyIdbMap = {
-                        bodega_products_v1: json.data.bodega_products_v1,
-                        bodega_accounts_v2: json.data.bodega_accounts_v2,
-                        my_categories_v1:   json.data.my_categories_v1,
-                    };
-                    for (const [key, value] of Object.entries(legacyIdbMap)) {
-                        if (!value) continue;
-                        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-                        await localforage.setItem(key, parsed);
-                    }
-                    const legacyLsKeys = [
-                        'street_rate_bs', 'catalog_use_auto_usdt', 'catalog_custom_usdt_price',
-                        'catalog_show_cash_price', 'monitor_rates_v12', 'business_name', 'business_rif'
-                    ];
-                    for (const key of legacyLsKeys) {
-                        if (json.data[key]) localStorage.setItem(key, json.data[key]);
-                    }
-                }
-
-                setImportStatus('success');
-                setStatusMessage('Restauracion completa. Reiniciando...');
-                auditLog('SISTEMA', 'BACKUP_IMPORTADO', `Backup restaurado (${json.source || 'archivo'}) — ${Object.keys(json.data.idb || {}).join(', ')}`);
-                triggerHaptic?.();
-
-                // Reload inmediato — no damos tiempo al auto-save del contexto
-                setTimeout(() => window.location.reload(), 800);
-            } catch (error) {
-                console.error('[IMPORT ERROR]', error);
-                setImportStatus('error');
-                setStatusMessage('Error: El archivo esta corrupto o es invalido.');
-            }
-        };
-        reader.readAsText(file);
-    };
 
     // ─── RENDER ───────────────────────────────────────────
     return (
@@ -772,7 +273,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
             <div className="flex-1 overflow-y-auto pb-[calc(3rem+env(safe-area-inset-bottom))]">
                 <div className="max-w-md mx-auto p-4 space-y-4">
 
-                                        {/* ═══ TAB: NEGOCIO ═══ */}
+                                    {/* ═══ TAB: NEGOCIO ═══ */}
                     {activeTab === 'negocio' && (
                         <SettingsTabNegocio
                             businessName={businessName} setBusinessName={setBusinessName}
@@ -851,19 +352,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                             </button>
                             <button
                                 disabled={deleteInput !== 'ELIMINAR'}
-                                onClick={async () => {
-                                    if (deleteInput === 'ELIMINAR') {
-                                        try {
-                                            triggerHaptic && triggerHaptic();
-                                            await storageService.removeItem('bodega_sales_v1');
-                                            auditLog('SISTEMA', 'HISTORIAL_BORRADO', 'Historial de ventas eliminado completamente');
-                                            showToast('Historial de ventas eliminado exitosamente', 'success');
-                                            setTimeout(() => window.location.reload(), 1500);
-                                        } catch (err) {
-                                            showToast('Error eliminando historial', 'error');
-                                        }
-                                    }
-                                }}
+                                onClick={handleDeleteAllData}
                                 className="flex-1 py-3 text-sm font-bold text-white bg-red-500 rounded-xl hover:bg-red-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Si, borrar todo
@@ -883,16 +372,8 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
             />
 
             <ShareInventoryModal
-                isOpen={isShareOpen} 
-                onClose={() => setIsShareOpen(false)} 
-                products={products} 
-                categories={categories}
-                onImport={({ products: imported, categories: importedCats }) => {
-                    if (importedCats && importedCats.length > 0) setCategories(importedCats);
-                    if (imported && imported.length > 0) setProducts(imported);
-                    showToast('Inventario importado correctamente', 'success');
-                    setIsShareOpen(false);
-                }}
+                isOpen={isShareOpen}
+                onClose={() => setIsShareOpen(false)}
             />
         </div>
     );

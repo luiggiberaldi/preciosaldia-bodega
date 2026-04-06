@@ -1,0 +1,23 @@
+{
+  "name": "preciosaldia-bodega",
+  "main": "./worker.js",
+  "compatibility_date": "2024-12-01",
+  "assets": {
+    "directory": "./dist/",
+    "binding": "ASSETS"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SHARE_STORAGE",
+        "class_name": "ShareStorage"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ShareStorage"]
+    }
+  ]
+}

@@ -7,6 +7,7 @@ const PIN_LENGTH = 4;
 export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [lockoutMsg, setLockoutMsg] = useState('');
   const [processing, setProcessing] = useState(false);
   const inputRef = useRef(null);
 
@@ -15,6 +16,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
     if (isOpen) {
       setPin('');
       setError(false);
+      setLockoutMsg('');
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);
@@ -29,10 +31,18 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
   const handleSubmit = async () => {
     if (pin.length !== PIN_LENGTH || processing) return;
     setProcessing(true);
+    setLockoutMsg('');
 
-    const success = await onSubmit(pin, user?.id);
+    const result = await onSubmit(pin, user?.id);
 
-    if (!success) {
+    if (result?.error && result.error.includes('Bloqueado')) {
+      setLockoutMsg(result.error);
+      setPin('');
+      setProcessing(false);
+      return;
+    }
+
+    if (!result?.success) {
       setError(true);
       setPin('');
       setProcessing(false);
@@ -43,7 +53,8 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
   };
 
   const handlePadPress = (digit) => {
-    if (pin.length >= PIN_LENGTH || processing) return;
+    if (pin.length >= PIN_LENGTH || processing || lockoutMsg) return;
+    setLockoutMsg('');
     setPin(prev => prev + digit);
   };
 
@@ -77,7 +88,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
         </div>
 
         {/* PIN Dots */}
-        <div className={`flex justify-center gap-3 mb-8 ${error ? 'animate-shake' : ''}`}>
+        <div className={`flex justify-center gap-3 mb-4 ${error ? 'animate-shake' : ''}`}>
           {Array.from({ length: PIN_LENGTH }).map((_, i) => (
             <div
               key={i}
@@ -92,13 +103,22 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
           ))}
         </div>
 
+        {/* Lockout message */}
+        {lockoutMsg && (
+          <div className="mb-4 px-4 py-2 bg-red-500/20 border border-red-500/40 rounded-xl text-center">
+            <p className="text-red-400 text-sm font-semibold">{lockoutMsg}</p>
+          </div>
+        )}
+
         {/* Input invisible para teclado nativo */}
         <input
           ref={inputRef}
           type="tel"
           maxLength={PIN_LENGTH}
           value={pin}
+          disabled={!!lockoutMsg}
           onChange={e => {
+            if (lockoutMsg) return;
             const val = e.target.value.replace(/\D/g, '').slice(0, PIN_LENGTH);
             setPin(val);
           }}

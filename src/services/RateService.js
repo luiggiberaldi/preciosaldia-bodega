@@ -41,31 +41,34 @@ export const RateService = {
         if (currency === 'USDT') currency = 'USD';
         if (effectiveTarget === 'USDT') effectiveTarget = 'USD';
 
+        const bcvPrice = rates?.bcv?.price || 0;
+        const euroPrice = rates?.euro?.price || 0;
+
         if (currency === 'USD') {
             if (effectiveTarget === 'EUR') {
-                rateUsed = rates.bcv.price / rates.euro.price;
+                rateUsed = euroPrice ? bcvPrice / euroPrice : 0;
                 rateName = 'Cross (USD → EUR)';
             } else {
-                rateUsed = rates.bcv.price;
+                rateUsed = bcvPrice;
                 rateName = 'Tasa BCV';
                 effectiveTarget = 'VES';
             }
         } else if (currency === 'EUR') {
             if (effectiveTarget === 'USD') {
-                rateUsed = rates.euro.price / rates.bcv.price;
+                rateUsed = bcvPrice ? euroPrice / bcvPrice : 0;
                 rateName = 'EUR → USD (Implícito)';
                 effectiveTarget = 'USD';
             } else {
-                rateUsed = rates.euro.price;
+                rateUsed = euroPrice;
                 rateName = 'Tasa Euro BCV';
                 effectiveTarget = 'VES';
             }
         } else if (currency === 'VES') {
             if (effectiveTarget === 'EUR') {
-                rateUsed = 1 / rates.euro.price;
+                rateUsed = euroPrice ? 1 / euroPrice : 0;
                 rateName = 'Compra EUR';
             } else {
-                rateUsed = 1 / rates.bcv.price;
+                rateUsed = bcvPrice ? 1 / bcvPrice : 0;
                 rateName = 'Compra USD (BCV)';
                 effectiveTarget = 'USD';
             }

@@ -46,7 +46,7 @@ export async function processCustomerTransaction({
     // 4. Update sales storage
     const sales = await storageService.getItem('bodega_sales_v1', []);
     const nextSaleNumber = sales.reduce((mx, s) => Math.max(mx, s.saleNumber || 0), 0) + 1;
-    const totalEnBs = currencyMode === 'BS' ? rawAmount : mulR(rawAmount, bcvRate);
+    const totalEnBs = currencyMode === 'BS' ? rawAmount : mulR(amountUsd, bcvRate);
     const totalEnUsd = amountUsd;
     const totalEnCop = currencyMode === 'COP' ? rawAmount : mulR(amountUsd, tasaCop);
 

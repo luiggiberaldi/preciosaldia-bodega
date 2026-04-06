@@ -8,11 +8,11 @@ export default function LockScreen() {
   const [selectedUser, setSelectedUser] = useState(null);
 
   const handlePinSubmit = async (pin, userId) => {
-    const success = await login(pin, userId);
-    if (success) {
+    const result = await login(pin, userId);
+    if (result?.success) {
       setSelectedUser(null);
     }
-    return success;
+    return result;
   };
 
   return (

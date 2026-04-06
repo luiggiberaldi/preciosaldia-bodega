@@ -13,6 +13,7 @@ import SwipeableItem from '../components/SwipeableItem';
 import { useProductContext } from '../context/ProductContext';
 import { useAudit } from '../hooks/useAudit';
 import { useAuthStore } from '../hooks/store/useAuthStore';
+import { useSupplierManagement } from '../hooks/useSupplierManagement';
 
 // Importaciones de Proveedores
 import SuppliersList from '../components/Suppliers/SuppliersList';
@@ -61,17 +62,17 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
 
     // ── ESTADOS DE PROVEEDORES ──
     const [activeTab, setActiveTab] = useState('clientes'); // 'clientes' | 'proveedores'
-    const [suppliers, setSuppliers] = useState([]);
-    const [invoices, setInvoices] = useState([]); // bodega_supplier_invoices_v1
-    const [selectedSupplier, setSelectedSupplier] = useState(null);
-    
-    // Modales de Proveedores
-    const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
-    const [editingSupplier, setEditingSupplier] = useState(null);
-    const [isAddInvoiceModalOpen, setIsAddInvoiceModalOpen] = useState(false);
-    const [isPayInvoiceModalOpen, setIsPayInvoiceModalOpen] = useState(false);
-    const [deleteSupplierTarget, setDeleteSupplierTarget] = useState(null);
-    const [supplierHistoryData, setSupplierHistoryData] = useState([]);
+
+    const {
+        suppliers, invoices, selectedSupplier,
+        isAddSupplierModalOpen, editingSupplier,
+        isAddInvoiceModalOpen, isPayInvoiceModalOpen,
+        deleteSupplierTarget, supplierHistoryData,
+        setSelectedSupplier, setIsAddSupplierModalOpen, setEditingSupplier,
+        setIsAddInvoiceModalOpen, setIsPayInvoiceModalOpen, setDeleteSupplierTarget,
+        handleSaveSupplier, refreshSupplierHistory, handleSelectSupplier,
+        handleAddInvoice, handlePayInvoice, handleDeleteSupplier, hydrateSuppliers,
+    } = useSupplierManagement({ bcvRate, tasaCop, copEnabled, triggerHaptic, auditLog });
 
     const loadData = async () => {
         const [savedCustomers, savedSuppliers, savedInvoices, savedMethods] = await Promise.all([
@@ -81,8 +82,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
             getActivePaymentMethods()
         ]);
         setCustomers(savedCustomers);
-        setSuppliers(savedSuppliers);
-        setInvoices(savedInvoices);
+        hydrateSuppliers(savedSuppliers, savedInvoices);
         setActivePaymentMethods(savedMethods);
     };
 
@@ -99,117 +99,6 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
     const saveCustomers = async (updatedCustomers) => {
         setCustomers(updatedCustomers);
         await storageService.setItem('bodega_customers_v1', updatedCustomers);
-    };
-
-    const saveSuppliers = async (updatedSuppliers) => {
-        setSuppliers(updatedSuppliers);
-        await storageService.setItem('bodega_suppliers_v1', updatedSuppliers);
-    };
-
-    const saveInvoices = async (updatedInvoices) => {
-        setInvoices(updatedInvoices);
-        await storageService.setItem('bodega_supplier_invoices_v1', updatedInvoices);
-    };
-
-    // ── LOGICA DE PROVEEDORES ──
-    const handleSaveSupplier = async (supplierData) => {
-        triggerHaptic && triggerHaptic();
-        let updated;
-        if (editingSupplier) {
-            updated = suppliers.map(s => s.id === supplierData.id ? supplierData : s);
-            showToast('Proveedor actualizado', 'success');
-            auditLog('PROVEEDOR', 'PROVEEDOR_EDITADO', `Proveedor "${supplierData.name}" actualizado`);
-        } else {
-            updated = [...suppliers, supplierData];
-            showToast('Proveedor agregado', 'success');
-            auditLog('PROVEEDOR', 'PROVEEDOR_CREADO', `Proveedor "${supplierData.name}" creado`);
-        }
-        await saveSuppliers(updated);
-        setIsAddSupplierModalOpen(false);
-        setEditingSupplier(null);
-        if (selectedSupplier && selectedSupplier.id === supplierData.id) setSelectedSupplier(supplierData);
-    };
-
-    const refreshSupplierHistory = async (supplierId) => {
-        const allSales = await storageService.getItem('bodega_sales_v1', []);
-        const supplierInvoices = invoices.filter(i => i.supplierId === supplierId);
-        const supplierPayments = allSales.filter(s => s.tipo === 'PAGO_PROVEEDOR' && s.supplierId === supplierId);
-        
-        const combined = [...supplierInvoices, ...supplierPayments]
-            .sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp));
-            
-        setSupplierHistoryData(combined);
-    };
-
-    const handleSelectSupplier = (supplier) => {
-        triggerHaptic && triggerHaptic();
-        setSelectedSupplier(supplier);
-        refreshSupplierHistory(supplier.id);
-    };
-
-    const handleAddInvoice = async (invoiceData) => {
-        triggerHaptic && triggerHaptic();
-        const updatedInvoices = [...invoices, invoiceData];
-        await saveInvoices(updatedInvoices);
-
-        // Actualizar deuda del proveedor
-        const supplier = suppliers.find(s => s.id === invoiceData.supplierId);
-        if (supplier) {
-            const updatedSupplier = { ...supplier, deuda: (supplier.deuda || 0) + invoiceData.amountUsd };
-            const updatedSuppliers = suppliers.map(s => s.id === supplier.id ? updatedSupplier : s);
-            await saveSuppliers(updatedSuppliers);
-            setSelectedSupplier(updatedSupplier);
-        }
-        setIsAddInvoiceModalOpen(false);
-        showToast('Factura registrada', 'success');
-        auditLog('PROVEEDOR', 'FACTURA_REGISTRADA', `Factura $${invoiceData.amountUsd?.toFixed(2)} - ${suppliers.find(s => s.id === invoiceData.supplierId)?.name || '?'}`);
-        refreshSupplierHistory(invoiceData.supplierId);
-    };
-
-    const handlePayInvoice = async (amountUsd, amountBs, methodId, currency) => {
-        triggerHaptic && triggerHaptic();
-        const supplier = selectedSupplier;
-        if (!supplier) return;
-
-        // 1. Descontar deuda
-        const updatedSupplier = { ...supplier, deuda: Math.max(0, (supplier.deuda || 0) - amountUsd) };
-        const updatedSuppliers = suppliers.map(s => s.id === supplier.id ? updatedSupplier : s);
-        await saveSuppliers(updatedSuppliers);
-        setSelectedSupplier(updatedSupplier);
-
-        // 2. Registrar en Caja como Egreso
-        const sales = await storageService.getItem('bodega_sales_v1', []);
-        const totalEnBs = currency === 'BS' ? amountBs : (amountUsd * bcvRate);
-        const totalEnUsd = currency === 'USD' ? amountUsd : (bcvRate > 0 ? amountBs / bcvRate : 0);
-        const totalEnCop = currency === 'COP' ? amountBs : (amountUsd * tasaCop);
-
-        const pagoRecord = {
-            id: crypto.randomUUID(),
-            timestamp: new Date().toISOString(),
-            tipo: 'PAGO_PROVEEDOR',
-            supplierId: supplier.id,
-            supplierName: supplier.name,
-            totalBs: -totalEnBs,
-            totalUsd: -totalEnUsd,
-            ...(copEnabled && { totalCop: -totalEnCop }),
-            paymentMethod: methodId,
-            payments: [{
-                methodId: methodId,
-                amountUsd: currency === 'USD' ? -totalEnUsd : 0,
-                amountBs: currency === 'BS' ? -totalEnBs : 0,
-                ...(copEnabled && { amountCop: currency === 'COP' ? -totalEnCop : 0 }),
-                currency: currency,
-                methodLabel: 'Pago a Proveedor'
-            }],
-            items: [{ name: `Pago a proveedor: ${supplier.name}`, qty: 1, priceUsd: -totalEnUsd, costBs: 0 }]
-        };
-        sales.push(pagoRecord);
-        await storageService.setItem('bodega_sales_v1', sales);
-
-        setIsPayInvoiceModalOpen(false);
-        showToast('Pago registrado correctamente', 'success');
-        auditLog('PROVEEDOR', 'PAGO_PROVEEDOR', `Pago $${amountUsd.toFixed(2)} a ${supplier.name}`);
-        refreshSupplierHistory(supplier.id);
     };
 
     const filteredCustomers = customers.filter(c => {
@@ -352,13 +241,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                 <ConfirmModal
                     isOpen={!!deleteSupplierTarget}
                     onClose={() => setDeleteSupplierTarget(null)}
-                    onConfirm={async () => {
-                        const updated = suppliers.filter(s => s.id !== deleteSupplierTarget.id);
-                        await saveSuppliers(updated);
-                        showToast(`Proveedor ${deleteSupplierTarget.name} eliminado`, 'success');
-                        setSelectedSupplier(null);
-                        setDeleteSupplierTarget(null);
-                    }}
+                    onConfirm={handleDeleteSupplier}
                     title="Eliminar Proveedor"
                     message={deleteSupplierTarget ? `¿Eliminar a ${deleteSupplierTarget.name}? Esta acción no se puede deshacer.` : ''}
                     confirmText="Sí, eliminar"

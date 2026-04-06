@@ -1,17 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FinancialEngine } from '../core/FinancialEngine';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { processVoidSale } from '../utils/voidSaleProcessor';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, CheckCircle2 } from 'lucide-react';
-import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
-import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, getPaymentIcon, toTitleCase } from '../config/paymentMethods';
-import { sumR } from '../utils/dinero';
+import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, ShoppingCart, Store, Users, ChevronDown, ChevronUp, Key, Settings, LockIcon, CheckCircle2 } from 'lucide-react';
+import { formatBs } from '../utils/calculatorUtils';
+import { getPaymentLabel, toTitleCase, getPaymentIcon, PAYMENT_ICONS } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import SalesChart from '../components/Dashboard/SalesChart';
 import ConfirmModal from '../components/ConfirmModal';
 import CierreCajaWizard from '../components/Dashboard/CierreCajaWizard';
 import { generateTicketPDF, printThermalTicket } from '../utils/ticketGenerator';
+import { shareSaleWhatsApp } from '../utils/dashboardActions';
 import { generateDailyClosePDF } from '../utils/dailyCloseGenerator';
 import { useNotifications } from '../hooks/useNotifications';
 import AnimatedCounter from '../components/AnimatedCounter';
@@ -19,27 +18,27 @@ import SyncStatus from '../components/SyncStatus';
 import { useProductContext } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import { useSecurity } from '../hooks/useSecurity';
-// useAuthStore removed - single-user app
 import { useAudit } from '../hooks/useAudit';
-
 import { getLocalISODate } from '../utils/dateHelpers';
-
 import Skeleton from '../components/Skeleton';
+import { useDashboardData } from '../hooks/useDashboardData';
+import { useDashboardMetrics } from '../hooks/useDashboardMetrics';
+import { TicketClientModal, DeleteHistoryModal, RecycleOfferModal } from '../components/Dashboard/DashboardModals';
 
 const SALES_KEY = 'bodega_sales_v1';
 export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme, isActive, isDemo, demoTimeLeft }) {
     const { notifyCierrePendiente, requestPermission } = useNotifications();
     const { deviceId } = useSecurity();
-    // Single-user mode: owner is always admin
     const isAdmin = true;
     const { log: auditLog } = useAudit();
-    const [sales, setSales] = useState([]);
     const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
-    const [customers, setCustomers] = useState([]);
-    const [isLoadingLocal, setIsLoadingLocal] = useState(true);
 
+    // Data loading
+    const { sales, setSales, customers, setCustomers, isLoadingLocal, refreshData } = useDashboardData(isActive, requestPermission);
     const isLoading = isLoadingProducts || isLoadingLocal;
+
+    // UI state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [voidSaleTarget, setVoidSaleTarget] = useState(null);
@@ -55,29 +54,22 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const [showTopDeudas, setShowTopDeudas] = useState(false);
     const touchStartY = useRef(0);
     const scrollRef = useRef(null);
-    const hasRequestedPermRef = useRef(false);
 
+    // Metrics
+    const {
+        today, todaySales, todayCashFlow, todayApertura,
+        todayTotalBs, todayTotalUsd, todayItemsSold,
+        todayExpenses, todayExpensesUsd, todayProfit,
+        getRecentSales, weekData, lowStockProducts,
+        totalDeudas, topProducts, paymentBreakdown, todayTopProducts,
+    } = useDashboardMetrics(sales, customers, products, bcvRate);
+
+    const recentSales = useMemo(() => getRecentSales(selectedChartDate), [getRecentSales, selectedChartDate]);
+
+    // Notificar cierre de caja pendiente (>7pm con ventas o cobros sin cerrar)
     useEffect(() => {
-        if (!isActive) return;
-        let mounted = true;
-        const load = async () => {
-            const [savedSales, savedCustomers] = await Promise.all([
-                storageService.getItem(SALES_KEY, []),
-                storageService.getItem('bodega_customers_v1', []),
-            ]);
-            if (mounted) {
-                setSales(savedSales);
-                setCustomers(savedCustomers);
-                setIsLoadingLocal(false);
-            }
-        };
-        load();
-        // Solicitar permiso de notificaciones al primer uso
-        if (!hasRequestedPermRef.current) { hasRequestedPermRef.current = true; requestPermission(); }
-        return () => { mounted = false; };
-    }, [isActive]);
-
-
+        if (todayCashFlow.length > 0) notifyCierrePendiente(todayCashFlow.length);
+    }, [todayCashFlow.length, notifyCierrePendiente]);
 
     // ── Funciones de Historial Avanzado ──
     const handleVoidSale = async (sale) => {
@@ -91,22 +83,16 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
         try {
             const { updatedSales, updatedProducts, updatedCustomers } = await processVoidSale(sale, sales, products);
-
             setSales(updatedSales);
-            setProducts(updatedProducts); // actualizar kpi
-            setCustomers(updatedCustomers); // FIX: Update local customers state so KPIs refresh
-
-            // Opcional: triggerHaptic()
+            setProducts(updatedProducts);
+            setCustomers(updatedCustomers);
             showToast('Venta anulada con éxito', 'success');
-
-            // Ofrecer reciclar la venta
             setRecycleOffer(sale);
         } catch (error) {
             console.error('Error anulando venta:', error);
             showToast('Hubo un problema anulando la venta', 'error');
         }
     };
-
 
     const handleShareWhatsApp = (sale) => {
         const saleCustomer = sale.customerId ? customers.find(c => c.id === sale.customerId) : null;
@@ -127,7 +113,6 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const handleRegisterClientForTicket = async () => {
         if (!ticketClientName.trim() || !ticketPendingSale) return;
 
-        // 1. Crear nuevo cliente
         const newCustomer = {
             id: crypto.randomUUID(),
             name: ticketClientName.trim(),
@@ -138,12 +123,10 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             createdAt: new Date().toISOString(),
         };
 
-        // 2. Guardar cliente en storage
         const updatedCustomers = [...customers, newCustomer];
         setCustomers(updatedCustomers);
         await storageService.setItem('bodega_customers_v1', updatedCustomers);
 
-        // 3. Actualizar la venta con el cliente nuevo
         const updatedSale = {
             ...ticketPendingSale,
             customerId: newCustomer.id,
@@ -154,153 +137,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         setSales(updatedSales);
         await storageService.setItem(SALES_KEY, updatedSales);
 
-        // 4. Cerrar modal y limpiar
         setTicketPendingSale(null);
         setTicketClientName('');
         setTicketClientPhone('');
         setTicketClientDocument('');
-
-        // 5. Enviar ticket por WhatsApp automáticamente
         handleShareWhatsApp(updatedSale);
     };
 
-    // ── Métricas del Día (memoized) ──
-    const today = getLocalISODate();
-
-    const todaySales = useMemo(() =>
-        sales.filter(s => {
-            if (s.status === 'ANULADA') return false;
-            if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA') return false;
-            // Ocultar ventas que ya fueron cerradas previamente
-            if (s.cajaCerrada === true) return false;
-            
-            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
-            return saleLocalDay === today;
-        }),
-        [sales, today]
-    );
-
-    // Movimientos reales de caja para el cuadre (Ventas + Abonos + Egresos + Apertura)
-    const todayCashFlow = useMemo(() =>
-        sales.filter(s => {
-            if (s.status === 'ANULADA') return false;
-            if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA' && s.tipo !== 'COBRO_DEUDA' && s.tipo !== 'PAGO_PROVEEDOR' && s.tipo !== 'APERTURA_CAJA') return false;
-            if (s.cajaCerrada === true) return false;
-            
-            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
-            return saleLocalDay === today;
-        }),
-        [sales, today]
-    );
-
-    // Detect if apertura was already registered today
-    const todayApertura = useMemo(() => {
-        return sales.find(s => {
-            if (s.tipo !== 'APERTURA_CAJA' || s.cajaCerrada) return false;
-            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
-            return saleLocalDay === today;
-        });
-    }, [sales, today]);
-    const todayTotalBs = useMemo(() => sumR(todaySales.map(s => s.totalBs || 0)), [todaySales]);
-    const todayTotalUsd = useMemo(() => sumR(todaySales.map(s => s.totalUsd || 0)), [todaySales]);
-    const todayItemsSold = useMemo(() => todaySales.reduce((sum, s) => sum + (s.items ? s.items.reduce((is, i) => is + i.qty, 0) : 0), 0), [todaySales]);
-
-    // Notificar cierre de caja pendiente (>7pm con ventas o cobros sin cerrar)
-    useEffect(() => {
-        if (todayCashFlow.length > 0) notifyCierrePendiente(todayCashFlow.length);
-    }, [todayCashFlow.length, notifyCierrePendiente]);
-
-    // Egresos del día (pagos a proveedores)
-    const todayExpenses = useMemo(() => {
-        return sales.filter(s => {
-            if (s.tipo !== 'PAGO_PROVEEDOR') return false;
-            if (s.cajaCerrada === true) return false;
-            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
-            return saleLocalDay === today;
-        });
-    }, [sales, today]);
-    const todayExpensesUsd = useMemo(() => sumR(todayExpenses.map(s => Math.abs(s.totalUsd || 0))), [todayExpenses]);
-
-    const todayProfit = useMemo(() =>
-        FinancialEngine.calculateAggregateProfit(todaySales, bcvRate, products),
-        [todaySales, bcvRate, products]
-    );
-
-    // Últimas ventas (por defecto las últimas 7, o las del día seleccionado en la gráfica)
-    const recentSales = useMemo(() => {
-        if (selectedChartDate) {
-            return sales.filter(s => {
-                const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
-                return saleLocalDay === selectedChartDate;
-            });
-        }
-        return sales.slice(0, 7);
-    }, [sales, selectedChartDate]);
-
-    // Datos últimos 7 días (para gráfica)
-    const weekData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        const dateStr = getLocalISODate(d);
-        const daySales = sales.filter(s => {
-            if (s.tipo === 'COBRO_DEUDA' || s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA' || s.tipo === 'VENTA_FIADA' || s.status === 'ANULADA') return false;
-            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
-            return saleLocalDay === dateStr;
-        });
-        return { date: dateStr, total: daySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0), count: daySales.length };
-    }), [sales, today]);
-
-    // Productos bajo stock
-    const lowStockProducts = useMemo(() =>
-        products.filter(p => (p.stock ?? 0) <= (p.lowStockAlert ?? 5))
-            .sort((a, b) => (a.stock ?? 0) - (b.stock ?? 0)).slice(0, 6),
-        [products]
-    );
-
-    // Deudas pendientes totales
-    const totalDeudas = useMemo(() => {
-        const deudores = customers.filter(c => (c.deuda || 0) > 0.01);
-        const totalUsd = deudores.reduce((sum, c) => sum + (c.deuda || 0), 0);
-        return { count: deudores.length, totalUsd, top5: [...deudores].sort((a, b) => (b.deuda || 0) - (a.deuda || 0)).slice(0, 5) };
-    }, [customers]);
-
-
-    // Top productos vendidos (todas las ventas netas)
-    const topProducts = useMemo(() => {
-        const productSalesMap = {};
-        sales.filter(s => s.tipo !== 'COBRO_DEUDA' && s.tipo !== 'AJUSTE_ENTRADA' && s.tipo !== 'AJUSTE_SALIDA' && s.tipo !== 'VENTA_FIADA' && s.status !== 'ANULADA').forEach(s => {
-            if (s.items) {
-                s.items.forEach(item => {
-                    if (!productSalesMap[item.name]) productSalesMap[item.name] = { name: item.name, qty: 0, revenue: 0 };
-                    productSalesMap[item.name].qty += item.qty;
-                    productSalesMap[item.name].revenue += item.priceUsd * item.qty;
-                });
-            }
-        });
-        return Object.values(productSalesMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
-    }, [sales]);
-
-    // Payment method breakdown (today)
-    const paymentBreakdown = useMemo(() => {
-        return FinancialEngine.calculatePaymentBreakdown(todayCashFlow);
-    }, [todayCashFlow]);
-
-    // Top productos vendidos HOY (para cierre del día)
-    const todayTopProducts = useMemo(() => {
-        const todayProductMap = {};
-        todaySales.forEach(s => {
-            if (s.items) {
-                s.items.forEach(item => {
-                    if (!todayProductMap[item.name]) todayProductMap[item.name] = { name: item.name, qty: 0, revenue: 0 };
-                    todayProductMap[item.name].qty += item.qty;
-                    todayProductMap[item.name].revenue += item.priceUsd * item.qty;
-                });
-            }
-        });
-        return Object.values(todayProductMap).sort((a, b) => b.qty - a.qty).slice(0, 10);
-    }, [todaySales]);
-
-    // Handler: Cierre de Caja (abre modal de confirmación y cuadre)
+    // Handler: Cierre de Caja
     const handleDailyClose = () => {
         triggerHaptic && triggerHaptic();
         if (todayCashFlow.length === 0 && todaySales.length === 0) {
@@ -311,17 +155,11 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     };
 
     const handleConfirmCashRecon = async (reconData) => {
-        const { declaredUsd, declaredBs, diffUsd, diffBs } = reconData;
-
-        // 1. Generar PDF del cierre pasando los datos de reconciliación
         if (todayCashFlow.length > 0 || todaySales.length > 0) {
             const allTodayForReport = sales.filter(s => {
                 const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
-                // Exclude APERTURA_CAJA from detail listing — shown separately in its own PDF section
                 return saleLocalDay === today && !s.cajaCerrada && s.tipo !== 'APERTURA_CAJA';
             });
-
-            // Sales used for count and detail = all cash flow except APERTURA_CAJA records
             const salesForPDF = todayCashFlow.filter(s => s.tipo !== 'APERTURA_CAJA');
 
             await generateDailyClosePDF({
@@ -334,16 +172,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 todayTotalBs,
                 todayProfit,
                 todayItemsSold,
-                reconData, // Pasamos los datos del cuadre al PDF
-                apertura: todayApertura, // Fondo inicial de caja
+                reconData,
+                apertura: todayApertura,
             });
         }
 
-        // 2. Marcar cajaCerrada en vez de borrar las ventas localmente
         const currentCierreId = new Date().getTime();
         const validTiposParaCerrar = ['VENTA', 'VENTA_FIADA', 'COBRO_DEUDA', 'PAGO_PROVEEDOR', 'APERTURA_CAJA'];
         const updatedSales = sales.map(s => {
-            // Sweep all unclosed transactions of cash flow types, resolving any "zombie" entries from previous days
             if (!s.cajaCerrada && validTiposParaCerrar.includes(s.tipo || 'VENTA')) {
                 return { ...s, cajaCerrada: true, cierreId: currentCierreId };
             }
@@ -390,14 +226,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const handleTouchEnd = async () => {
         if (pullDistance > 60) {
             setIsRefreshing(true);
-            const [savedSales, savedProducts, savedCustomers] = await Promise.all([
-                storageService.getItem(SALES_KEY, []),
-                storageService.getItem('bodega_products_v1', []),
-                storageService.getItem('bodega_customers_v1', []),
-            ]);
-            setSales(savedSales);
-            setProducts(savedProducts);
-            setCustomers(savedCustomers);
+            await refreshData(setProducts);
             setIsRefreshing(false);
         }
         setPullDistance(0);
@@ -430,7 +259,6 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
                 <div className="flex items-center gap-2">
                     <SyncStatus />
-                    {/* GEAR ICON FOR SETTINGS */}
                     <button
                         onClick={() => { triggerHaptic(); onNavigate('ajustes'); }}
                         className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-300 rounded-full shadow-sm hover:shadow active:scale-95 transition-all outline-none"
@@ -459,7 +287,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
             {/* Stats Cards */}
             <div className="grid grid-cols-2 gap-3 mb-5">
-                {/* Licencia Demo (solo visible en modo demo) */}
+                {/* Licencia Demo */}
                 {isDemo && demoTimeLeft && (
                     <div className="col-span-2 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-4 shadow-sm relative overflow-hidden text-white flex items-center justify-between">
                         <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
@@ -509,7 +337,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     <p className="text-[11px] text-slate-400 mt-1"><AnimatedCounter value={todayItemsSold} /> {todayItemsSold === 1 ? 'artículo vendido' : 'artículos vendidos'}</p>
                 </div>
 
-                {/* Egresos del Día (solo si hay pagos a proveedores) */}
+                {/* Egresos del Día */}
                 {todayExpensesUsd > 0 && (
                     <div className="col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-orange-200 dark:border-orange-800/30 shadow-sm relative overflow-hidden">
                         <div className="absolute -right-4 -top-4 w-16 h-16 bg-orange-50 dark:bg-orange-900/10 rounded-full blur-2xl"></div>
@@ -558,8 +386,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     <p className="text-[11px] text-slate-400 mt-1">Tasa BCV actual</p>
                 </div>
 
-
-                {/* ═══ BOTON CERRAR CAJA ═══ */}
+                {/* BOTON CERRAR CAJA */}
                 <div className="col-span-2">
                     {(todayCashFlow.length > 0 || todaySales.length > 0) ? (
                         <button
@@ -594,7 +421,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
                 {/* Deudas Pendientes */}
                 {totalDeudas.count > 0 && (
-                    <div 
+                    <div
                         onClick={() => { setShowTopDeudas(!showTopDeudas); triggerHaptic && triggerHaptic(); }}
                         className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-red-100 dark:border-red-800/30 shadow-sm relative overflow-hidden col-span-2 cursor-pointer active:scale-[0.99] transition-all"
                     >
@@ -641,7 +468,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 )}
             </div>
 
-            {/* Pago por Metodo (agrupado Bs / USD) */}
+            {/* Pago por Metodo */}
             {Object.keys(paymentBreakdown).length > 0 && (() => {
                 const entries = Object.entries(paymentBreakdown).filter(([, d]) => d.total > 0);
                 const fiadoMethods = entries.filter(([, d]) => d.currency === 'FIADO');
@@ -661,7 +488,6 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     let displayAmount = `${formatBs(data.total)} Bs`;
 
                     if (data.currency === 'FIADO') {
-                        // Fiado saves its total in USD, so equivalent is total * bcvRate
                         totalBsEquiv = data.total * bcvRate;
                         pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0;
                         displayAmount = `$ ${data.total.toFixed(2)}`;
@@ -709,7 +535,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
                             <DollarSign size={12} /> Desglose por Metodo
                         </h3>
-                        
+
                         {fiadoMethods.length > 0 && (
                             <div className="mb-4">
                                 <div className="flex items-center justify-between mb-2">
@@ -758,14 +584,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     </div>
                 );
             })()}
+
             {/* Gráfica semanal */}
             <SalesChart
-                weekData={weekData} 
+                weekData={weekData}
                 selectedDate={selectedChartDate}
                 onDayClick={(date) => {
                     triggerHaptic();
                     setSelectedChartDate(prev => prev === date ? null : date);
-                    // Scroll down to history a bit smoothly if selecting
                     setTimeout(() => {
                         window.scrollBy({ top: 150, behavior: 'smooth' });
                     }, 50);
@@ -852,189 +678,43 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
             )}
 
-            {/* Modal Registrar Cliente para Ticket */}
-            {ticketPendingSale && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200"
-                    onClick={() => { setTicketPendingSale(null); setTicketClientName(''); setTicketClientPhone(''); setTicketClientDocument(''); }}
-                >
-                    <div
-                        className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="p-5">
-                            <div className="flex justify-center mb-4">
-                                <div className="w-14 h-14 bg-brand-light/30 dark:bg-brand-dark/30 text-brand rounded-full flex items-center justify-center">
-                                    <UserPlus size={28} />
-                                </div>
-                            </div>
-                            <h3 className="text-lg font-black text-center text-slate-900 dark:text-white mb-1">
-                                Registrar Cliente
-                            </h3>
-                            <p className="text-xs text-center text-slate-400 mb-5">
-                                Para enviar el ticket, registra los datos del cliente.
-                            </p>
+            {/* Modals */}
+            <TicketClientModal
+                ticketPendingSale={ticketPendingSale}
+                ticketClientName={ticketClientName}
+                ticketClientPhone={ticketClientPhone}
+                ticketClientDocument={ticketClientDocument}
+                setTicketClientName={setTicketClientName}
+                setTicketClientPhone={setTicketClientPhone}
+                setTicketClientDocument={setTicketClientDocument}
+                onClose={() => { setTicketPendingSale(null); setTicketClientName(''); setTicketClientPhone(''); setTicketClientDocument(''); }}
+                onRegister={handleRegisterClientForTicket}
+            />
 
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">Nombre del Cliente *</label>
-                                    <input
-                                        type="text"
-                                        value={ticketClientName}
-                                        onChange={(e) => setTicketClientName(e.target.value)}
-                                        placeholder="Ej: María García"
-                                        autoFocus
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
-                                        Cédula / RIF (Opcional)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={ticketClientDocument}
-                                        onChange={(e) => setTicketClientDocument(e.target.value.toUpperCase())}
-                                        placeholder="Ej: V-12345678"
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all uppercase"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
-                                        <Phone size={10} /> Teléfono / WhatsApp
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        value={ticketClientPhone}
-                                        onChange={(e) => setTicketClientPhone(e.target.value)}
-                                        placeholder="Ej: 0414-1234567"
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex gap-3">
-                            <button
-                                onClick={() => { setTicketPendingSale(null); setTicketClientName(''); setTicketClientPhone(''); setTicketClientDocument(''); }}
-                                className="flex-1 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-bold rounded-xl active:scale-[0.98] transition-all"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleRegisterClientForTicket}
-                                disabled={!ticketClientName.trim()}
-                                className="flex-1 py-3 bg-brand disabled:bg-slate-300 dark:disabled:bg-slate-700 hover:bg-brand-dark text-white font-bold rounded-xl active:scale-[0.98] transition-all flex justify-center items-center gap-2 shadow-md shadow-brand/20"
-                            >
-                                <Send size={16} /> Registrar y Enviar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <DeleteHistoryModal
+                isOpen={isDeleteModalOpen}
+                deleteConfirmText={deleteConfirmText}
+                setDeleteConfirmText={setDeleteConfirmText}
+                onClose={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(''); }}
+                onConfirm={() => {
+                    if (deleteConfirmText.trim().toUpperCase() === 'BORRAR') {
+                        setSales([]);
+                        storageService.removeItem('my_sales_v1');
+                        setIsDeleteModalOpen(false);
+                        setDeleteConfirmText('');
+                    }
+                }}
+            />
 
-            {/* Modal de Confirmación Borrado Historial */}
-            {isDeleteModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-4 flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/40 text-red-500 rounded-full flex items-center justify-center mb-4">
-                                <Trash2 size={32} />
-                            </div>
-                            <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2">¿Estás absolutamente seguro?</h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 px-2">
-                                Esta acción borrará permanentemente <strong className="text-red-500">TODO el historial de ventas</strong>. (No afectará tu inventario de productos).
-                            </p>
-                            <div className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-6">
-                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Escribe "BORRAR" para confirmar:</p>
-                                <input
-                                    type="text"
-                                    value={deleteConfirmText}
-                                    onChange={(e) => setDeleteConfirmText(e.target.value)}
-                                    placeholder="BORRAR"
-                                    className="w-full form-input bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-3 text-center font-black text-red-500 uppercase tracking-widest focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all"
-                                />
-                            </div>
-                        </div>
-                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex gap-3">
-                            <button
-                                onClick={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(''); }}
-                                className="flex-1 py-3.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-bold rounded-xl active:scale-[0.98] transition-all"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (deleteConfirmText.trim().toUpperCase() === 'BORRAR') {
-                                        setSales([]);
-                                        storageService.removeItem('my_sales_v1');
-                                        setIsDeleteModalOpen(false);
-                                        setDeleteConfirmText('');
-                                    }
-                                }}
-                                disabled={deleteConfirmText.trim().toUpperCase() !== 'BORRAR'}
-                                className="flex-1 py-3.5 bg-red-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold rounded-xl active:scale-[0.98] transition-all flex justify-center items-center gap-2"
-                            >
-                                <Trash2 size={18} /> Borrar Historial
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* Modal: ¿Reciclar Venta? */}
-            {recycleOffer && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200"
-                    onClick={() => setRecycleOffer(null)}
-                >
-                    <div
-                        className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="p-5 text-center">
-                            <div className="flex justify-center mb-4">
-                                <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 rounded-full flex items-center justify-center">
-                                    <Recycle size={28} />
-                                </div>
-                            </div>
-                            <h3 className="text-lg font-black text-slate-900 dark:text-white mb-1">
-                                Venta Anulada
-                            </h3>
-                            <p className="text-xs text-slate-400 mb-2">
-                                ¿Quieres reciclar los productos de esta venta y enviarlos a la caja?
-                            </p>
-                            <div className="text-left bg-slate-50 dark:bg-slate-800 rounded-xl p-3 mt-3 space-y-1">
-                                {recycleOffer.items?.slice(0, 5).map((item, i) => (
-                                    <div key={i} className="flex justify-between text-xs">
-                                        <span className="text-slate-600 dark:text-slate-300 font-medium">{item.qty}{item.isWeight ? 'kg' : 'u'} {item.name.length > 20 ? item.name.substring(0, 20) + '…' : item.name}</span>
-                                        <span className="text-slate-400 font-bold">${(item.priceUsd * item.qty).toFixed(2)}</span>
-                                    </div>
-                                ))}
-                                {recycleOffer.items?.length > 5 && (
-                                    <p className="text-[10px] text-slate-400 text-center">+{recycleOffer.items.length - 5} más...</p>
-                                )}
-                            </div>
-                        </div>
-                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex gap-3">
-                            <button
-                                onClick={() => setRecycleOffer(null)}
-                                className="flex-1 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-bold rounded-xl active:scale-[0.98] transition-all"
-                            >
-                                No, gracias
-                            </button>
-                            <button
-                                onClick={() => {
-                                    loadCart(recycleOffer.items);
-                                    setRecycleOffer(null);
-                                    if (onNavigate) onNavigate('ventas');
-                                }}
-                                className="flex-1 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl active:scale-[0.98] transition-all flex justify-center items-center gap-2 shadow-md shadow-indigo-500/20"
-                            >
-                                <Recycle size={16} /> Reciclar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <RecycleOfferModal
+                recycleOffer={recycleOffer}
+                onClose={() => setRecycleOffer(null)}
+                onRecycle={() => {
+                    loadCart(recycleOffer.items);
+                    setRecycleOffer(null);
+                    if (onNavigate) onNavigate('ventas');
+                }}
+            />
 
             {/* Modal Confirmación: Anular Venta */}
             <ConfirmModal
@@ -1062,8 +742,6 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 copEnabled={copEnabled}
                 tasaCop={tasaCop}
             />
-
-
         </div>
     );
 }

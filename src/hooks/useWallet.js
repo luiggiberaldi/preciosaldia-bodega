@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { storageService } from '../utils/storageService';
 
 const STORAGE_KEY = 'bodega_accounts_v2';
@@ -6,6 +6,7 @@ const STORAGE_KEY = 'bodega_accounts_v2';
 export function useWallet() {
   const [accounts, setAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const hasLoaded = useRef(false);
 
   // 1. Cargar datos iniciales asíncronamente
   useEffect(() => {
@@ -21,6 +22,7 @@ export function useWallet() {
         }));
         if (isMounted) {
           setAccounts(normalized);
+          hasLoaded.current = true;
         }
       } catch (error) {
         console.error("Error cargando billetera:", error);
@@ -37,7 +39,7 @@ export function useWallet() {
 
   // 2. Guardar automáticamente cada vez que cambien (sólo si ya cargó)
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && hasLoaded.current) {
       storageService.setItem(STORAGE_KEY, accounts);
     }
   }, [accounts, isLoading]);
