@@ -25,6 +25,7 @@ function AppRouter() {
   const [isRecovery, setIsRecovery] = useState(detectRecovery);
 
   useEffect(() => {
+    if (!supabaseCloud) return;
     const { data: { subscription } } = supabaseCloud.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setIsRecovery(true);
     });

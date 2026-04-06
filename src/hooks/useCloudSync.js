@@ -55,6 +55,7 @@ function _debouncePush(key, value) {
  * Llamado desde storageService (colección 'store') y el interceptor localStorage (colección 'local').
  */
 export const pushCloudSync = async (key, value) => {
+    if (!supabaseCloud) return;
     if (isSyncingFromCloud) return;          // Nunca re-emitir lo que llegó de la nube
     if (!SYNC_KEYS.includes(key)) return;
 
@@ -119,7 +120,7 @@ export function useCloudSync() {
     const isInitialized = useRef(false);
 
     useEffect(() => {
-        if (!isCloudConfigured) {
+        if (!supabaseCloud || !isCloudConfigured) {
             if (globalSubscription) {
                 globalSubscription.unsubscribe();
                 globalSubscription = null;

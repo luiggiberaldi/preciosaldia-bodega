@@ -243,7 +243,9 @@ export default function App() {
 
         <div className={`flex-1 flex flex-col ${activeTab === 'catalogo' ? '' : 'hidden'}`}>
           <ErrorBoundary>
-            <ProductsView rates={rates} triggerHaptic={triggerHaptic} />
+            <PremiumGuard featureName="Inventario de Productos">
+              <ProductsView rates={rates} triggerHaptic={triggerHaptic} />
+            </PremiumGuard>
           </ErrorBoundary>
         </div>
 

@@ -14,6 +14,7 @@ function ChangePasswordScreen({ onPasswordChanged }) {
     const [sessionReady, setSessionReady] = useState(false);
 
     useEffect(() => {
+        if (!supabaseCloud) return;
         const { data: { subscription } } = supabaseCloud.auth.onAuthStateChange(
             async (event, session) => {
                 if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session) {
