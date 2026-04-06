@@ -36,8 +36,12 @@ export default function App() {
     setMountedViews(prev => ({...prev, [activeTab]: true}));
   }, [activeTab]);
 
-  // Inicializar Sincronización Realtime con Supabase
-  useCloudSync();
+  const { isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg, deviceId } = useSecurity();
+  const { isOnline, cacheRates } = useOfflineQueue();
+  useAutoBackup(isPremium, isDemo, deviceId);
+
+  // Inicializar Sincronización Realtime con Supabase (device_id como clave)
+  useCloudSync(deviceId);
 
   // Detectar iOS Safari (no standalone) para mostrar instrucciones manuales
   const isIOS = useMemo(() => /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream, []);
@@ -55,10 +59,6 @@ export default function App() {
   const lastClickTimeRef = useRef(0);
 
   const { rates } = useRates();
-  const { isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg, deviceId } = useSecurity();
-  const { isOnline, cacheRates } = useOfflineQueue();
-  useAutoBackup(isPremium, isDemo, deviceId);
-  // Auto-lock removed - single-user app
 
   // Purge old audit log entries on startup
   useEffect(() => { purgeOldEntries(); }, []);

@@ -89,11 +89,16 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const handleSort = (field) => baseSortHandler(field, setCurrentPage);
     const [itemsPerPage, setItemsPerPage] = useState(() => {
         const mode = localStorage.getItem('bodega_inventory_view') || 'grid';
-        return mode === 'list' ? 25 : (window.innerWidth >= 1024 ? 12 : 8);
+        if (mode === 'list') return 25;
+        const w = window.innerWidth;
+        return w >= 1536 ? 24 : w >= 1280 ? 20 : w >= 1024 ? 16 : 8;
     });
     useEffect(() => {
         const handleResize = () => {
-            if (viewMode === 'grid') setItemsPerPage(window.innerWidth >= 1024 ? 12 : 8);
+            if (viewMode === 'grid') {
+                const w = window.innerWidth;
+                setItemsPerPage(w >= 1536 ? 24 : w >= 1280 ? 20 : w >= 1024 ? 16 : 8);
+            }
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
@@ -104,7 +109,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         setViewMode(next);
         localStorage.setItem('bodega_inventory_view', next);
         setCurrentPage(1);
-        setItemsPerPage(next === 'list' ? 25 : (window.innerWidth >= 1024 ? 12 : 8));
+        setItemsPerPage(next === 'list' ? 25 : (() => { const w = window.innerWidth; return w >= 1536 ? 24 : w >= 1280 ? 20 : w >= 1024 ? 16 : 8; })());
         triggerHaptic && triggerHaptic();
     };
 
@@ -423,7 +428,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
             {/* Product Grid */}
             {isLoadingProducts ? (
                 <div className="flex-1 overflow-y-auto pb-4 scrollbar-hide">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
                         {[1,2,3,4,5,6,7,8,9,10].map(i => (
                             <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-3 h-56 flex flex-col justify-between">
                                 <div>
@@ -475,7 +480,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                     )}
                     <div className="flex-1 overflow-y-auto pb-4 scrollbar-hide">
                         {viewMode === 'grid' ? (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
                             {paginatedProducts.map(p => (
                                 <SwipeableItem 
                                     key={p.id}

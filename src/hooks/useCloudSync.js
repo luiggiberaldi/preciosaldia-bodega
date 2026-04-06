@@ -32,6 +32,7 @@ const LOCAL_KEYS = [
 let globalSubscription = null;
 let isSyncingFromCloud = false; // true mientras aplicamos cambios de la nube → evita eco
 let pendingPush = {};           // Debounce: { [key]: timeoutId }
+let _currentDeviceId = '';      // Device ID activo para pushCloudSync
 
 // Interceptor de localStorage — solo para llaves 'local'
 const originalSetItem = localStorage.setItem.bind(localStorage);
@@ -42,12 +43,18 @@ localStorage.setItem = function (key, value) {
     }
 };
 
+// Keys pesadas (arrays grandes con imágenes) usan debounce más largo para agrupar ediciones
+const HEAVY_KEYS = ['bodega_products_v1', 'bodega_sales_v1', 'bodega_customers_v1', 'abasto_audit_log_v1'];
+const DEBOUNCE_LIGHT_MS = 300;
+const DEBOUNCE_HEAVY_MS = 3000; // 3s para keys grandes — reduce writes en ráfagas de edición
+
 function _debouncePush(key, value) {
     if (pendingPush[key]) clearTimeout(pendingPush[key]);
+    const delay = HEAVY_KEYS.includes(key) ? DEBOUNCE_HEAVY_MS : DEBOUNCE_LIGHT_MS;
     pendingPush[key] = setTimeout(() => {
         delete pendingPush[key];
         pushCloudSync(key, value).catch(() => {});
-    }, 300);
+    }, delay);
 }
 
 /**
@@ -58,20 +65,18 @@ export const pushCloudSync = async (key, value) => {
     if (!supabaseCloud) return;
     if (isSyncingFromCloud) return;          // Nunca re-emitir lo que llegó de la nube
     if (!SYNC_KEYS.includes(key)) return;
+    if (!_currentDeviceId) return;
 
     try {
-        const { data: { session } } = await supabaseCloud.auth.getSession();
-        if (!session?.user?.id) return;
-
         const collectionType = LOCAL_KEYS.includes(key) ? 'local' : 'store';
 
         await supabaseCloud.from('sync_documents').upsert({
-            user_id: session.user.id,
+            device_id: _currentDeviceId,
             collection: collectionType,
             doc_id: key,
             data: { payload: value },
             updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id,collection,doc_id' });
+        }, { onConflict: 'device_id,collection,doc_id' });
 
     } catch (e) {
         console.warn('[CloudSync] Error al enviar a la nube:', e.message ?? e);
@@ -113,46 +118,33 @@ async function _applyFromCloud(docId, collection, payload) {
 }
 
 // ─── Hook de React ─────────────────────────────────────────────────────────
-export function useCloudSync() {
-    const adminEmail = useAuthStore(s => s.adminEmail);
-    const adminPassword = useAuthStore(s => s.adminPassword);
-    const isCloudConfigured = Boolean(adminEmail && adminPassword);
+export function useCloudSync(deviceId) {
     const isInitialized = useRef(false);
 
     useEffect(() => {
-        if (!supabaseCloud || !isCloudConfigured) {
+        if (!supabaseCloud || !deviceId) {
             if (globalSubscription) {
                 globalSubscription.unsubscribe();
                 globalSubscription = null;
                 isInitialized.current = false;
+                _currentDeviceId = '';
             }
             return;
         }
 
         if (isInitialized.current) return;
 
+        _currentDeviceId = deviceId;
+
         const initSync = async () => {
             try {
-                let session = (await supabaseCloud.auth.getSession()).data.session;
-
-                if (!session?.user?.id && adminEmail && adminPassword) {
-                    const loginRes = await supabaseCloud.auth.signInWithPassword({
-                        email: adminEmail,
-                        password: adminPassword
-                    });
-                    if (loginRes.error) throw loginRes.error;
-                    session = loginRes.data.session;
-                }
-
-                if (!session?.user?.id) return;
-
                 isInitialized.current = true;
-                const userId = session.user.id;
 
                 // ── Pull Inicial ───────────────────────────────────────────
                 const { data: docs } = await supabaseCloud
                     .from('sync_documents')
                     .select('collection, doc_id, data')
+                    .eq('device_id', deviceId)
                     .in('collection', ['store', 'local']);
 
                 if (docs?.length > 0) {
@@ -165,12 +157,12 @@ export function useCloudSync() {
                 // ── Suscripción WebSocket Realtime ─────────────────────────
                 if (!globalSubscription) {
                     globalSubscription = supabaseCloud
-                        .channel(`sync:${userId}`)
+                        .channel(`sync:${deviceId}`)
                         .on('postgres_changes', {
                             event: '*',
                             schema: 'public',
                             table: 'sync_documents',
-                            filter: `user_id=eq.${userId}`
+                            filter: `device_id=eq.${deviceId}`
                         }, async (payload) => {
                             const doc = payload.new;
                             if (!doc || !['store', 'local'].includes(doc.collection)) return;
@@ -179,13 +171,13 @@ export function useCloudSync() {
                         })
                         .subscribe((status) => {
                             if (status === 'SUBSCRIBED') {
-                                console.log('[CloudSync] Conectado y escuchando P2P en Tiempo Real');
+                                console.log('[CloudSync] Conectado y escuchando en Tiempo Real');
                             }
                         });
                 }
 
             } catch (err) {
-                console.error('[CloudSync] Fallo en inicialización P2P:', err);
+                console.error('[CloudSync] Fallo en inicialización:', err);
                 isInitialized.current = false; // Permitir reintento
             }
         };
@@ -195,5 +187,5 @@ export function useCloudSync() {
         return () => {
             // No desuscribir en cleanup del efecto — la suscripción debe vivir mientras la app esté abierta
         };
-    }, [isCloudConfigured, adminEmail, adminPassword]);
+    }, [deviceId]);
 }

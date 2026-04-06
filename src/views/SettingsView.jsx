@@ -2,20 +2,14 @@ import React, { useState, useRef } from 'react';
 import {
     ArrowLeft, Store, Printer, Coins, Package, CreditCard, Database,
     Palette, Fingerprint, Upload, Download, Share2, Check, X,
-    AlertTriangle, Copy, Sun, Moon, ChevronRight, Trash2, Users, FileText, Lock,
-    Mail, Eye, EyeOff, CheckCircle2, ShieldCheck
+    AlertTriangle, Copy, Sun, Moon, ChevronRight, Trash2, Users, FileText, Lock
 } from 'lucide-react';
-import { storageService } from '../utils/storageService';
-import localforage from 'localforage';
 import { showToast } from '../components/Toast';
 import PaymentMethodsManager from '../components/Settings/PaymentMethodsManager';
 // UsersManager removed - single-user app
 import AuditLogViewer from '../components/Settings/AuditLogViewer';
 import { useSecurity } from '../hooks/useSecurity';
-import { supabaseCloud } from '../config/supabaseCloud';
-import AnimatedCounter from '../components/AnimatedCounter';
 import { useProductContext } from '../context/ProductContext';
-import { useAuthStore } from '../hooks/store/useAuthStore';
 import ShareInventoryModal from '../components/ShareInventoryModal';
 import { useAudit } from '../hooks/useAudit';
 import SettingsTabNegocio from '../components/Settings/tabs/SettingsTabNegocio';
@@ -45,9 +39,6 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     } = useProductContext();
 
     const isAdmin = true; // Single-user mode: owner is always admin
-    const adminEmail = useAuthStore(s => s.adminEmail);
-    const adminPassword = useAuthStore(s => s.adminPassword);
-    const setAdminCredentials = useAuthStore(s => s.setAdminCredentials);
 
     const { deviceId, forceHeartbeat } = useSecurity();
     const { log: auditLog } = useAudit();
@@ -55,19 +46,6 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const [activeTab, setActiveTab] = useState('negocio');
     const [idCopied, setIdCopied] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
-
-    // Credenciales Locales
-    const [inputEmail, setInputEmail] = useState(adminEmail || '');
-    const [inputPassword, setInputPassword] = useState(adminPassword || '');
-    const isCloudConfigured = Boolean(adminEmail && adminPassword);
-    const [isCloudLogin, setIsCloudLogin] = useState(true);
-
-    // UI states for Auth form
-    const [inputPhone, setInputPhone] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [emailError, setEmailError] = useState('');
-    const [passwordError, setPasswordError] = useState('');
-    const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
 
     // Business Data
     const [businessName, setBusinessName] = useState(() => localStorage.getItem('business_name') || '');
@@ -83,28 +61,14 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
         setImportStatus,
         statusMessage,
         setStatusMessage,
-        deviceLimitError,
-        setDeviceLimitError,
-        blockedDevices,
-        setBlockedDevices,
         dataConflictPending,
         setDataConflictPending,
-        handleSaveCloudAccount,
         handleDataConflictChoice,
-        handleUnlinkOldestDevice,
     } = useCloudBackup({
         deviceId,
         auditLog,
         forceHeartbeat,
         triggerHaptic,
-        inputEmail,
-        inputPassword,
-        inputPhone,
-        isCloudLogin,
-        businessName,
-        setAdminCredentials,
-        setEmailError,
-        setPasswordError,
     });
 
     // ─── Data import/export hook ──────────────────────────
@@ -178,56 +142,6 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                             <p className="text-[9px] text-center text-slate-400 dark:text-slate-500 px-2">
                                 La opción que no elijas se perderá. Esta acción no se puede deshacer.
                             </p>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ════ MODAL: Límite de Dispositivos ════ */}
-            {deviceLimitError && (
-                <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 backdrop-blur-sm p-4 pb-8 animate-in fade-in">
-                    <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden">
-                        <div className="bg-red-500 px-5 py-4 text-white">
-                            <div className="flex items-center gap-2 mb-1">
-                                <AlertTriangle size={20} />
-                                <span className="font-black text-base">Límite de Dispositivos</span>
-                            </div>
-                            <p className="text-xs text-white/80">Esta cuenta ya está activa en 2 dispositivos simultáneamente.</p>
-                        </div>
-                        <div className="p-5 space-y-3">
-                            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">Dispositivos activos:</p>
-                            {blockedDevices.map((d, i) => (
-                                <div key={d.device_id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                                    <div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center shrink-0">
-                                        <Fingerprint size={16} className="text-slate-500" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{d.device_alias || `Dispositivo ${i + 1}`}</p>
-                                        <p className="text-[9px] text-slate-400">
-                                            Registrado: {new Date(d.created_at).toLocaleDateString('es-VE')}
-                                            {i === 0 && [...blockedDevices].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0]?.device_id === d.device_id
-                                                ? ' · Más antiguo' : ''}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                            <button
-                                onClick={handleUnlinkOldestDevice}
-                                disabled={importStatus === 'loading'}
-                                className="w-full mt-2 py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-sm font-black rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 active:scale-[0.98]"
-                            >
-                                {importStatus === 'loading'
-                                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    : <Trash2 size={16} />
-                                }
-                                Desvincular el dispositivo más antiguo
-                            </button>
-                            <button
-                                onClick={() => { setDeviceLimitError(null); setBlockedDevices([]); setImportStatus(null); }}
-                                className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                            >
-                                Cancelar
-                            </button>
                         </div>
                     </div>
                 </div>

@@ -75,16 +75,14 @@ export function useLicenseMonitoring({
         sendHeartbeat();
         const heartbeatInterval = setInterval(sendHeartbeat, 4 * 60 * 60 * 1000);
 
-        // 2. Poll de estado cada 1 minuto para revocaciones rapidas
-        const statusInterval = setInterval(verifyStatus, 60 * 1000);
-
-        // 3. Revisar apenas el usuario regrese a la app
+        // 2. Revisar apenas el usuario regrese a la app
+        // (El polling de 60s fue eliminado — el Realtime cubre las revocaciones instantáneas)
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') verifyStatus();
         };
         document.addEventListener('visibilitychange', handleVisibility);
 
-        // 4. Supabase Realtime para deteccion instantanea
+        // 3. Supabase Realtime para detección instantánea de revocaciones
         let subscription = null;
         try {
             subscription = supabase
@@ -102,7 +100,6 @@ export function useLicenseMonitoring({
 
         return () => {
             clearInterval(heartbeatInterval);
-            clearInterval(statusInterval);
             document.removeEventListener('visibilitychange', handleVisibility);
             if (subscription) subscription.unsubscribe();
         };

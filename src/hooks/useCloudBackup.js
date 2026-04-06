@@ -4,45 +4,26 @@ import { showToast } from '../components/Toast';
 import { supabaseCloud } from '../config/supabaseCloud';
 
 /**
- * Hook that encapsulates all cloud backup/restore logic.
+ * Hook that encapsulates cloud backup/restore logic using device_id as the sole identifier.
+ * No email or password required.
  *
  * @param {Object} params
  * @param {string}   params.deviceId
  * @param {Function} params.auditLog
  * @param {Function} params.forceHeartbeat
  * @param {Function} [params.triggerHaptic]
- * @param {string}   params.inputEmail       – bound email input value
- * @param {string}   params.inputPassword    – bound password input value
- * @param {string}   params.inputPhone       – bound phone input value
- * @param {boolean}  params.isCloudLogin     – true = login, false = register
- * @param {string}   params.businessName
- * @param {Function} params.setAdminCredentials
- * @param {Function} params.setEmailError
- * @param {Function} params.setPasswordError
  */
 export function useCloudBackup({
     deviceId,
     auditLog,
     forceHeartbeat,
     triggerHaptic,
-    inputEmail,
-    inputPassword,
-    inputPhone,
-    isCloudLogin,
-    businessName,
-    setAdminCredentials,
-    setEmailError,
-    setPasswordError,
 }) {
     const [importStatus, setImportStatus] = useState(null);
     const [statusMessage, setStatusMessage] = useState('');
-    const [deviceLimitError, setDeviceLimitError] = useState(null);
-    const [blockedDevices, setBlockedDevices] = useState([]);
     const [dataConflictPending, setDataConflictPending] = useState(null);
 
     // ─── HELPER: Apply a cloud backup to local storage ───────────────────────
-    // IMPORTANTE: usa storageService.setItem (instancia global de localforage)
-    // NO usar localforage.createInstance() — genera una instancia separada que la app no lee
     const applyCloudBackup = async (cloudBackup) => {
         if (!cloudBackup?.data) {
             console.error('[applyCloudBackup] Backup inválido o sin datos:', cloudBackup);
@@ -50,10 +31,8 @@ export function useCloudBackup({
         }
         if (cloudBackup.version === '2.0' && cloudBackup.data.idb) {
             const idbEntries = Object.entries(cloudBackup.data.idb);
-            console.log(`[applyCloudBackup] Restaurando ${idbEntries.length} keys de IDB...`);
             for (const [key, value] of idbEntries) {
                 await storageService.setItem(key, value);
-                console.log(`[applyCloudBackup] ✓ ${key}`);
             }
         } else {
             console.warn('[applyCloudBackup] Formato no reconocido, intentando restauración legacy...');
@@ -63,7 +42,6 @@ export function useCloudBackup({
                 localStorage.setItem(key, value);
             }
         }
-        console.log('[applyCloudBackup] Restauración completa.');
     };
 
     // ─── HELPER: Collect local backup payload ────────────────────────────────
@@ -102,82 +80,67 @@ export function useCloudBackup({
         };
     };
 
-    // ─── HELPER: Upload local backup to cloud ────────────────────────────────
-    const uploadLocalBackup = async (email, backupData) => {
-        // 1. Respaldo Legacy Blobs
+    // ─── HELPER: Upload local backup + initialize sync_documents ─────────────
+    const uploadLocalBackup = async (backupData) => {
+        if (!supabaseCloud || !deviceId) return;
+
+        // 1. Backup blob completo
         const { error } = await supabaseCloud
             .from('cloud_backups')
             .upsert({
-                email: email.toLowerCase(),
+                device_id: deviceId,
                 backup_data: backupData,
                 updated_at: new Date().toISOString()
-            }, { onConflict: 'email' });
+            }, { onConflict: 'device_id' });
         if (error) throw error;
 
-        // 2. Inyección Inicial en Nuevo Sistema Realtime Sync
+        // 2. Inyección inicial en sync_documents para P2P
         try {
-            const { data: { session } } = await supabaseCloud.auth.getSession();
-            if (session?.user?.id) {
-                const syncPayloads = [];
-                for (const [key, value] of Object.entries(backupData.data.idb || {})) {
-                    syncPayloads.push({
-                        user_id: session.user.id,
-                        collection: 'store',
-                        doc_id: key,
-                        data: { payload: value },
-                        updated_at: new Date().toISOString()
-                    });
-                }
-                // Incluir localStorage en P2P
-                for (const [key, value] of Object.entries(backupData.data.ls || {})) {
-                    let finalVal = value;
-                    try { finalVal = JSON.parse(value); } catch { /* keep as string if not valid JSON */ } // Parsear localStorage (strings) a objetos si es posible
-                    syncPayloads.push({
-                        user_id: session.user.id,
-                        collection: 'local',
-                        doc_id: key,
-                        data: { payload: finalVal },
-                        updated_at: new Date().toISOString()
-                    });
-                }
-                if (syncPayloads.length > 0) {
-                    await supabaseCloud.from('sync_documents').upsert(syncPayloads, { onConflict: 'user_id,collection,doc_id' });
-                }
+            const syncPayloads = [];
+            for (const [key, value] of Object.entries(backupData.data.idb || {})) {
+                syncPayloads.push({
+                    device_id: deviceId,
+                    collection: 'store',
+                    doc_id: key,
+                    data: { payload: value },
+                    updated_at: new Date().toISOString()
+                });
             }
-        } catch(syncErr) {
-            console.warn('[Realtime Sync Init] Fallo inicializando sync_documents:', syncErr);
+            for (const [key, value] of Object.entries(backupData.data.ls || {})) {
+                let finalVal = value;
+                try { finalVal = JSON.parse(value); } catch { /* keep as string */ }
+                syncPayloads.push({
+                    device_id: deviceId,
+                    collection: 'local',
+                    doc_id: key,
+                    data: { payload: finalVal },
+                    updated_at: new Date().toISOString()
+                });
+            }
+            if (syncPayloads.length > 0) {
+                await supabaseCloud.from('sync_documents').upsert(syncPayloads, { onConflict: 'device_id,collection,doc_id' });
+            }
+        } catch (syncErr) {
+            console.warn('[CloudBackup] Fallo inicializando sync_documents:', syncErr);
         }
     };
 
-    // ─── HELPER: Register or update device in account_devices ─────────────────
-    const registerDevice = async (email) => {
-        await supabaseCloud.from('account_devices').upsert({
-            email: email.toLowerCase(),
-            device_id: deviceId || 'UNKNOWN',
-            device_alias: `Dispositivo ${navigator.platform || 'Web'}`,
-            last_seen: new Date().toISOString()
-        }, { onConflict: 'email,device_id' });
-    };
-
-    // ─── HANDLER: Data conflict resolution ──────────────────────────────────
+    // ─── HANDLER: Data conflict resolution ───────────────────────────────────
     const handleDataConflictChoice = async (choice) => {
         if (!dataConflictPending) return;
-        const { email, cloudBackup, localBackup } = dataConflictPending;
+        const { cloudBackup, localBackup } = dataConflictPending;
         setDataConflictPending(null);
         setImportStatus('loading');
         setStatusMessage('Aplicando tu elección...');
         try {
             if (choice === 'cloud') {
-                // Restore cloud data to this device
                 await applyCloudBackup(cloudBackup);
                 showToast('Datos de la nube restaurados. Reiniciando...', 'success');
                 setTimeout(() => window.location.reload(), 1500);
             } else {
-                // Upload local data to cloud (overwrite)
-                await uploadLocalBackup(email, localBackup);
+                await uploadLocalBackup(localBackup);
                 showToast('Datos locales guardados en la nube', 'success');
             }
-            setAdminCredentials(email, inputPassword);
             auditLog('NUBE', 'CONFLICTO_RESUELTO', `Conflicto datos resuelto: usuario eligió ${choice}`);
             setImportStatus(null);
         } catch (err) {
@@ -186,146 +149,43 @@ export function useCloudBackup({
         }
     };
 
-    // ─── HANDLER: Desvincular dispositivo más antiguo y reintentar ────────────
-    const handleUnlinkOldestDevice = async () => {
-        if (!blockedDevices.length || !inputEmail) return;
-        setImportStatus('loading');
-        setStatusMessage('Desvinculando dispositivo más antiguo...');
-        try {
-            // Sort by created_at ascending, remove the oldest
-            const oldest = [...blockedDevices].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
-            await supabaseCloud.from('account_devices')
-                .delete()
-                .eq('email', inputEmail.toLowerCase())
-                .eq('device_id', oldest.device_id);
-            setDeviceLimitError(null);
-            setBlockedDevices([]);
-            showToast(`"${oldest.device_alias}" desvinculado. Volviendo a conectar...`, 'success');
-            await handleSaveCloudAccount();
-        } catch (err) {
-            showToast(err.message || 'Error al desvincular', 'error');
-            setImportStatus('error');
-        }
-    };
-
-    const handleSaveCloudAccount = async () => {
-        // Reset errors
-        setEmailError('');
-        setPasswordError('');
-        setDeviceLimitError(null);
-        setBlockedDevices([]);
-
-        let hasError = false;
-        if (!inputEmail.includes('@')) {
-            setEmailError('Formato de correo no válido');
-            hasError = true;
-        }
-        if (inputPassword.length < 6) {
-            setPasswordError('Mínimo 6 caracteres para mayor seguridad');
-            hasError = true;
-        }
-        if (!isCloudLogin && !inputPhone.trim()) {
-            showToast('El teléfono es obligatorio para registrarse', 'error');
-            hasError = true;
-        }
-        if (hasError) {
-            triggerHaptic?.();
+    // ─── HANDLER: Sync cloud (initial connect) ────────────────────────────────
+    const handleSyncCloud = async () => {
+        if (!supabaseCloud || !deviceId) {
+            showToast('Sin conexión a la nube', 'error');
             return;
         }
 
-        const emailToUse = inputEmail.trim().toLowerCase();
-
         try {
             setImportStatus('loading');
-            setStatusMessage('Autenticando en la nube...');
-
-            // ── 1. Supabase Auth ────────────────────────────────────────────────
-            if (supabaseCloud) {
-                if (isCloudLogin) {
-                    const { error: err } = await supabaseCloud.auth.signInWithPassword({
-                        email: emailToUse,
-                        password: inputPassword,
-                    });
-                    if (err) throw new Error('Error al iniciar sesión: ' + err.message);
-                } else {
-                    const { data, error: err } = await supabaseCloud.auth.signUp({
-                        email: emailToUse,
-                        password: inputPassword,
-                        options: { data: { full_name: businessName || 'Bodega', phone: inputPhone } },
-                    });
-                    if (err) {
-                        if (err.message.includes('already registered') || err.message.includes('User already registered')) {
-                            throw new Error('Este correo ya está registrado. Selecciona "Entrar".');
-                        }
-                        throw new Error('Error en el registro: ' + err.message);
-                    }
-                    if (data?.user?.identities?.length === 0) throw new Error('Este correo ya está registrado. Selecciona "Entrar".');
-                    if (data?.user && !data.session) {
-                        showToast('Por favor, revisa tu correo y confirma tu cuenta.', 'success');
-                        setImportStatus('awaiting_email_confirmation');
-                        setStatusMessage('Por favor confirma tu correo...');
-                        return;
-                    }
-                }
-            }
-
-            // ── 2. Control de dispositivos (máx. 2) ─────────────────────────────
-            setStatusMessage('Verificando dispositivos autorizados...');
-            const { data: existingDevices, error: devErr } = await supabaseCloud
-                .from('account_devices')
-                .select('*')
-                .eq('email', emailToUse)
-                .order('created_at', { ascending: true });
-
-            if (!devErr && existingDevices) {
-                const myDeviceRegistered = existingDevices.find(d => d.device_id === (deviceId || 'UNKNOWN'));
-                const activeCount = existingDevices.length;
-
-                if (!myDeviceRegistered && activeCount >= 2) {
-                    // ❌ Límite alcanzado - mostrar error con opción de desvincular
-                    setDeviceLimitError({ devices: existingDevices });
-                    setBlockedDevices(existingDevices);
-                    setImportStatus('error');
-                    setStatusMessage('Límite de dispositivos alcanzado.');
-                    triggerHaptic?.();
-                    return;
-                }
-            }
-
-            // ── 3. Fetch backup en la nube ───────────────────────────────────────
             setStatusMessage('Consultando backup en la nube...');
+
             const { data: cloudRow } = await supabaseCloud
                 .from('cloud_backups')
                 .select('backup_data')
-                .eq('email', emailToUse)
+                .eq('device_id', deviceId)
                 .maybeSingle();
 
             const cloudBackup = cloudRow?.backup_data || null;
-
-            // ── 4. Recolectar datos locales ──────────────────────────────────────
             const localBackup = await collectLocalBackup();
             const hasLocalData = Object.keys(localBackup.data.idb).length > 0;
             const hasCloudData = cloudBackup && cloudBackup.data;
 
-            if (isCloudLogin && hasCloudData && hasLocalData) {
+            if (hasCloudData && hasLocalData) {
                 // ⚠️ Conflicto: ambos tienen datos → preguntar al usuario
-                setDataConflictPending({ email: emailToUse, cloudBackup, localBackup });
-                await registerDevice(emailToUse);
-                setAdminCredentials(emailToUse, inputPassword);
+                setDataConflictPending({ cloudBackup, localBackup });
                 setImportStatus(null);
                 setStatusMessage('');
-                auditLog('NUBE', 'LOGIN_NUBE', `Login exitoso: ${emailToUse}`);
-                return; // Modal de conflicto se muestra, usuario elige
+                auditLog('NUBE', 'CONFLICTO_DETECTADO', 'Conflicto datos nube/local');
+                return;
             }
 
-            if (isCloudLogin && hasCloudData && !hasLocalData) {
-                // 🆕 Dispositivo nuevo/vacío: restaurar automáticamente
+            if (hasCloudData && !hasLocalData) {
+                // Dispositivo vacío → restaurar desde nube
                 setStatusMessage('Restaurando backup de la nube...');
                 await applyCloudBackup(cloudBackup);
-                await registerDevice(emailToUse);
-                setAdminCredentials(emailToUse, inputPassword);
                 showToast('Datos restaurados automáticamente desde la nube', 'success');
-                auditLog('NUBE', 'RESTORE_AUTO', `Backup restaurado automaticamente para: ${emailToUse}`);
+                auditLog('NUBE', 'RESTORE_AUTO', 'Backup restaurado automáticamente');
                 triggerHaptic?.();
                 setImportStatus('success');
                 setStatusMessage('Restauración completa. Reiniciando...');
@@ -333,38 +193,17 @@ export function useCloudBackup({
                 return;
             }
 
-            // ── 5. Subir datos locales a la nube (flujo normal) ─────────────────
-            setStatusMessage('Guardando y sincronizando datos locales...');
-            if (supabaseCloud) {
-                await uploadLocalBackup(emailToUse, localBackup);
-
-                // Registrar licencia inicial (Estación Maestra)
-                try {
-                    await supabaseCloud.from('cloud_licenses').upsert({
-                        email: emailToUse,
-                        device_id: deviceId || 'UNKNOWN_DEVICE',
-                        license_type: 'trial',
-                        days_remaining: 15,
-                        business_name: businessName || 'Bodega',
-                        phone: inputPhone || '',
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'email' });
-                } catch (licErr) {
-                    console.warn('Licencia cloud skip:', licErr);
-                }
-
-                await registerDevice(emailToUse);
-            }
-
-            setAdminCredentials(emailToUse, inputPassword);
-            showToast(isCloudLogin ? 'Sesión iniciada y sincronizada' : 'Cuenta confirmada y sincronizada', 'success');
-            auditLog('NUBE', isCloudLogin ? 'LOGIN_NUBE' : 'REGISTRO_NUBE', `Sincronización completa: ${emailToUse}`);
+            // Sin datos en la nube → subir datos locales
+            setStatusMessage('Guardando datos locales en la nube...');
+            await uploadLocalBackup(localBackup);
+            showToast('Datos sincronizados con la nube', 'success');
+            auditLog('NUBE', 'SYNC_INICIAL', 'Datos locales subidos a la nube');
             triggerHaptic?.();
             setImportStatus(null);
 
         } catch (error) {
-            console.error('Error sincronizando con la nube:', error);
-            showToast(error.message || 'Hubo un error contactando la nube', 'error');
+            console.error('[CloudBackup] Error:', error);
+            showToast(error.message || 'Error contactando la nube', 'error');
             setImportStatus('error');
         }
     };
@@ -374,17 +213,12 @@ export function useCloudBackup({
         setImportStatus,
         statusMessage,
         setStatusMessage,
-        deviceLimitError,
-        setDeviceLimitError,
-        blockedDevices,
-        setBlockedDevices,
         dataConflictPending,
         setDataConflictPending,
         applyCloudBackup,
         collectLocalBackup,
         uploadLocalBackup,
-        handleSaveCloudAccount,
+        handleSyncCloud,
         handleDataConflictChoice,
-        handleUnlinkOldestDevice,
     };
 }

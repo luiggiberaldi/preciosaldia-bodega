@@ -20,8 +20,6 @@ export const useAuthStore = create(
             requireLogin: false, // Login opcional, por defecto desactivado
             failedAttempts: 0,
             lockUntil: null,
-            adminEmail: '',
-            adminPassword: '',
 
 
             // ACCIONES
@@ -127,18 +125,12 @@ export const useAuthStore = create(
                 logEvent('CONFIG', 'LOGIN_REQUERIDO_MODIFICADO', `Login requerido establecido a ${val ? 'SI' : 'NO'}`);
             },
 
-            setAdminCredentials: (email, password) => {
-                set({ adminEmail: email, adminPassword: password });
-                logEvent('CONFIG', 'CREDENCIALES_REMOTAS_ESTABLECIDAS', `Se ha registrado el acceso remoto para la cuenta administradora.`);
-            }
         }),
         {
             name: 'abasto-auth-storage', // Nombre para localStorage
             partialize: (state) => ({ 
                 usuarios: state.usuarios, 
                 requireLogin: state.requireLogin,
-                adminEmail: state.adminEmail,
-                adminPassword: state.adminPassword
             }),
             storage: {
                 getItem: (name) => {

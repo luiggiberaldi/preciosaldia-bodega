@@ -31,7 +31,7 @@ export default function ProductCard({
     return (
         <div className={`bg-white dark:bg-slate-900 rounded-2xl shadow-sm border flex flex-col overflow-hidden group ${isLowStock ? 'border-amber-300 dark:border-amber-700' : 'border-slate-100 dark:border-slate-800'} ${isSelected ? 'ring-2 ring-brand border-brand shadow-brand/20 bg-brand/5 dark:bg-brand/10' : ''}`}>
             {/* Image */}
-            <div className="w-full h-24 bg-slate-100 dark:bg-slate-800 overflow-hidden relative shrink-0">
+            <div className="w-full h-24 lg:h-20 bg-slate-100 dark:bg-slate-800 overflow-hidden relative shrink-0">
                 {/* Select Checkbox */}
                 <div className="absolute top-1 left-1 z-10 w-6 h-6 flex items-center justify-center bg-white/80 dark:bg-slate-900/80 rounded backdrop-blur-sm">
                     <input type="checkbox" checked={isSelected} onChange={onToggleSelect} className="w-4 h-4 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer shadow-sm" />
@@ -58,8 +58,8 @@ export default function ProductCard({
             </div>
 
             {/* Info */}
-            <div className="p-3 flex flex-col flex-1">
-                <h3 className="font-bold text-slate-700 dark:text-slate-200 text-[13px] leading-tight line-clamp-2 mb-2">{p.name}</h3>
+            <div className="p-3 lg:p-2.5 flex flex-col flex-1">
+                <h3 className="font-bold text-slate-700 dark:text-slate-200 text-[13px] lg:text-[12px] leading-tight line-clamp-2 mb-2">{p.name}</h3>
 
                 {/* Units per package info */}
                 {p.unit === 'paquete' && p.unitsPerPackage && (
@@ -70,7 +70,7 @@ export default function ProductCard({
 
                 <div className="flex justify-between items-end mb-3">
                     <div>
-                        <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none">
+                        <p className="text-lg lg:text-base font-black text-emerald-600 dark:text-emerald-400 leading-none">
                             {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                         </p>
                         <p className="text-[11px] font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
