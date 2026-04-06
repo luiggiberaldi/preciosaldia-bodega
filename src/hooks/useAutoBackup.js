@@ -114,7 +114,7 @@ export function useAutoBackup(isPremium, isDemo, deviceId) {
 
     // ── Suscripción a solicitudes de backup en tiempo real ─────────────────
     useEffect(() => {
-        if (!deviceId || !isPremium || isDemo || !supabaseCloud) return;
+        if (!deviceId || !supabaseCloud) return;
 
         const channel = supabaseCloud
             .channel(`backup_request_${deviceId}`)
@@ -137,7 +137,7 @@ export function useAutoBackup(isPremium, isDemo, deviceId) {
             .subscribe();
 
         return () => channel.unsubscribe();
-    }, [deviceId, isPremium, isDemo]);
+    }, [deviceId]);
 }
 
 // Restaurar desde backup local (para emergencias)
