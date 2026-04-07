@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { round2, divR, mulR, subR, sumR } from '../utils/dinero';
 
 export function useCheckoutCalculations({
@@ -13,6 +13,8 @@ export function useCheckoutCalculations({
     const [barValues, setBarValues] = useState({});
     const [changeUsdGiven, setChangeUsdGiven] = useState('');
     const [changeBsGiven, setChangeBsGiven] = useState('');
+    const [paymentWarning, setPaymentWarning] = useState(null);
+    const pendingConfirmRef = useRef(null);
 
     const safeRate = effectiveRate > 0 ? effectiveRate : 1;
     const safeTasaCop = tasaCop > 0 ? tasaCop : 4150;
@@ -64,63 +66,8 @@ export function useCheckoutCalculations({
         }
     }, [remainingUsd, remainingBs, triggerHaptic, tasaCop]);
 
-    const handleConfirm = useCallback(() => {
-        triggerHaptic && triggerHaptic();
-
-        // ── Detección inteligente de errores de entrada ───────────────────────
-        if (cartTotalUsd > 0) {
-            for (const m of paymentMethods) {
-                const val = parseFloat(barValues[m.id]) || 0;
-                if (val === 0) continue;
-
-                const valUsd = m.currency === 'USD' ? val
-                    : m.currency === 'COP' ? val / safeTasaCop
-                    : val / safeRate;
-                const diff = valUsd - cartTotalUsd;
-
-                // Capa 1 — Confusión Bs → USD
-                // Si el método es USD y (monto ÷ tasa) ≈ total real (±10%), el cajero
-                // probablemente ingresó el precio en Bolívares en el campo de Dólares.
-                if (m.currency === 'USD' && safeRate > 1) {
-                    const impliedUsd = val / safeRate;
-                    const ratio = impliedUsd / cartTotalUsd;
-                    if (ratio >= 0.90 && ratio <= 1.10 && val > cartTotalUsd * 3) {
-                        const expectedBs = (cartTotalUsd * safeRate).toFixed(2);
-                        const ok = window.confirm(
-                            `⚠️ Posible error de moneda\n\n` +
-                            `Ingresaste $${val.toFixed(2)} en el campo de Dólares, pero el total de la venta es $${cartTotalUsd.toFixed(2)}.\n\n` +
-                            `¿Confundiste el campo? El total en Bolívares es Bs ${expectedBs}.\n\n` +
-                            `Presiona Aceptar solo si el cliente realmente pagó $${val.toFixed(2)} en dólares.`
-                        );
-                        if (!ok) return;
-                        break;
-                    }
-                }
-
-                // Capa 2 — Umbral proporcional según tamaño de venta
-                const threshold = cartTotalUsd <= 10  ? { factor: 4,   minDiff: 15 }
-                                : cartTotalUsd <= 50  ? { factor: 3,   minDiff: 30 }
-                                : cartTotalUsd <= 200 ? { factor: 2,   minDiff: 50 }
-                                :                      { factor: 1.5, minDiff: 100 };
-
-                if (valUsd > cartTotalUsd * threshold.factor && diff > threshold.minDiff) {
-                    // Capa 3 — ¿Es un número redondo sospechoso?
-                    const isRoundNumber = val >= 100 && val % 100 === 0;
-                    const roundNote = isRoundNumber ? '\nEl monto parece un número redondeado — verifica que no hayas agregado ceros de más.' : '';
-
-                    const ok = window.confirm(
-                        `⚠️ Monto inusualmente alto\n\n` +
-                        `Ingresaste ${m.currency === 'USD' ? '$' : 'Bs '}${val.toFixed(2)} para una venta de $${cartTotalUsd.toFixed(2)}.` +
-                        roundNote +
-                        `\n\n¿El cliente realmente pagó esa cantidad?\n\nPresiona Aceptar para confirmar o Cancelar para corregirlo.`
-                    );
-                    if (!ok) return;
-                    break;
-                }
-            }
-        }
-        // ─────────────────────────────────────────────────────────────────────
-
+    // ── Procesamiento final de la venta (sin validaciones) ────────────────────
+    const _processPayments = useCallback(() => {
         const payments = paymentMethods
             .filter(m => parseFloat(barValues[m.id]) > 0)
             .map(m => {
@@ -138,12 +85,87 @@ export function useCheckoutCalculations({
             });
         const defaultUsdChange = (!changeUsdGiven && !changeBsGiven) ? changeUsd : round2(parseFloat(changeUsdGiven) || 0);
         const defaultBsChange = (!changeUsdGiven && !changeBsGiven) ? 0 : round2(parseFloat(changeBsGiven) || 0);
-
         onConfirmSale(payments, {
             changeUsdGiven: Math.min(defaultUsdChange, changeUsd),
             changeBsGiven: Math.min(defaultBsChange, changeBs),
         });
-    }, [barValues, paymentMethods, effectiveRate, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd, cartTotalUsd]);
+    }, [barValues, paymentMethods, effectiveRate, onConfirmSale, changeUsdGiven, changeBsGiven, changeUsd, changeBs]);
+
+    // ── Detección inteligente de errores de entrada ───────────────────────────
+    const _detectWarning = useCallback(() => {
+        if (cartTotalUsd <= 0) return null;
+
+        for (const m of paymentMethods) {
+            const val = parseFloat(barValues[m.id]) || 0;
+            if (val === 0) continue;
+
+            const valUsd = m.currency === 'USD' ? val
+                : m.currency === 'COP' ? val / safeTasaCop
+                : val / safeRate;
+            const diff = valUsd - cartTotalUsd;
+
+            // Capa 1 — Confusión Bs → USD
+            if (m.currency === 'USD' && safeRate > 1) {
+                const impliedUsd = val / safeRate;
+                const ratio = impliedUsd / cartTotalUsd;
+                if (ratio >= 0.90 && ratio <= 1.10 && val > cartTotalUsd * 3) {
+                    const expectedBs = (cartTotalUsd * safeRate).toFixed(2);
+                    return {
+                        type: 'currency_confusion',
+                        title: 'Posible error de moneda',
+                        lines: [
+                            `Ingresaste $${val.toFixed(2)} en el campo de Dólares, pero el total de la venta es $${cartTotalUsd.toFixed(2)}.`,
+                            `El total en Bolívares es Bs ${Number(expectedBs).toLocaleString('es-VE', { minimumFractionDigits: 2 })}. ¿Confundiste el campo?`,
+                        ],
+                        isRound: false,
+                    };
+                }
+            }
+
+            // Capa 2 — Umbral proporcional según tamaño de venta
+            const threshold = cartTotalUsd <= 10  ? { factor: 4,   minDiff: 15 }
+                            : cartTotalUsd <= 50  ? { factor: 3,   minDiff: 30 }
+                            : cartTotalUsd <= 200 ? { factor: 2,   minDiff: 50 }
+                            :                      { factor: 1.5, minDiff: 100 };
+
+            if (valUsd > cartTotalUsd * threshold.factor && diff > threshold.minDiff) {
+                const symbol = m.currency === 'USD' ? '$' : m.currency === 'COP' ? 'COP ' : 'Bs ';
+                const isRound = val >= 100 && val % 100 === 0;
+                return {
+                    type: 'high_amount',
+                    title: 'Monto inusualmente alto',
+                    lines: [
+                        `Ingresaste ${symbol}${val.toLocaleString('es-VE', { minimumFractionDigits: 2 })} para una venta de $${cartTotalUsd.toFixed(2)}.`,
+                        `¿El cliente realmente pagó esa cantidad?`,
+                    ],
+                    isRound,
+                };
+            }
+        }
+        return null;
+    }, [barValues, paymentMethods, cartTotalUsd, safeRate, safeTasaCop]);
+
+    const handleConfirm = useCallback(() => {
+        triggerHaptic && triggerHaptic();
+        const warning = _detectWarning();
+        if (warning) {
+            pendingConfirmRef.current = _processPayments;
+            setPaymentWarning(warning);
+            return;
+        }
+        _processPayments();
+    }, [_detectWarning, _processPayments, triggerHaptic]);
+
+    const confirmWarning = useCallback(() => {
+        setPaymentWarning(null);
+        pendingConfirmRef.current?.();
+        pendingConfirmRef.current = null;
+    }, []);
+
+    const dismissWarning = useCallback(() => {
+        setPaymentWarning(null);
+        pendingConfirmRef.current = null;
+    }, []);
 
     return {
         barValues,
@@ -160,6 +182,9 @@ export function useCheckoutCalculations({
         handleBarChange,
         fillBar,
         handleConfirm,
+        paymentWarning,
+        confirmWarning,
+        dismissWarning,
         safeRate,
         safeTasaCop,
     };

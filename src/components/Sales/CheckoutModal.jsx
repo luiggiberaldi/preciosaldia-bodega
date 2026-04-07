@@ -5,6 +5,7 @@ import { mulR, divR, subR } from '../../utils/dinero';
 import { useCheckoutCalculations } from '../../hooks/useCheckoutCalculations';
 import CheckoutPaymentBars from './CheckoutPaymentBars';
 import CheckoutCustomerPicker from './CheckoutCustomerPicker';
+import PaymentWarningModal from './PaymentWarningModal';
 
 /**
  * CheckoutModal — Zona de Cobro con Barras de Pago (Estilo Listo POS)
@@ -49,6 +50,9 @@ export default function CheckoutModal({
         handleBarChange,
         fillBar,
         handleConfirm,
+        paymentWarning,
+        confirmWarning,
+        dismissWarning,
     } = useCheckoutCalculations({
         paymentMethods,
         effectiveRate,
@@ -348,6 +352,12 @@ export default function CheckoutModal({
                     </div>
                 </div>
             )}
+
+            <PaymentWarningModal
+                warning={paymentWarning}
+                onConfirm={confirmWarning}
+                onCancel={dismissWarning}
+            />
 
         </div>
     );
