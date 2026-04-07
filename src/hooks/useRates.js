@@ -6,10 +6,12 @@ const DEFAULT_RATES = {
     lastUpdate: new Date().toISOString()
 };
 
-const EXCHANGERATE_KEY = import.meta.env.VITE_EXCHANGERATE_KEY || '';
 const DEFAULT_EUR_USD_RATIO = 1.18;
-const UPDATE_INTERVAL = 30000;
+const UPDATE_INTERVAL = 15 * 60 * 1000; // 15 minutos
+const CACHE_MAX_AGE_MS = 14 * 60 * 1000; // refrescar si tiene más de 14 min
 
+// Fallback directo (solo si el endpoint /api/rates no está disponible)
+const EXCHANGERATE_KEY = import.meta.env.VITE_EXCHANGERATE_KEY || '';
 const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
 
 export function useRates() {
@@ -61,10 +63,15 @@ export function useRates() {
     };
 
     const updateData = useCallback(async (isAutoUpdate = false) => {
+        // Si es auto-update, saltar si los datos son recientes (< 14 min)
+        if (isAutoUpdate && ratesRef.current?.lastUpdate) {
+            const age = Date.now() - new Date(ratesRef.current.lastUpdate).getTime();
+            if (age < CACHE_MAX_AGE_MS) return;
+        }
+
         if (!isAutoUpdate) setLoading(true);
 
         const log = (msg, type) => !isAutoUpdate && addLog(msg, type);
-
         log(isAutoUpdate ? "--- Auto-Update ---" : "--- Actualización Manual ---");
 
         const fetchGeneric = async (url, retries = 1) => {
@@ -74,17 +81,11 @@ export function useRates() {
                 try {
                     const res = await fetch(url, { signal: controller.signal });
                     clearTimeout(id);
-                    if (!res.ok) {
-                        if (i < retries) continue;
-                        return null;
-                    }
+                    if (!res.ok) { if (i < retries) continue; return null; }
                     return await res.json();
                 } catch (e) {
                     clearTimeout(id);
-                    if (i < retries) {
-                        await new Promise(r => setTimeout(r, 1000)); // Esperar 1 segundo antes de reintentar
-                        continue;
-                    }
+                    if (i < retries) { await new Promise(r => setTimeout(r, 1000)); continue; }
                     return null;
                 }
             }
@@ -117,6 +118,22 @@ export function useRates() {
         };
 
         try {
+            // Intentar endpoint cacheado primero
+            const apiData = await fetchGeneric('/api/rates');
+            if (apiData && apiData.bcv?.price > 0) {
+                const newRates = {
+                    bcv: apiData.bcv,
+                    euro: apiData.euro,
+                    ...(apiData.autoCopRate ? { autoCopRate: apiData.autoCopRate } : {}),
+                    lastUpdate: apiData.lastUpdate || new Date(),
+                };
+                setRates(newRates);
+                if (!isAutoUpdate) addLog("Actualización completada", 'success');
+                return;
+            }
+
+            // Fallback: fetch directo a las fuentes externas
+            log("ℹ️ Fallback a fuentes directas", "info");
             // Fetch en paralelo: datos privados (Google Script), dolarapi fallback, y external rates (Euro, COP)
             const taskPrivate = fetchGeneric(GOOGLE_SCRIPT_URL);
             const taskDolarApi = fetchGeneric('https://ve.dolarapi.com/v1/dolares');
