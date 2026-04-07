@@ -1,26 +1,27 @@
 // Vercel Serverless Function — Relay de inventario con código de 6 dígitos
-// Storage: Supabase (tabla shares) — sin dependencia de Upstash Redis
+// Storage: Upstash Redis (REST API, gratis)
 
-const SUPABASE_URL = process.env.SUPABASE_CLOUD_URL;
-const SUPABASE_KEY = process.env.SUPABASE_CLOUD_KEY;
-const TTL_HOURS = 24;
-const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024; // 5MB
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const TTL_SECONDS = 86400; // 24 horas
+const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024; // 5MB máximo
 
-async function supabase(method, path, body) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-        method,
+// Helper: ejecutar comando Redis via REST
+async function redis(command, ...args) {
+    const res = await fetch(`${UPSTASH_URL}`, {
+        method: 'POST',
         headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
+            Authorization: `Bearer ${UPSTASH_TOKEN}`,
             'Content-Type': 'application/json',
-            Prefer: method === 'POST' ? 'return=representation' : '',
         },
-        body: body ? JSON.stringify(body) : undefined,
+        body: JSON.stringify([command, ...args]),
     });
-    const text = await res.text();
-    return { ok: res.ok, status: res.status, data: text ? JSON.parse(text) : null };
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.result;
 }
 
+// Generar código de 6 dígitos
 function generateCode() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -39,9 +40,9 @@ export default async function handler(req, res) {
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
+    if (!UPSTASH_URL || !UPSTASH_TOKEN) {
         return res.status(500).json({
-            error: 'Supabase no configurado. Agrega SUPABASE_CLOUD_URL y SUPABASE_CLOUD_KEY en las variables de entorno de Vercel.',
+            error: 'Upstash Redis no configurado. Agrega UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN en las variables de entorno de Vercel.',
         });
     }
 
@@ -65,20 +66,22 @@ export default async function handler(req, res) {
                 productCount = body.products.length;
             }
 
-            // Generar código único
+            // Generar código único (reintentar si existe)
             let code;
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 5; i++) {
                 const candidate = generateCode();
-                const check = await supabase('GET', `/shares?code=eq.${candidate}&select=code`);
-                if (!check.data || check.data.length === 0) { code = candidate; break; }
+                const exists = await redis('EXISTS', `inv:${candidate}`);
+                if (!exists) { code = candidate; break; }
             }
             if (!code) return res.status(500).json({ error: 'No se pudo generar un código único.' });
 
-            const expiresAt = new Date(Date.now() + TTL_HOURS * 3600 * 1000).toISOString();
-            const payload = JSON.stringify({ ...body, isComplete: !!(body.idb), createdAt: new Date().toISOString() });
+            const payload = JSON.stringify({
+                ...body,
+                isComplete: !!(body.idb),
+                createdAt: new Date().toISOString(),
+            });
 
-            const insert = await supabase('POST', '/shares', { code, payload, expires_at: expiresAt });
-            if (!insert.ok) throw new Error(JSON.stringify(insert.data));
+            await redis('SET', `inv:${code}`, payload, 'EX', TTL_SECONDS);
 
             return res.status(200).json({
                 code: `${code.slice(0, 3)}-${code.slice(3)}`,
@@ -96,14 +99,12 @@ export default async function handler(req, res) {
                 return res.status(400).json({ error: 'Código inválido. Usa el formato XXX-XXX.' });
             }
 
-            const now = new Date().toISOString();
-            const result = await supabase('GET', `/shares?code=eq.${clean}&expires_at=gt.${now}&select=payload&limit=1`);
-
-            if (!result.ok || !result.data || result.data.length === 0) {
+            const data = await redis('GET', `inv:${clean}`);
+            if (!data) {
                 return res.status(404).json({ error: 'Código no encontrado o expirado.' });
             }
 
-            return res.status(200).json(JSON.parse(result.data[0].payload));
+            return res.status(200).json(JSON.parse(data));
         }
 
         return res.status(405).json({ error: 'Método no permitido.' });
