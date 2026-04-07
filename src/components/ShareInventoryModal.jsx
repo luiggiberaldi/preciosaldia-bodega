@@ -1,80 +1,126 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import localforage from 'localforage';
-import { Share2, Download, X, Copy, Check, Loader2, AlertTriangle, Database } from 'lucide-react';
+import { Share2, Download, X, Copy, Check, Loader2, AlertTriangle, Package, Users, ShoppingBag, Settings2, Database } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 
-// Claves IDB a incluir en el backup completo
-const ALL_IDB_KEYS = [
-    'bodega_products_v1', 'my_categories_v1',
-    'bodega_sales_v1', 'bodega_customers_v1',
-    'bodega_suppliers_v1', 'bodega_supplier_invoices_v1',
-    'bodega_accounts_v2', 'bodega_pending_cart_v1',
-    'bodega_payment_methods_v1',
-    'abasto_audit_log_v1',
+// Grupos de datos compartibles
+const SHARE_GROUPS = [
+    {
+        id: 'inventory',
+        label: 'Inventario',
+        desc: 'Productos y categorías',
+        Icon: Package,
+        idbKeys: ['bodega_products_v1', 'my_categories_v1'],
+        countKey: 'bodega_products_v1',
+        lsKeys: [],
+    },
+    {
+        id: 'customers',
+        label: 'Clientes',
+        desc: 'Clientes y proveedores',
+        Icon: Users,
+        idbKeys: ['bodega_customers_v1', 'bodega_suppliers_v1', 'bodega_supplier_invoices_v1'],
+        countKey: 'bodega_customers_v1',
+        lsKeys: [],
+    },
+    {
+        id: 'sales',
+        label: 'Historial de Ventas',
+        desc: 'Todas las transacciones',
+        Icon: ShoppingBag,
+        idbKeys: ['bodega_sales_v1', 'bodega_accounts_v2', 'abasto_audit_log_v1'],
+        countKey: 'bodega_sales_v1',
+        lsKeys: [],
+    },
+    {
+        id: 'config',
+        label: 'Configuración',
+        desc: 'Ajustes y métodos de pago',
+        Icon: Settings2,
+        idbKeys: ['bodega_payment_methods_v1', 'bodega_pending_cart_v1'],
+        countKey: null,
+        lsKeys: [
+            'business_name', 'business_rif', 'printer_paper_width',
+            'allow_negative_stock', 'cop_enabled', 'auto_cop_enabled', 'tasa_cop',
+            'bodega_use_auto_rate', 'bodega_custom_rate', 'bodega_inventory_view',
+        ],
+    },
 ];
 
-// Claves LS a incluir en el backup completo
-const ALL_LS_KEYS = [
-    'business_name', 'business_rif',
-    'printer_paper_width', 'allow_negative_stock',
-    'cop_enabled', 'auto_cop_enabled', 'tasa_cop',
-    'bodega_use_auto_rate', 'bodega_custom_rate',
-    'bodega_inventory_view', 'street_rate_bs',
-    'catalog_use_auto_usdt', 'catalog_custom_usdt_price',
-    'catalog_show_cash_price', 'monitor_rates_v12',
-    'premium_token',
-];
-
-// Recopilar todos los datos del dispositivo
-async function collectAllData() {
-    const idb = {};
-    for (const key of ALL_IDB_KEYS) {
-        const val = await storageService.getItem(key, null);
-        if (val !== null) idb[key] = val;
-    }
-    const ls = {};
-    for (const key of ALL_LS_KEYS) {
-        const val = localStorage.getItem(key);
-        if (val !== null) ls[key] = val;
-    }
-    return { idb, ls };
-}
+const API_URL = '/api/share';
 
 export default function ShareInventoryModal({ isOpen, onClose }) {
-    const [tab, setTab] = useState('share'); // 'share' | 'import'
+    const [tab, setTab] = useState('export');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [shareCode, setShareCode] = useState('');
-    const [shareInfo, setShareInfo] = useState(null); // { productCount }
-    const [importCode, setImportCode] = useState('');
-    const [importResult, setImportResult] = useState(null); // { idb, ls, isComplete, productCount }
     const [copied, setCopied] = useState(false);
+    const [importCode, setImportCode] = useState('');
+    const [importResult, setImportResult] = useState(null);
+
+    const [selected, setSelected] = useState({ inventory: true, customers: false, sales: false, config: false });
+    const [counts, setCounts] = useState({});
+
+    // Cargar conteos al abrir
+    useEffect(() => {
+        if (!isOpen) return;
+        async function loadCounts() {
+            const c = {};
+            for (const g of SHARE_GROUPS) {
+                if (g.countKey) {
+                    const data = await storageService.getItem(g.countKey, null);
+                    c[g.id] = Array.isArray(data) ? data.length : 0;
+                } else {
+                    // Config: contar cuántas LS keys tienen valor
+                    c[g.id] = g.lsKeys.filter(k => localStorage.getItem(k) !== null).length;
+                }
+            }
+            setCounts(c);
+        }
+        loadCounts();
+        setShareCode('');
+        setError('');
+        setImportCode('');
+        setImportResult(null);
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
-    const API_URL = '/api/share';
+    const toggleGroup = (id) => setSelected(prev => ({ ...prev, [id]: !prev[id] }));
 
-    const handleShare = async () => {
+    const totalSelected = SHARE_GROUPS
+        .filter(g => selected[g.id])
+        .reduce((sum, g) => sum + (counts[g.id] || 0), 0);
+
+    const handleExport = async () => {
+        const activeGroups = SHARE_GROUPS.filter(g => selected[g.id]);
+        if (activeGroups.length === 0) {
+            setError('Selecciona al menos un tipo de datos para compartir.');
+            return;
+        }
         setLoading(true);
         setError('');
-        setShareCode('');
-        setShareInfo(null);
-
         try {
-            const { idb, ls } = await collectAllData();
-
+            const idb = {};
+            const ls = {};
+            for (const g of activeGroups) {
+                for (const key of g.idbKeys) {
+                    const val = await storageService.getItem(key, null);
+                    if (val !== null) idb[key] = val;
+                }
+                for (const key of g.lsKeys) {
+                    const val = localStorage.getItem(key);
+                    if (val !== null) ls[key] = val;
+                }
+            }
             const res = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idb, ls }),
+                body: JSON.stringify({ idb, ls, groups: activeGroups.map(g => g.id) }),
             });
-
             const data = await res.json();
-
             if (!res.ok) throw new Error(data.error || 'Error al compartir');
-
             setShareCode(data.code);
-            setShareInfo({ productCount: data.productCount });
         } catch (err) {
             setError(err.message);
         } finally {
@@ -90,17 +136,14 @@ export default function ShareInventoryModal({ isOpen, onClose }) {
 
     const handleImport = async () => {
         const clean = importCode.replace(/[-\s]/g, '').trim();
-        if (!clean) return;
+        if (clean.length !== 6) return;
         setLoading(true);
         setError('');
         setImportResult(null);
-
         try {
             const res = await fetch(`${API_URL}?code=${clean}`);
             const data = await res.json();
-
             if (!res.ok) throw new Error(data.error || 'Error al importar');
-
             setImportResult(data);
         } catch (err) {
             setError(err.message);
@@ -113,38 +156,16 @@ export default function ShareInventoryModal({ isOpen, onClose }) {
         if (!importResult) return;
         setLoading(true);
         try {
-            // Limpiar datos actuales
-            await localforage.clear();
-
-            // Limpiar localStorage de la app
-            const appLsKeys = [
-                'street_rate_bs', 'catalog_use_auto_usdt', 'catalog_custom_usdt_price',
-                'catalog_show_cash_price', 'monitor_rates_v12', 'business_name', 'business_rif',
-                'printer_paper_width', 'allow_negative_stock', 'cop_enabled', 'auto_cop_enabled',
-                'tasa_cop', 'bodega_use_auto_rate', 'bodega_custom_rate', 'bodega_inventory_view',
-                'premium_token', 'abasto-auth-storage',
-            ];
-            appLsKeys.forEach(k => localStorage.removeItem(k));
-
-            if (importResult.isComplete && importResult.idb) {
-                // Restauración completa
+            if (importResult.idb) {
                 for (const [key, value] of Object.entries(importResult.idb)) {
                     await localforage.setItem(key, value);
                 }
-                if (importResult.ls) {
-                    for (const [key, value] of Object.entries(importResult.ls)) {
-                        localStorage.setItem(key, value);
-                    }
-                }
-            } else if (importResult.products) {
-                // Formato legado — solo productos y categorías
-                await localforage.setItem('bodega_products_v1', importResult.products);
-                if (importResult.categories) {
-                    await localforage.setItem('my_categories_v1', importResult.categories);
+            }
+            if (importResult.ls) {
+                for (const [key, value] of Object.entries(importResult.ls)) {
+                    localStorage.setItem(key, value);
                 }
             }
-
-            // Recargar app para aplicar todos los cambios
             setTimeout(() => window.location.reload(), 300);
         } catch (err) {
             setError('Error al restaurar: ' + err.message);
@@ -152,25 +173,29 @@ export default function ShareInventoryModal({ isOpen, onClose }) {
         }
     };
 
+    const handleCodeInput = (val) => {
+        const digits = val.replace(/\D/g, '').slice(0, 6);
+        setImportCode(digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits);
+    };
+
     const handleClose = () => {
         setShareCode('');
-        setShareInfo(null);
-        setImportCode('');
         setError('');
+        setImportCode('');
         setImportResult(null);
         setLoading(false);
         onClose();
     };
 
-    // Formatear input como XXX-XXX
-    const handleCodeInput = (val) => {
-        const digits = val.replace(/\D/g, '').slice(0, 6);
-        if (digits.length > 3) {
-            setImportCode(`${digits.slice(0, 3)}-${digits.slice(3)}`);
-        } else {
-            setImportCode(digits);
-        }
-    };
+    // Información resumida del resultado de importar
+    const importSummary = importResult ? (() => {
+        const groups = importResult.groups || [];
+        const labels = SHARE_GROUPS.filter(g => groups.includes(g.id)).map(g => g.label);
+        const productCount = importResult.idb?.bodega_products_v1?.length ?? 0;
+        const salesCount = importResult.idb?.bodega_sales_v1?.length ?? 0;
+        const customerCount = importResult.idb?.bodega_customers_v1?.length ?? 0;
+        return { labels, productCount, salesCount, customerCount };
+    })() : null;
 
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200" onClick={handleClose}>
@@ -178,7 +203,9 @@ export default function ShareInventoryModal({ isOpen, onClose }) {
 
                 {/* Header */}
                 <div className="flex items-center justify-between mb-5">
-                    <h2 className="text-lg font-black text-slate-800 dark:text-white">Compartir Datos</h2>
+                    <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                        <Database size={20} className="text-blue-500" /> Compartir Base de Datos
+                    </h2>
                     <button onClick={handleClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl transition-colors">
                         <X size={20} />
                     </button>
@@ -187,14 +214,14 @@ export default function ShareInventoryModal({ isOpen, onClose }) {
                 {/* Tabs */}
                 <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 mb-5">
                     <button
-                        onClick={() => { setTab('share'); setError(''); }}
-                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${tab === 'share' ? 'bg-white dark:bg-slate-700 text-brand-dark shadow-sm' : 'text-slate-400'}`}
+                        onClick={() => { setTab('export'); setError(''); setShareCode(''); }}
+                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${tab === 'export' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}
                     >
-                        <Share2 size={14} /> Compartir
+                        <Share2 size={14} /> Exportar
                     </button>
                     <button
                         onClick={() => { setTab('import'); setError(''); }}
-                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${tab === 'import' ? 'bg-white dark:bg-slate-700 text-brand-dark shadow-sm' : 'text-slate-400'}`}
+                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${tab === 'import' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}
                     >
                         <Download size={14} /> Importar
                     </button>
@@ -202,30 +229,51 @@ export default function ShareInventoryModal({ isOpen, onClose }) {
 
                 {/* Error */}
                 {error && (
-                    <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-medium mb-4">
-                        <AlertTriangle size={14} /> {error}
+                    <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-medium mb-4">
+                        <AlertTriangle size={14} className="shrink-0 mt-0.5" /> {error}
                     </div>
                 )}
 
-                {/* TAB: Compartir */}
-                {tab === 'share' && (
-                    <div className="space-y-4">
+                {/* TAB: Exportar */}
+                {tab === 'export' && (
+                    <div className="space-y-3">
                         {!shareCode ? (
                             <>
-                                <div className="text-center py-4">
-                                    <div className="w-16 h-16 bg-brand/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                                        <Database size={32} className="text-brand-dark" />
-                                    </div>
-                                    <p className="text-sm font-bold text-slate-700 dark:text-white mb-1">Backup completo</p>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                                        Se compartirán <strong>todos los datos</strong>: inventario, ventas, clientes, proveedores, cierres, configuración y más.
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">¿Qué deseas compartir?</p>
+
+                                {SHARE_GROUPS.map(({ id, label, desc, Icon }) => {
+                                    const isChecked = selected[id];
+                                    const count = counts[id] ?? 0;
+                                    return (
+                                        <button
+                                            key={id}
+                                            onClick={() => toggleGroup(id)}
+                                            className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all text-left ${isChecked ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900'}`}
+                                        >
+                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isChecked ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                                                <Icon size={18} className={isChecked ? 'text-blue-500' : 'text-slate-400'} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`text-sm font-bold ${isChecked ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>{label}</p>
+                                                <p className="text-[11px] text-slate-400">{desc} · {count} registros</p>
+                                            </div>
+                                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${isChecked ? 'bg-blue-500 border-blue-500' : 'border-slate-300 dark:border-slate-600'}`}>
+                                                {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+
+                                <div className="flex items-center justify-between pt-1 pb-1">
+                                    <p className="text-[11px] text-slate-400">
+                                        <span className="font-bold text-slate-600 dark:text-slate-300">{totalSelected} registros</span> seleccionados · El código expira en 24h.
                                     </p>
-                                    <p className="text-[10px] text-slate-400 mt-1">El código expira en 24 horas.</p>
                                 </div>
+
                                 <button
-                                    onClick={handleShare}
-                                    disabled={loading}
-                                    className="w-full py-3.5 bg-brand hover:bg-brand/90 text-slate-900 font-black rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                                    onClick={handleExport}
+                                    disabled={loading || Object.values(selected).every(v => !v)}
+                                    className="w-full py-3.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-black rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all"
                                 >
                                     {loading ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
                                     {loading ? 'Generando código...' : 'Generar Código'}
@@ -233,16 +281,14 @@ export default function ShareInventoryModal({ isOpen, onClose }) {
                             </>
                         ) : (
                             <div className="text-center py-2">
-                                <p className="text-xs text-slate-400 mb-2">Tu código para compartir:</p>
-                                <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-6 mb-3">
-                                    <p className="text-4xl font-black text-brand-dark tracking-[0.3em] font-mono">{shareCode}</p>
+                                <div className="w-14 h-14 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                                    <Check size={28} className="text-blue-500" />
                                 </div>
-                                {shareInfo && (
-                                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mb-1">
-                                        ✓ {shareInfo.productCount} productos incluidos
-                                    </p>
-                                )}
-                                <p className="text-[10px] text-slate-400 mb-4">El receptor va a Ajustes → Compartir Datos → Importar y escribe este código.</p>
+                                <p className="text-xs text-slate-400 mb-2">Código para compartir:</p>
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 mb-3">
+                                    <p className="text-4xl font-black text-blue-600 dark:text-blue-400 tracking-[0.3em] font-mono">{shareCode}</p>
+                                </div>
+                                <p className="text-[10px] text-slate-400 mb-4">El receptor va a Compartir Datos → Importar y escribe este código.</p>
                                 <button
                                     onClick={handleCopy}
                                     className="w-full py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl flex items-center justify-center gap-2 transition-all"
@@ -260,50 +306,64 @@ export default function ShareInventoryModal({ isOpen, onClose }) {
                     <div className="space-y-4">
                         {!importResult ? (
                             <>
-                                <div className="text-center py-2">
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                                        Escribe el código de 6 dígitos para importar todos los datos.
-                                    </p>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={importCode}
-                                        onChange={(e) => handleCodeInput(e.target.value)}
-                                        placeholder="000-000"
-                                        maxLength={7}
-                                        className="w-full text-center text-3xl font-black font-mono tracking-[0.3em] p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 outline-none focus:border-brand text-slate-800 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 transition-colors"
-                                    />
-                                </div>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
+                                    Escribe el código de 6 dígitos para importar los datos.
+                                </p>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={importCode}
+                                    onChange={(e) => handleCodeInput(e.target.value)}
+                                    placeholder="000-000"
+                                    maxLength={7}
+                                    className="w-full text-center text-3xl font-black font-mono tracking-[0.3em] p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 text-slate-800 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-600 transition-colors"
+                                />
                                 <button
                                     onClick={handleImport}
                                     disabled={loading || importCode.replace(/\D/g, '').length !== 6}
-                                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+                                    className="w-full py-3.5 bg-blue-500 hover:bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50"
                                 >
                                     {loading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
                                     {loading ? 'Buscando...' : 'Importar Datos'}
                                 </button>
                             </>
                         ) : (
-                            <div className="text-center py-2">
-                                <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                                    <Check size={32} className="text-emerald-500" />
+                            <div className="text-center py-1">
+                                <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                                    <Check size={28} className="text-emerald-500" />
                                 </div>
-                                <p className="text-sm font-bold text-slate-700 dark:text-white mb-1">
-                                    {importResult.isComplete ? '¡Backup completo encontrado!' : '¡Inventario encontrado!'}
-                                </p>
-                                {importResult.isComplete ? (
-                                    <p className="text-xs text-slate-400 mb-1">
-                                        Contiene <strong className="text-slate-600 dark:text-slate-200">{(importResult.idb?.bodega_products_v1?.length ?? 0)} productos</strong>,{' '}
-                                        <strong className="text-slate-600 dark:text-slate-200">{(importResult.idb?.bodega_sales_v1?.length ?? 0)} ventas</strong>,{' '}
-                                        <strong className="text-slate-600 dark:text-slate-200">{(importResult.idb?.bodega_customers_v1?.length ?? 0)} clientes</strong> y más.
-                                    </p>
-                                ) : (
-                                    <p className="text-xs text-slate-400 mb-1">
-                                        <strong className="text-slate-600 dark:text-slate-200">{importResult.products?.length ?? 0} productos</strong> listos para importar.
-                                    </p>
-                                )}
+                                <p className="text-sm font-bold text-slate-700 dark:text-white mb-2">¡Datos encontrados!</p>
+
+                                {/* Resumen de lo que contiene */}
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 mb-3 text-left space-y-1.5">
+                                    {importSummary?.productCount > 0 && (
+                                        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                            <Package size={13} className="text-blue-400 shrink-0" />
+                                            <span><strong>{importSummary.productCount}</strong> productos</span>
+                                        </div>
+                                    )}
+                                    {importSummary?.customerCount > 0 && (
+                                        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                            <Users size={13} className="text-violet-400 shrink-0" />
+                                            <span><strong>{importSummary.customerCount}</strong> clientes</span>
+                                        </div>
+                                    )}
+                                    {importSummary?.salesCount > 0 && (
+                                        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                            <ShoppingBag size={13} className="text-emerald-400 shrink-0" />
+                                            <span><strong>{importSummary.salesCount}</strong> ventas</span>
+                                        </div>
+                                    )}
+                                    {importSummary?.labels?.includes('Configuración') && (
+                                        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                            <Settings2 size={13} className="text-amber-400 shrink-0" />
+                                            <span>Configuración de la app</span>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <p className="text-[10px] text-amber-500 font-medium mb-4">
-                                    ⚠️ Esto reemplazará todos los datos actuales del dispositivo.
+                                    ⚠️ Esto reemplazará los datos actuales del dispositivo.
                                 </p>
                                 <div className="flex gap-3">
                                     <button
@@ -319,7 +379,7 @@ export default function ShareInventoryModal({ isOpen, onClose }) {
                                         className="flex-1 py-3 text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                                     >
                                         {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-                                        {loading ? 'Restaurando...' : 'Confirmar'}
+                                        {loading ? 'Importando...' : 'Confirmar'}
                                     </button>
                                 </div>
                             </div>

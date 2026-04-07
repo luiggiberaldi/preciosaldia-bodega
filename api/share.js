@@ -78,6 +78,7 @@ export default async function handler(req, res) {
             const payload = JSON.stringify({
                 ...body,
                 isComplete: !!(body.idb),
+                groups: Array.isArray(body.groups) ? body.groups : [],
                 createdAt: new Date().toISOString(),
             });
 
