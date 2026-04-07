@@ -248,20 +248,33 @@ export default function ReportsMetricsTab({
             {/* Payment Breakdown */}
             {Object.keys(paymentBreakdown).length > 0 && (() => {
                 const entries = Object.entries(paymentBreakdown);
-                const fiadoMethods = entries.filter(([, d]) => d.currency === 'FIADO');
-                const bsMethods = entries.filter(([, d]) => d.currency === 'BS' || (!d.currency));
-                const usdMethods = entries.filter(([, d]) => d.currency === 'USD');
-                const copMethods = entries.filter(([, d]) => d.currency === 'COP');
+                const fiadoMethods = entries.filter(([, d]) => d.currency === 'FIADO' && !d.isChange);
+                const bsMethods = entries.filter(([, d]) => (d.currency === 'BS' || (!d.currency)) && !d.isChange);
+                const usdMethods = entries.filter(([, d]) => d.currency === 'USD' && !d.isChange);
+                const copMethods = entries.filter(([, d]) => d.currency === 'COP' && !d.isChange);
+                const vueltoBs  = entries.filter(([, d]) => d.isChange && d.currency === 'BS');
+                const vueltoUsd = entries.filter(([, d]) => d.isChange && d.currency === 'USD');
                 const fmtCop = (v) => v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
                 const renderMethod = ([method, data]) => {
-                    const label = toTitleCase(getPaymentLabel(method, data.label));
-                    const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
+                    const label = data.isChange
+                        ? data.label
+                        : toTitleCase(getPaymentLabel(method, data.label));
+                    const PayIcon = data.isChange ? null : (getPaymentIcon(method) || PAYMENT_ICONS[method]);
                     let totalBsEquiv = data.total;
                     let pct = 0;
                     let displayAmount = `${formatBs(data.total)} Bs`;
 
-                    if (data.currency === 'FIADO') {
+                    if (data.isChange) {
+                        // Vuelto entregado — always shown as negative/outgoing
+                        if (data.currency === 'USD') {
+                            totalBsEquiv = data.total * bcvRate;
+                            displayAmount = `$ ${data.total.toFixed(2)}`;
+                        } else {
+                            displayAmount = `${formatBs(data.total)} Bs`;
+                        }
+                        pct = 0;
+                    } else if (data.currency === 'FIADO') {
                         totalBsEquiv = data.total * bcvRate;
                         pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;
                         displayAmount = `$ ${data.total.toFixed(2)}`;
@@ -275,6 +288,19 @@ export default function ReportsMetricsTab({
                         displayAmount = `${fmtCop(data.total)} COP`;
                     } else {
                         pct = totalBs > 0 ? (data.total / totalBs * 100) : 0;
+                    }
+
+                    if (data.isChange) {
+                        return (
+                            <div key={method} className="flex justify-between text-sm mb-1 opacity-70 italic">
+                                <span className="text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 text-xs">
+                                    ↩ {label}
+                                </span>
+                                <span className="font-bold text-rose-500 dark:text-rose-400 text-xs">
+                                    {displayAmount}
+                                </span>
+                            </div>
+                        );
                     }
 
                     return (
@@ -352,6 +378,15 @@ export default function ReportsMetricsTab({
                             </div>
                             <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
                                 <div className="pl-3 space-y-3">{copMethods.map(renderMethod)}</div>
+                            </div>
+                        </div>
+                    )}
+                    {(vueltoBs.length > 0 || vueltoUsd.length > 0) && (
+                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                            <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">↩ Vuelto / Cambio Entregado</span>
+                            <div className="mt-2 space-y-1">
+                                {vueltoBs.map(renderMethod)}
+                                {vueltoUsd.map(renderMethod)}
                             </div>
                         </div>
                     )}

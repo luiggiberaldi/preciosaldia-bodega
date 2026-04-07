@@ -66,6 +66,22 @@ export function useCheckoutCalculations({
 
     const handleConfirm = useCallback(() => {
         triggerHaptic && triggerHaptic();
+
+        // Guard: if any single payment amount is suspiciously high (>10x the total),
+        // require explicit confirmation to prevent data-entry mistakes.
+        const hasOverpay = paymentMethods.some(m => {
+            const val = parseFloat(barValues[m.id]) || 0;
+            if (val === 0) return false;
+            const valUsd = m.currency === 'USD' ? val : m.currency === 'COP' ? val / safeTasaCop : val / safeRate;
+            return cartTotalUsd > 0 && valUsd > cartTotalUsd * 10 && valUsd - cartTotalUsd > 50;
+        });
+        if (hasOverpay) {
+            const ok = window.confirm(
+                `⚠️ El monto ingresado parece muy alto para esta venta de $${cartTotalUsd.toFixed(2)}.\n¿El cliente realmente pagó esa cantidad?\n\nPresiona Aceptar para confirmar o Cancelar para corregirlo.`
+            );
+            if (!ok) return;
+        }
+
         const payments = paymentMethods
             .filter(m => parseFloat(barValues[m.id]) > 0)
             .map(m => {
@@ -88,7 +104,7 @@ export function useCheckoutCalculations({
             changeUsdGiven: Math.min(defaultUsdChange, changeUsd),
             changeBsGiven: Math.min(defaultBsChange, changeBs),
         });
-    }, [barValues, paymentMethods, effectiveRate, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd]);
+    }, [barValues, paymentMethods, effectiveRate, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd, cartTotalUsd]);
 
     return {
         barValues,

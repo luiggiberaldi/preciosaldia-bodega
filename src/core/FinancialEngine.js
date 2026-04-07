@@ -215,12 +215,12 @@ export class FinancialEngine {
             }
 
             if (safeChangeUsd > 0) {
-                if (!breakdown['efectivo_usd']) breakdown['efectivo_usd'] = { total: 0, currency: 'USD', label: 'Efectivo $' };
-                breakdown['efectivo_usd'].total = round2(breakdown['efectivo_usd'].total - safeChangeUsd);
+                if (!breakdown['_vuelto_usd']) breakdown['_vuelto_usd'] = { total: 0, currency: 'USD', label: 'Vuelto entregado ($)', isChange: true };
+                breakdown['_vuelto_usd'].total = round2(breakdown['_vuelto_usd'].total - safeChangeUsd);
             }
             if (safeChangeBs > 0) {
-                if (!breakdown['efectivo_bs']) breakdown['efectivo_bs'] = { total: 0, currency: 'BS', label: 'Efectivo Bs' };
-                breakdown['efectivo_bs'].total = round2(breakdown['efectivo_bs'].total - safeChangeBs);
+                if (!breakdown['_vuelto_bs']) breakdown['_vuelto_bs'] = { total: 0, currency: 'BS', label: 'Vuelto entregado (Bs)', isChange: true };
+                breakdown['_vuelto_bs'].total = round2(breakdown['_vuelto_bs'].total - safeChangeBs);
             }
         });
 
@@ -228,6 +228,7 @@ export class FinancialEngine {
         const finalBreakdown = {};
         Object.keys(breakdown).forEach(k => {
             const roundedTotal = round2(breakdown[k].total);
+            // Keep vuelto entries even if they are negative (they represent outgoing cash)
             if (roundedTotal !== 0) {
                 finalBreakdown[k] = { ...breakdown[k], total: roundedTotal };
             }

@@ -34,6 +34,14 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
             showToast('Escribe un nombre para el método', 'error');
             return;
         }
+        // Check for duplicate or very similar names
+        const normalize = s => s.toLowerCase().trim().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/\s+/g,' ');
+        const newNorm = normalize(newLabel);
+        const similar = methods.find(m => normalize(m.label) === newNorm);
+        if (similar) {
+            showToast(`Ya existe "${similar.label}" — usa un nombre diferente`, 'error');
+            return;
+        }
         triggerHaptic && triggerHaptic();
         const updated = [...methods, {
             id: 'custom_' + Date.now(),

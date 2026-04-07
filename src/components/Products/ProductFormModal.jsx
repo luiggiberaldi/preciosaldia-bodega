@@ -405,7 +405,14 @@ export default function ProductFormModal({
                                 )}
                             </div>
                         ) : (
-                            <div className="text-xs text-slate-400 italic">Ingresa Precio y Costo para calcular tu margen.</div>
+                            <div className="text-xs text-slate-400 italic">
+                                Ingresa Precio y Costo para calcular tu margen.
+                                {parsedPrice > 0 && parsedCost === 0 && (
+                                    <p className="text-[10px] font-bold text-amber-500 flex items-center gap-1 mt-1 not-italic">
+                                        <AlertTriangle size={11} /> Sin costo: no podrás ver tu ganancia real en reportes
+                                    </p>
+                                )}
+                            </div>
                         )}
                     </div>
 
