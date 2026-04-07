@@ -82,8 +82,8 @@ async function handleShare(request, env) {
 
       // Construir payload
       const payload = idb
-        ? { idb, ls: ls || {}, isComplete: true, createdAt: new Date().toISOString() }
-        : { products, categories: categories || null, createdAt: new Date().toISOString() };
+        ? { idb, ls: ls || {}, isComplete: true, groups: Array.isArray(body.groups) ? body.groups : [], createdAt: new Date().toISOString() }
+        : { products, categories: categories || null, groups: [], createdAt: new Date().toISOString() };
 
       // Validar tamaño (máximo 10MB)
       const payloadStr = JSON.stringify(payload);

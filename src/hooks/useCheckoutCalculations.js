@@ -67,20 +67,59 @@ export function useCheckoutCalculations({
     const handleConfirm = useCallback(() => {
         triggerHaptic && triggerHaptic();
 
-        // Guard: if any single payment amount is suspiciously high (>10x the total),
-        // require explicit confirmation to prevent data-entry mistakes.
-        const hasOverpay = paymentMethods.some(m => {
-            const val = parseFloat(barValues[m.id]) || 0;
-            if (val === 0) return false;
-            const valUsd = m.currency === 'USD' ? val : m.currency === 'COP' ? val / safeTasaCop : val / safeRate;
-            return cartTotalUsd > 0 && valUsd > cartTotalUsd * 10 && valUsd - cartTotalUsd > 50;
-        });
-        if (hasOverpay) {
-            const ok = window.confirm(
-                `⚠️ El monto ingresado parece muy alto para esta venta de $${cartTotalUsd.toFixed(2)}.\n¿El cliente realmente pagó esa cantidad?\n\nPresiona Aceptar para confirmar o Cancelar para corregirlo.`
-            );
-            if (!ok) return;
+        // ── Detección inteligente de errores de entrada ───────────────────────
+        if (cartTotalUsd > 0) {
+            for (const m of paymentMethods) {
+                const val = parseFloat(barValues[m.id]) || 0;
+                if (val === 0) continue;
+
+                const valUsd = m.currency === 'USD' ? val
+                    : m.currency === 'COP' ? val / safeTasaCop
+                    : val / safeRate;
+                const diff = valUsd - cartTotalUsd;
+
+                // Capa 1 — Confusión Bs → USD
+                // Si el método es USD y (monto ÷ tasa) ≈ total real (±10%), el cajero
+                // probablemente ingresó el precio en Bolívares en el campo de Dólares.
+                if (m.currency === 'USD' && safeRate > 1) {
+                    const impliedUsd = val / safeRate;
+                    const ratio = impliedUsd / cartTotalUsd;
+                    if (ratio >= 0.90 && ratio <= 1.10 && val > cartTotalUsd * 3) {
+                        const expectedBs = (cartTotalUsd * safeRate).toFixed(2);
+                        const ok = window.confirm(
+                            `⚠️ Posible error de moneda\n\n` +
+                            `Ingresaste $${val.toFixed(2)} en el campo de Dólares, pero el total de la venta es $${cartTotalUsd.toFixed(2)}.\n\n` +
+                            `¿Confundiste el campo? El total en Bolívares es Bs ${expectedBs}.\n\n` +
+                            `Presiona Aceptar solo si el cliente realmente pagó $${val.toFixed(2)} en dólares.`
+                        );
+                        if (!ok) return;
+                        break;
+                    }
+                }
+
+                // Capa 2 — Umbral proporcional según tamaño de venta
+                const threshold = cartTotalUsd <= 10  ? { factor: 4,   minDiff: 15 }
+                                : cartTotalUsd <= 50  ? { factor: 3,   minDiff: 30 }
+                                : cartTotalUsd <= 200 ? { factor: 2,   minDiff: 50 }
+                                :                      { factor: 1.5, minDiff: 100 };
+
+                if (valUsd > cartTotalUsd * threshold.factor && diff > threshold.minDiff) {
+                    // Capa 3 — ¿Es un número redondo sospechoso?
+                    const isRoundNumber = val >= 100 && val % 100 === 0;
+                    const roundNote = isRoundNumber ? '\nEl monto parece un número redondeado — verifica que no hayas agregado ceros de más.' : '';
+
+                    const ok = window.confirm(
+                        `⚠️ Monto inusualmente alto\n\n` +
+                        `Ingresaste ${m.currency === 'USD' ? '$' : 'Bs '}${val.toFixed(2)} para una venta de $${cartTotalUsd.toFixed(2)}.` +
+                        roundNote +
+                        `\n\n¿El cliente realmente pagó esa cantidad?\n\nPresiona Aceptar para confirmar o Cancelar para corregirlo.`
+                    );
+                    if (!ok) return;
+                    break;
+                }
+            }
         }
+        // ─────────────────────────────────────────────────────────────────────
 
         const payments = paymentMethods
             .filter(m => parseFloat(barValues[m.id]) > 0)
