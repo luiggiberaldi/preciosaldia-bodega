@@ -21,6 +21,14 @@ export const DEFAULT_PAYMENT_METHODS = FACTORY_PAYMENT_METHODS;
 
 // ── PERSISTENCIA ──
 
+/** Normaliza un nombre para comparar duplicados */
+function _normLabel(s) {
+    return (s || '').toLowerCase().trim()
+        .replace(/[áàä]/g, 'a').replace(/[éèë]/g, 'e')
+        .replace(/[íìï]/g, 'i').replace(/[óòö]/g, 'o').replace(/[úùü]/g, 'u')
+        .replace(/\s+/g, ' ');
+}
+
 /** Obtener TODOS los métodos (activos e inactivos) */
 export async function getAllPaymentMethods() {
     const saved = await storageService.getItem(PM_KEY, null) || [];
@@ -40,7 +48,30 @@ export async function getAllPaymentMethods() {
     });
 
     // 2. Extraer los métodos custom guardados y rehidratar el icono
-    const customMethods = saved.filter(m => !m.isFactory).map(m => ({
+    const rawCustom = saved.filter(m => !m.isFactory);
+
+    // 3. Deduplicar: eliminar custom methods cuyo nombre normalizado ya existe
+    //    (sea en fábrica o en otro custom anterior)
+    const seenLabels = new Set(FACTORY_PAYMENT_METHODS.map(m => _normLabel(m.label)));
+    const dedupedCustom = [];
+    let hadDuplicates = false;
+    for (const m of rawCustom) {
+        const norm = _normLabel(m.label);
+        if (seenLabels.has(norm)) {
+            hadDuplicates = true; // silently drop duplicate
+        } else {
+            seenLabels.add(norm);
+            dedupedCustom.push(m);
+        }
+    }
+
+    // Si se eliminaron duplicados, persistir la lista limpia en segundo plano
+    if (hadDuplicates) {
+        const cleaned = [...mergedFactory, ...dedupedCustom];
+        storageService.setItem(PM_KEY, cleaned.map(({ Icon, ...rest }) => rest)).catch(() => {});
+    }
+
+    const customMethods = dedupedCustom.map(m => ({
         ...m,
         isEnabled: m.isEnabled !== false,
         Icon: ICON_COMPONENTS[m.icon] || null,
