@@ -14,8 +14,30 @@ export class ShareStorage extends DurableObject {
         expires_at INTEGER NOT NULL
       )
     `);
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS rates_cache (
+        key TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
     // Limpiar códigos expirados al inicio
     this.sql.exec(`DELETE FROM share_codes WHERE expires_at < unixepoch()`);
+  }
+
+  async getRatesCache() {
+    const row = this.sql.exec(`SELECT data, updated_at FROM rates_cache WHERE key = 'bcv'`).one();
+    if (!row) return null;
+    const ageMs = (Date.now() / 1000 - row.updated_at) * 1000;
+    if (ageMs > 14 * 60 * 1000) return null; // stale after 14 min
+    return JSON.parse(row.data);
+  }
+
+  async setRatesCache(data) {
+    this.sql.exec(
+      `INSERT OR REPLACE INTO rates_cache (key, data, updated_at) VALUES ('bcv', ?, ?)`,
+      JSON.stringify(data), Math.floor(Date.now() / 1000)
+    );
   }
 
   async store(code, payload, ttlSeconds = 86400) {
@@ -41,6 +63,71 @@ export class ShareStorage extends DurableObject {
       code
     ).one();
     return !!row;
+  }
+}
+
+// ─── Handler de la API /api/rates ────────────────────────────────────────────
+async function handleRates(request, env) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  const storage = env.SHARE_STORAGE.get(env.SHARE_STORAGE.idFromName('global'));
+
+  // Return cached rates if fresh (< 14 min)
+  const cached = await storage.getRatesCache();
+  if (cached) {
+    return new Response(JSON.stringify(cached), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
+    });
+  }
+
+  // Fetch fresh rates from dolarapi (public, no key required)
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
+    const res = await fetch('https://ve.dolarapi.com/v1/dolares', { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!res.ok) throw new Error(`dolarapi ${res.status}`);
+
+    const data = await res.json();
+    const oficial = Array.isArray(data) ? data.find(d => d.fuente === 'oficial' || d.nombre === 'Oficial') : null;
+    const paralelo = Array.isArray(data) ? data.find(d => d.fuente === 'paralelo' || d.nombre === 'Paralelo') : null;
+
+    if (!oficial?.promedio) throw new Error('No se obtuvo tasa oficial');
+
+    const bcvPrice = parseFloat(oficial.promedio);
+    const euroPrice = parseFloat(paralelo?.promedio || oficial.promedio * 1.09);
+
+    const rates = {
+      bcv: { price: bcvPrice, source: 'BCV Oficial', change: 0 },
+      euro: { price: euroPrice, source: 'Euro BCV', change: 0 },
+      lastUpdate: new Date().toISOString(),
+    };
+
+    await storage.setRatesCache(rates);
+
+    return new Response(JSON.stringify(rates), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' }
+    });
+  } catch (err) {
+    // Return stale cache if fetch fails
+    const stale = await storage.getRatesCache().catch(() => null);
+    if (stale) {
+      return new Response(JSON.stringify({ ...stale, stale: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'STALE' }
+      });
+    }
+    return new Response(JSON.stringify({ error: 'No se pudo obtener la tasa de cambio.' }), {
+      status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 }
 
@@ -167,6 +254,10 @@ async function handleShare(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === '/api/rates') {
+      return handleRates(request, env);
+    }
 
     if (url.pathname === '/api/share') {
       return handleShare(request, env);
