@@ -28,8 +28,8 @@ export default function CierreCajaWizard({
 
     if (!isOpen) return null;
 
-    const expectedUsd = paymentBreakdown['efectivo_usd']?.total || 0;
-    const expectedBs = paymentBreakdown['efectivo_bs']?.total || 0;
+    const expectedUsd = round2((paymentBreakdown['efectivo_usd']?.total || 0) - (paymentBreakdown['_vuelto_usd']?.total || 0));
+    const expectedBs = round2((paymentBreakdown['efectivo_bs']?.total || 0) - (paymentBreakdown['_vuelto_bs']?.total || 0));
     const expectedCop = paymentBreakdown['efectivo_cop']?.total || 0;
 
     const declaredUsd = round2(parseFloat(actualUsd) || 0);
