@@ -293,7 +293,7 @@ export default function ReportsMetricsTab({
 
                     return (
                         <div key={method}>
-                            <div className="flex justify-between text-sm mb-1">
+                            <div className="flex justify-between text-sm mb-1.5">
                                 <span className="text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5">
                                     {PayIcon && <PayIcon size={14} className="text-slate-400" />}
                                     {label}
@@ -307,8 +307,8 @@ export default function ReportsMetricsTab({
                                 </div>
                             </div>
                             {data.currency !== 'FIADO' && (
-                                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-cyan-400 to-teal-500 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
+                                <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-gradient-to-r from-blue-400 via-cyan-400 to-teal-400 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
                                 </div>
                             )}
                         </div>
@@ -316,22 +316,22 @@ export default function ReportsMetricsTab({
                 };
 
                 const renderVuelto = ([method, data]) => {
-                    const bsEquiv = toBsEquiv(data);
+                    const bsEquiv = data.currency === 'USD' ? data.total * bcvRate : data.total;
                     const pct = grandTotalBsEquiv > 0 ? (bsEquiv / grandTotalBsEquiv * 100) : 0;
                     const isUsd = data.currency === 'USD';
                     const displayAmount = isUsd ? `$ ${data.total.toFixed(2)}` : `${formatBs(data.total)} Bs`;
 
                     return (
                         <div key={method}>
-                            <div className="flex justify-between text-sm mb-1">
+                            <div className="flex justify-between text-sm mb-1.5">
                                 <span className="text-orange-500 dark:text-orange-400 font-medium">{data.label || 'Vuelto entregado'}</span>
                                 <div className="flex items-center gap-2">
                                     <span className="font-bold text-orange-500 dark:text-orange-400">− {displayAmount}</span>
                                     <span className="text-[10px] text-slate-400 font-medium w-8 text-right">{pct.toFixed(0)}%</span>
                                 </div>
                             </div>
-                            <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
+                            <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
                             </div>
                         </div>
                     );
@@ -339,69 +339,61 @@ export default function ReportsMetricsTab({
 
                 return (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
-                        <DollarSign size={12} /> Desglose por Metodo de Pago
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+                        Medios de Pago
                     </h3>
 
                     {fiadoMethods.length > 0 && (
-                        <div className="mb-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Por Cobrar</span>
+                        <div className="mb-5">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-[11px] font-bold text-amber-500 uppercase tracking-wider">Por Cobrar</span>
                                 <span className="text-xs font-black text-amber-600 dark:text-amber-400">${fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span>
                             </div>
-                            <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
-                                <div className="pl-3 space-y-3">{fiadoMethods.map(e => renderMethod(e))}</div>
-                            </div>
+                            <div className="space-y-4">{fiadoMethods.map(e => renderMethod(e))}</div>
                         </div>
                     )}
 
                     {(bsMethods.length > 0 || vueltoBs.length > 0) && (
-                        <div className="mb-3">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Bolivares</span>
+                        <div className="mb-5">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-[11px] font-bold text-blue-500 uppercase tracking-wider">Bolívares</span>
                                 <span className={`text-xs font-black ${totalVueltoBs > 0 ? 'text-cyan-500 dark:text-cyan-400' : 'text-blue-600 dark:text-blue-400'}`}>
                                     {totalVueltoBs > 0
                                         ? `${netoBs < 0 ? '−' : ''}${formatBs(Math.abs(netoBs))} Bs neto`
                                         : `${formatBs(subtotalBs)} Bs`}
                                 </span>
                             </div>
-                            <div className="space-y-3 pl-1 border-l-2 border-blue-200 dark:border-blue-800/40">
-                                <div className="pl-3 space-y-3">
-                                    {bsMethods.map(e => renderMethod(e))}
-                                    {vueltoBs.map(e => renderVuelto(e))}
-                                </div>
+                            <div className="space-y-4">
+                                {bsMethods.map(e => renderMethod(e))}
+                                {vueltoBs.map(e => renderVuelto(e))}
                             </div>
                         </div>
                     )}
 
                     {(usdMethods.length > 0 || vueltoUsd.length > 0) && (
-                        <div className={copMethods.length > 0 ? 'mb-3' : ''}>
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Dolares</span>
-                                <span className={`text-xs font-black ${totalVueltoUsd > 0 ? 'text-cyan-500 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                        <div className={copMethods.length > 0 ? 'mb-5' : ''}>
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Dólares</span>
+                                <span className={`text-xs font-black ${totalVueltoUsd > 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                     {totalVueltoUsd > 0
-                                        ? `${netoUsd < 0 ? '−' : ''}$${Math.abs(netoUsd).toFixed(2)} neto`
+                                        ? `$${Math.abs(netoUsd).toFixed(2)} neto`
                                         : `$${subtotalUsd.toFixed(2)}`}
                                 </span>
                             </div>
-                            <div className="space-y-3 pl-1 border-l-2 border-emerald-200 dark:border-emerald-800/40">
-                                <div className="pl-3 space-y-3">
-                                    {usdMethods.map(e => renderMethod(e))}
-                                    {vueltoUsd.map(e => renderVuelto(e))}
-                                </div>
+                            <div className="space-y-4">
+                                {usdMethods.map(e => renderMethod(e))}
+                                {vueltoUsd.map(e => renderVuelto(e))}
                             </div>
                         </div>
                     )}
 
                     {copEnabled && copMethods.length > 0 && (
                         <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pesos Colombianos</span>
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-[11px] font-bold text-amber-500 uppercase tracking-wider">Pesos Colombianos</span>
                                 <span className="text-xs font-black text-amber-600 dark:text-amber-400">{fmtCop(subtotalCop)} COP</span>
                             </div>
-                            <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
-                                <div className="pl-3 space-y-3">{copMethods.map(e => renderMethod(e))}</div>
-                            </div>
+                            <div className="space-y-4">{copMethods.map(e => renderMethod(e))}</div>
                         </div>
                     )}
                 </div>

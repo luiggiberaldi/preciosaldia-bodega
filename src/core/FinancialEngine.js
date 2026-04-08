@@ -215,12 +215,12 @@ export class FinancialEngine {
             }
 
             if (safeChangeUsd > 0) {
-                if (!breakdown['_vuelto_usd']) breakdown['_vuelto_usd'] = { total: 0, currency: 'USD', label: 'Vuelto entregado ($)', isChange: true };
-                breakdown['_vuelto_usd'].total = round2(breakdown['_vuelto_usd'].total - safeChangeUsd);
+                if (!breakdown['_vuelto_usd']) breakdown['_vuelto_usd'] = { total: 0, currency: 'USD', label: 'Vuelto En $ Entregado', isChange: true };
+                breakdown['_vuelto_usd'].total = round2(breakdown['_vuelto_usd'].total + safeChangeUsd);
             }
             if (safeChangeBs > 0) {
-                if (!breakdown['_vuelto_bs']) breakdown['_vuelto_bs'] = { total: 0, currency: 'BS', label: 'Vuelto entregado (Bs)', isChange: true };
-                breakdown['_vuelto_bs'].total = round2(breakdown['_vuelto_bs'].total - safeChangeBs);
+                if (!breakdown['_vuelto_bs']) breakdown['_vuelto_bs'] = { total: 0, currency: 'BS', label: 'Vuelto En Bs Entregado', isChange: true };
+                breakdown['_vuelto_bs'].total = round2(breakdown['_vuelto_bs'].total + safeChangeBs);
             }
         });
 

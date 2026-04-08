@@ -84,7 +84,7 @@ export function useCheckoutCalculations({
                 };
             });
         const defaultUsdChange = (!changeUsdGiven && !changeBsGiven) ? changeUsd : round2(parseFloat(changeUsdGiven) || 0);
-        const defaultBsChange = (!changeUsdGiven && !changeBsGiven) ? 0 : round2(parseFloat(changeBsGiven) || 0);
+        const defaultBsChange  = (!changeUsdGiven && !changeBsGiven) ? changeBs  : round2(parseFloat(changeBsGiven)  || 0);
         onConfirmSale(payments, {
             changeUsdGiven: Math.min(defaultUsdChange, changeUsd),
             changeBsGiven: Math.min(defaultBsChange, changeBs),
