@@ -360,8 +360,11 @@ async function suitePagosInconsistentes() {
     let inconsistentCount = 0;
 
     for (const sale of sales) {
+        // Skip voided, missing payments, missing total, and fiado sales
+        // (VENTA_FIADA payments[] contain only partial abono, not full total — they go to cartera)
         if (sale.status === 'ANULADA' || !sale.payments || !sale.payments.length) continue;
         if (!sale.totalUsd) continue;
+        if (sale.tipo === 'VENTA_FIADA') continue;
 
         let sumPaidUsd = 0;
         for (const pmt of sale.payments) {
@@ -374,8 +377,10 @@ async function suitePagosInconsistentes() {
             }
         }
 
+        // Deduct both USD and Bs change (Bs change converted to USD equivalent)
         const changeUsd = sale.changeUsd || 0;
-        const netPaidUsd = subR(sumPaidUsd, changeUsd);
+        const changeBsAsUsd = sale.rate ? round2((sale.changeBs || 0) / sale.rate) : 0;
+        const netPaidUsd = subR(subR(sumPaidUsd, changeUsd), changeBsAsUsd);
 
         if (Math.abs(netPaidUsd - sale.totalUsd) > 0.05) {
             inconsistentCount++;
