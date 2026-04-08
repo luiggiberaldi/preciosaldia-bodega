@@ -379,7 +379,13 @@ async function suitePagosInconsistentes() {
 
         if (Math.abs(netPaidUsd - sale.totalUsd) > 0.05) {
             inconsistentCount++;
-            log(`[Ticket ${sale.id?.slice(-6) || '?'}] Cobrado neto $${netPaidUsd} vs Total $${sale.totalUsd} (diff $${Math.abs(netPaidUsd - sale.totalUsd).toFixed(2)})`, 'warn');
+            const shortId = sale.id?.slice(-6) || '?';
+            log(`[Ticket ${shortId}] Cobrado neto $${netPaidUsd} vs Total $${sale.totalUsd} (diff $${Math.abs(netPaidUsd - sale.totalUsd).toFixed(2)})`, 'warn');
+            // Diagnóstico detallado del ticket fallido
+            log(`  ↳ rate=${sale.rate} | changeUsd=${sale.changeUsd ?? 'N/A'} | changeBs=${sale.changeBs ?? 'N/A'} | tipo=${sale.tipo || 'VENTA'}`, 'warn');
+            for (const pmt of sale.payments) {
+                log(`  ↳ pago: method=${pmt.methodId} currency=${pmt.currency} amount=${pmt.amount ?? '—'} amountUsd=${pmt.amountUsd ?? '—'} amountBs=${pmt.amountBs ?? '—'}`, 'warn');
+            }
         }
     }
 
