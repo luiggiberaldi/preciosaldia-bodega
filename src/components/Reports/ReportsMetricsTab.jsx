@@ -269,23 +269,22 @@ export default function ReportsMetricsTab({
                 const netoBs  = subtotalBs - totalVueltoBs;
                 const netoUsd = subtotalUsd - totalVueltoUsd;
 
-                const renderMethod = ([method, data], totalForPct) => {
+                const toBsEquiv = (data) => {
+                    if (data.currency === 'USD' || data.currency === 'FIADO') return data.total * bcvRate;
+                    if (data.currency === 'COP') return (data.total / (tasaCop || 1)) * bcvRate;
+                    return data.total;
+                };
+
+                const renderMethod = ([method, data]) => {
                     const label = toTitleCase(getPaymentLabel(method, data.label));
                     const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
-                    let totalBsEquiv = data.total;
-                    let pct = totalForPct > 0 ? (data.total / totalForPct * 100) : 0;
-                    let displayAmount = `${formatBs(data.total)} Bs`;
+                    const bsEquiv = toBsEquiv(data);
+                    const pct = totalBs > 0 ? (bsEquiv / totalBs * 100) : 0;
 
-                    if (data.currency === 'FIADO') {
-                        totalBsEquiv = data.total * bcvRate;
-                        displayAmount = `$ ${data.total.toFixed(2)}`;
-                    } else if (data.currency === 'USD') {
-                        totalBsEquiv = data.total * bcvRate;
-                        displayAmount = `$ ${data.total.toFixed(2)}`;
-                    } else if (data.currency === 'COP') {
-                        totalBsEquiv = (data.total / (tasaCop || 1)) * bcvRate;
-                        displayAmount = `${fmtCop(data.total)} COP`;
-                    }
+                    let displayAmount = `${formatBs(data.total)} Bs`;
+                    if (data.currency === 'FIADO') displayAmount = `$ ${data.total.toFixed(2)}`;
+                    else if (data.currency === 'USD') displayAmount = `$ ${data.total.toFixed(2)}`;
+                    else if (data.currency === 'COP') displayAmount = `${fmtCop(data.total)} COP`;
 
                     return (
                         <div key={method}>
@@ -298,21 +297,22 @@ export default function ReportsMetricsTab({
                                     <span className="font-bold text-slate-700 dark:text-white">{displayAmount}</span>
                                     {data.currency !== 'FIADO' && <span className="text-[10px] text-slate-400 font-medium w-8 text-right">{pct.toFixed(0)}%</span>}
                                     {data.currency === 'FIADO' && (
-                                        <div className="text-[10px] text-slate-400 font-medium">{formatBs(totalBsEquiv)} Bs</div>
+                                        <div className="text-[10px] text-slate-400 font-medium">{formatBs(bsEquiv)} Bs</div>
                                     )}
                                 </div>
                             </div>
                             {data.currency !== 'FIADO' && (
                                 <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
+                                    <div className="h-full bg-gradient-to-r from-cyan-400 to-teal-500 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%` }} />
                                 </div>
                             )}
                         </div>
                     );
                 };
 
-                const renderVuelto = ([method, data], subtotal) => {
-                    const pct = subtotal > 0 ? (data.total / subtotal * 100) : 0;
+                const renderVuelto = ([method, data]) => {
+                    const bsEquiv = toBsEquiv(data);
+                    const pct = totalBs > 0 ? (bsEquiv / totalBs * 100) : 0;
                     const isUsd = data.currency === 'USD';
                     const displayAmount = isUsd ? `$ ${data.total.toFixed(2)}` : `${formatBs(data.total)} Bs`;
 
@@ -345,7 +345,7 @@ export default function ReportsMetricsTab({
                                 <span className="text-xs font-black text-amber-600 dark:text-amber-400">${fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span>
                             </div>
                             <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
-                                <div className="pl-3 space-y-3">{fiadoMethods.map(e => renderMethod(e, totalBs))}</div>
+                                <div className="pl-3 space-y-3">{fiadoMethods.map(e => renderMethod(e))}</div>
                             </div>
                         </div>
                     )}
@@ -362,8 +362,8 @@ export default function ReportsMetricsTab({
                             </div>
                             <div className="space-y-3 pl-1 border-l-2 border-blue-200 dark:border-blue-800/40">
                                 <div className="pl-3 space-y-3">
-                                    {bsMethods.map(e => renderMethod(e, subtotalBs))}
-                                    {vueltoBs.map(e => renderVuelto(e, subtotalBs || totalVueltoBs))}
+                                    {bsMethods.map(e => renderMethod(e))}
+                                    {vueltoBs.map(e => renderVuelto(e))}
                                 </div>
                             </div>
                         </div>
@@ -381,8 +381,8 @@ export default function ReportsMetricsTab({
                             </div>
                             <div className="space-y-3 pl-1 border-l-2 border-emerald-200 dark:border-emerald-800/40">
                                 <div className="pl-3 space-y-3">
-                                    {usdMethods.map(e => renderMethod(e, subtotalUsd))}
-                                    {vueltoUsd.map(e => renderVuelto(e, subtotalUsd || totalVueltoUsd))}
+                                    {usdMethods.map(e => renderMethod(e))}
+                                    {vueltoUsd.map(e => renderVuelto(e))}
                                 </div>
                             </div>
                         </div>
@@ -395,7 +395,7 @@ export default function ReportsMetricsTab({
                                 <span className="text-xs font-black text-amber-600 dark:text-amber-400">{fmtCop(subtotalCop)} COP</span>
                             </div>
                             <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
-                                <div className="pl-3 space-y-3">{copMethods.map(e => renderMethod(e, subtotalCop))}</div>
+                                <div className="pl-3 space-y-3">{copMethods.map(e => renderMethod(e))}</div>
                             </div>
                         </div>
                     )}
