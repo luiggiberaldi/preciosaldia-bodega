@@ -377,10 +377,27 @@ async function suitePagosInconsistentes() {
             }
         }
 
-        // Deduct both USD and Bs change (Bs change converted to USD equivalent)
+        // Deduct change. The system stores change in both USD and Bs.
+        // If changeBs ≈ changeUsd * rate → same change in both currencies (auto-computed), count once.
+        // If they differ significantly → separate portions given in different currencies, add both.
         const changeUsd = sale.changeUsd || 0;
-        const changeBsAsUsd = sale.rate ? round2((sale.changeBs || 0) / sale.rate) : 0;
-        const netPaidUsd = subR(subR(sumPaidUsd, changeUsd), changeBsAsUsd);
+        const changeBs  = sale.changeBs  || 0;
+        const rate       = sale.rate || 1;
+
+        let totalChangeUsd = changeUsd;
+        if (changeBs > 0 && changeUsd > 0) {
+            const expectedBs = changeUsd * rate;
+            const isSameChange = Math.abs(changeBs - expectedBs) / Math.max(expectedBs, 0.01) < 0.05;
+            if (!isSameChange) {
+                // Split change: e.g. $10 USD + Bs 4038 separately → add the Bs portion
+                totalChangeUsd = round2(changeUsd + changeBs / rate);
+            }
+            // else: changeBs is just the Bs mirror of changeUsd → don't double-count
+        } else if (changeBs > 0 && changeUsd === 0) {
+            totalChangeUsd = round2(changeBs / rate);
+        }
+
+        const netPaidUsd = subR(sumPaidUsd, totalChangeUsd);
 
         if (Math.abs(netPaidUsd - sale.totalUsd) > 0.05) {
             inconsistentCount++;
