@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, DollarSign, TrendingUp, ShoppingBag, Package, ChevronDown, ChevronUp, Clock, Send, Ban, Shuffle, Search, X, Recycle, LockIcon } from 'lucide-react';
+import { Calendar, DollarSign, TrendingUp, ShoppingBag, Package, ChevronDown, ChevronUp, Clock, Send, Ban, Shuffle, Search, X, Recycle, LockIcon, CornerDownLeft } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../../config/paymentMethods';
 import { generateTicketPDF } from '../../utils/ticketGenerator';
@@ -131,7 +131,12 @@ function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, on
                             <span>Ref: {formatBs(s.totalBs)} Bs @ {formatBs(s.rate || bcvRate)}</span>
                             {s.tasaCop > 0 && <span>COP: {(s.totalCop || (s.totalUsd * s.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} @ {s.tasaCop}</span>}
                         </div>
-                        {s.changeUsd > 0 && <div className="text-emerald-500 font-bold self-start mt-0.5">Vuelto: ${s.changeUsd.toFixed(2)}</div>}
+                        {s.changeUsd > 0 && (
+                                            <div className="flex items-center gap-1 self-start mt-0.5 bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400 font-bold px-1.5 py-0.5 rounded-md border border-orange-100 dark:border-orange-800/40 text-[10px]">
+                                                <CornerDownLeft size={10} />
+                                                <span>−${s.changeUsd.toFixed(2)}</span>
+                                            </div>
+                                        )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -255,6 +260,11 @@ export default function ReportsMetricsTab({
                 const vueltoBs  = entries.filter(([, d]) => d.isChange && d.currency === 'BS');
                 const vueltoUsd = entries.filter(([, d]) => d.isChange && d.currency === 'USD');
                 const fmtCop = (v) => v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                const totalVueltoBs  = vueltoBs.reduce((s, [, d]) => s + d.total, 0);
+                const totalVueltoUsd = vueltoUsd.reduce((s, [, d]) => s + d.total, 0);
+                const netoBs  = Math.max(0, bsMethods.reduce((s, [, d]) => s + d.total, 0) - totalVueltoBs);
+                const netoUsd = Math.max(0, usdMethods.reduce((s, [, d]) => s + d.total, 0) - totalVueltoUsd);
 
                 const renderMethod = ([method, data]) => {
                     const label = data.isChange
@@ -383,10 +393,27 @@ export default function ReportsMetricsTab({
                     )}
                     {(vueltoBs.length > 0 || vueltoUsd.length > 0) && (
                         <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                            <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">↩ Vuelto / Cambio Entregado</span>
+                            <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider flex items-center gap-1">
+                                <CornerDownLeft size={10} /> Vuelto / Cambio Entregado
+                            </span>
                             <div className="mt-2 space-y-1">
                                 {vueltoBs.map(renderMethod)}
                                 {vueltoUsd.map(renderMethod)}
+                            </div>
+                            {/* Valor Neto */}
+                            <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                                {totalVueltoBs > 0 && (
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">Valor Neto Bs</span>
+                                        <span className="text-sm font-black text-blue-600 dark:text-blue-400">{formatBs(netoBs)} Bs</span>
+                                    </div>
+                                )}
+                                {totalVueltoUsd > 0 && (
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Valor Neto USD</span>
+                                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">${netoUsd.toFixed(2)}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

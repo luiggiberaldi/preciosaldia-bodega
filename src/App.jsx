@@ -40,6 +40,13 @@ export default function App() {
   const { isOnline, cacheRates } = useOfflineQueue();
   useAutoBackup(isPremium, isDemo, deviceId);
 
+  // Si el usuario pierde acceso premium y estaba en inventario, redirigir a inicio
+  useEffect(() => {
+    if (!isPremium && activeTab === 'catalogo') {
+      setActiveTab('inicio');
+    }
+  }, [isPremium, activeTab]);
+
   // Inicializar Sincronización Realtime con Supabase (device_id como clave)
   useCloudSync(deviceId);
 
@@ -156,11 +163,11 @@ export default function App() {
   const ALL_TABS = [
     { id: 'inicio', label: 'Inicio', icon: Home },
     { id: 'ventas', label: 'Vender', icon: ShoppingCart },
-    { id: 'catalogo', label: 'Inventario', icon: Store },
+    { id: 'catalogo', label: 'Inventario', icon: Store, premiumOnly: true },
     { id: 'clientes', label: 'Contactos', icon: Users },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
   ];
-  const TABS = ALL_TABS;
+  const TABS = ALL_TABS.filter(tab => !tab.premiumOnly || isPremium);
 
   return (
     <div className="font-sans antialiased bg-slate-50 dark:bg-black h-[100dvh] flex flex-col overflow-clip transition-colors duration-300">
@@ -260,7 +267,7 @@ export default function App() {
           {(activeTab === 'clientes' || mountedViews.clientes) && (
             <div data-view="clientes" className={`flex-1 flex flex-col ${activeTab === 'clientes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
-                <PremiumGuard featureName="Gestión de Clientes">
+                <PremiumGuard featureName="Gestión de Clientes" isShop={true}>
                   <CustomersView triggerHaptic={triggerHaptic} rates={rates} isActive={activeTab === 'clientes'} />
                 </PremiumGuard>
               </ErrorBoundary>
@@ -269,7 +276,7 @@ export default function App() {
           {(activeTab === 'reportes' || mountedViews.reportes) && (
             <div data-view="reportes" className={`flex-1 flex flex-col ${activeTab === 'reportes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
-                <PremiumGuard featureName="Reportes Históricos">
+                <PremiumGuard featureName="Reportes Históricos" isShop={true}>
                   <ReportsView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'reportes'} />
                 </PremiumGuard>
               </ErrorBoundary>

@@ -646,7 +646,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                                     cart={cart} effectiveRate={effectiveRate}
                                     cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
                                     cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
-                                    discountData={discountData} onOpenDiscount={() => setIsCartSheetOpen(false) || setShowDiscountModal(true)}
+                                    discountData={discountData} onOpenDiscount={() => setShowDiscountModal(true)}
                                     updateQty={updateQty} removeFromCart={removeFromCart}
                                     onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); setIsCartSheetOpen(false); }}
                                     onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}

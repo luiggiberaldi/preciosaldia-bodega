@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Clock, Send, Ban, ChevronDown, ChevronUp, Trash2, Shuffle, Recycle, Receipt, Printer, LockIcon } from 'lucide-react';
+import { Clock, Send, Ban, ChevronDown, ChevronUp, Trash2, Shuffle, Recycle, Receipt, Printer, LockIcon, CornerDownLeft } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../../config/paymentMethods';
 import EmptyState from '../EmptyState';
+import { printerSerial } from '../../services/PrinterSerial';
+import { showToast } from '../Toast';
 
 export default function SalesHistory({
     recentSales,
@@ -18,6 +20,28 @@ export default function SalesHistory({
     isAdmin
 }) {
     const [expandedSaleId, setExpandedSaleId] = useState(null);
+    const [printingId, setPrintingId] = useState(null);
+
+    const handleThermalPrint = async (e, sale) => {
+        e.stopPropagation();
+        if (!printerSerial.isSupported()) {
+            showToast('Tu navegador no soporta impresoras seriales. Usa Chrome o Edge.', 'error');
+            return;
+        }
+        try {
+            if (!printerSerial.isConnected()) {
+                const connected = await printerSerial.connect();
+                if (!connected) return;
+            }
+            setPrintingId(sale.id);
+            await printerSerial.printTicket(sale, bcvRate);
+            showToast('Ticket impreso correctamente', 'success');
+        } catch (err) {
+            showToast('Error al imprimir: ' + (err.message || 'desconocido'), 'error');
+        } finally {
+            setPrintingId(null);
+        }
+    };
 
     if (recentSales.length === 0) {
         return (
@@ -91,6 +115,8 @@ export default function SalesHistory({
                                         {s.customerName || 'Consumidor Final'} {s.tipo === 'VENTA_FIADA' && <span className="text-[9px] bg-amber-100 text-amber-600 px-1 rounded uppercase">Fiado</span>}
                                     </p>
                                     <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                                        {s.saleNumber && <span className="font-black text-slate-400">#{String(s.saleNumber).padStart(7, '0')}</span>}
+                                        {s.saleNumber && <span>·</span>}
                                         <span>{d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</span> ·
                                         <span>{methodLabel}</span>
                                     </p>
@@ -125,7 +151,12 @@ export default function SalesHistory({
                                             <span>Ref: {formatBs(s.totalBs)} Bs @ {formatBs(s.rate || bcvRate)}</span>
                                             {s.tasaCop > 0 && <span>COP: {(s.totalCop || (s.totalUsd * s.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} @ {s.tasaCop}</span>}
                                         </div>
-                                        {s.changeUsd > 0 && <div className="text-emerald-500 font-bold self-start mt-0.5">Vuelto: ${s.changeUsd.toFixed(2)}</div>}
+                                        {s.changeUsd > 0 && (
+                                            <div className="flex items-center gap-1 self-start mt-0.5 bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400 font-bold px-1.5 py-0.5 rounded-md border border-orange-100 dark:border-orange-800/40">
+                                                <CornerDownLeft size={10} />
+                                                <span>−${s.changeUsd.toFixed(2)}</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -157,6 +188,15 @@ export default function SalesHistory({
                                                 <Printer size={14} />
                                             </button>
                                         )}
+                                        <button
+                                            onClick={(e) => handleThermalPrint(e, s)}
+                                            disabled={printingId === s.id}
+                                            className="py-2 px-3 bg-slate-800 dark:bg-slate-700 text-white hover:bg-slate-700 dark:hover:bg-slate-600 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm active:scale-95 disabled:opacity-50"
+                                            title="Imprimir en impresora térmica"
+                                        >
+                                            <Printer size={14} />
+                                            <span className="hidden sm:inline">{printingId === s.id ? '...' : 'Térmica'}</span>
+                                        </button>
 
                                         {isAdmin && !isCanceled && !s.cajaCerrada && (
                                             <button

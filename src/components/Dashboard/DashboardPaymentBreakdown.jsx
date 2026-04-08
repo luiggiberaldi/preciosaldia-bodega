@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, CornerDownLeft } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, toTitleCase, getPaymentIcon, PAYMENT_ICONS } from '../../config/paymentMethods';
 
@@ -8,14 +8,22 @@ export default function DashboardPaymentBreakdown({
 }) {
     if (Object.keys(paymentBreakdown).length === 0) return null;
 
-    const entries = Object.entries(paymentBreakdown).filter(([, d]) => d.total > 0);
-    const fiadoMethods = entries.filter(([, d]) => d.currency === 'FIADO');
-    const bsMethods = entries.filter(([, d]) => d.currency === 'BS' || (!d.currency));
-    const usdMethods = entries.filter(([, d]) => d.currency === 'USD');
-    const copMethods = entries.filter(([, d]) => d.currency === 'COP');
-    const subtotalBs = bsMethods.reduce((s, [, d]) => s + d.total, 0);
+    const allEntries = Object.entries(paymentBreakdown).filter(([, d]) => d.total > 0);
+    const fiadoMethods = allEntries.filter(([, d]) => d.currency === 'FIADO' && !d.isChange);
+    const bsMethods    = allEntries.filter(([, d]) => (d.currency === 'BS' || (!d.currency)) && !d.isChange);
+    const usdMethods   = allEntries.filter(([, d]) => d.currency === 'USD' && !d.isChange);
+    const copMethods   = allEntries.filter(([, d]) => d.currency === 'COP' && !d.isChange);
+    const vueltoBs     = allEntries.filter(([, d]) => d.isChange && d.currency === 'BS');
+    const vueltoUsd    = allEntries.filter(([, d]) => d.isChange && d.currency === 'USD');
+
+    const subtotalBs  = bsMethods.reduce((s, [, d]) => s + d.total, 0);
     const subtotalUsd = usdMethods.reduce((s, [, d]) => s + d.total, 0);
     const subtotalCop = copMethods.reduce((s, [, d]) => s + d.total, 0);
+    const totalVueltoBs  = vueltoBs.reduce((s, [, d]) => s + d.total, 0);
+    const totalVueltoUsd = vueltoUsd.reduce((s, [, d]) => s + d.total, 0);
+    const netoBs  = Math.max(0, subtotalBs - totalVueltoBs);
+    const netoUsd = Math.max(0, subtotalUsd - totalVueltoUsd);
+
     const fmtCop = (v) => v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     const renderMethod = ([method, data]) => {
@@ -95,8 +103,23 @@ export default function DashboardPaymentBreakdown({
                     <div className="space-y-3 pl-1 border-l-2 border-blue-200 dark:border-blue-800/40">
                         <div className="pl-3 space-y-3">{bsMethods.map(renderMethod)}</div>
                     </div>
+                    {totalVueltoBs > 0 && (
+                        <div className="mt-2 pl-4 space-y-1.5">
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="flex items-center gap-1 text-orange-500 dark:text-orange-400 font-medium italic">
+                                    <CornerDownLeft size={11} /> Vuelto entregado
+                                </span>
+                                <span className="font-bold text-orange-500 dark:text-orange-400">−{formatBs(totalVueltoBs)} Bs</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-1.5 border-t border-slate-100 dark:border-slate-800">
+                                <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">Neto Bs</span>
+                                <span className="text-sm font-black text-blue-600 dark:text-blue-400">{formatBs(netoBs)} Bs</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
+
             {usdMethods.length > 0 && (
                 <div className={copMethods.length > 0 ? 'mb-3' : ''}>
                     <div className="flex items-center justify-between mb-2">
@@ -106,8 +129,23 @@ export default function DashboardPaymentBreakdown({
                     <div className="space-y-3 pl-1 border-l-2 border-emerald-200 dark:border-emerald-800/40">
                         <div className="pl-3 space-y-3">{usdMethods.map(renderMethod)}</div>
                     </div>
+                    {totalVueltoUsd > 0 && (
+                        <div className="mt-2 pl-4 space-y-1.5">
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="flex items-center gap-1 text-orange-500 dark:text-orange-400 font-medium italic">
+                                    <CornerDownLeft size={11} /> Vuelto entregado
+                                </span>
+                                <span className="font-bold text-orange-500 dark:text-orange-400">−${totalVueltoUsd.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-1.5 border-t border-slate-100 dark:border-slate-800">
+                                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Neto USD</span>
+                                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">${netoUsd.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
+
             {copEnabled && copMethods.length > 0 && (
                 <div>
                     <div className="flex items-center justify-between mb-2">
