@@ -275,11 +275,16 @@ export default function ReportsMetricsTab({
                     return data.total;
                 };
 
+                // Grand total in Bs equiv from all income entries — used as 100% reference
+                const grandTotalBsEquiv = allEntries
+                    .filter(([, d]) => !d.isChange)
+                    .reduce((s, [, d]) => s + toBsEquiv(d), 0);
+
                 const renderMethod = ([method, data]) => {
                     const label = toTitleCase(getPaymentLabel(method, data.label));
                     const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
                     const bsEquiv = toBsEquiv(data);
-                    const pct = totalBs > 0 ? (bsEquiv / totalBs * 100) : 0;
+                    const pct = grandTotalBsEquiv > 0 ? (bsEquiv / grandTotalBsEquiv * 100) : 0;
 
                     let displayAmount = `${formatBs(data.total)} Bs`;
                     if (data.currency === 'FIADO') displayAmount = `$ ${data.total.toFixed(2)}`;
@@ -312,7 +317,7 @@ export default function ReportsMetricsTab({
 
                 const renderVuelto = ([method, data]) => {
                     const bsEquiv = toBsEquiv(data);
-                    const pct = totalBs > 0 ? (bsEquiv / totalBs * 100) : 0;
+                    const pct = grandTotalBsEquiv > 0 ? (bsEquiv / grandTotalBsEquiv * 100) : 0;
                     const isUsd = data.currency === 'USD';
                     const displayAmount = isUsd ? `$ ${data.total.toFixed(2)}` : `${formatBs(data.total)} Bs`;
 
