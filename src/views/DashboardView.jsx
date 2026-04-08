@@ -428,7 +428,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 onClose={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(''); }}
                 onConfirm={async () => {
                     if (deleteConfirmText.trim().toUpperCase() === 'BORRAR') {
-                        await storageService.removeItem(SALES_KEY);
+                        await storageService.setItem(SALES_KEY, []);
                         setIsDeleteModalOpen(false);
                         setDeleteConfirmText('');
                         window.location.reload();

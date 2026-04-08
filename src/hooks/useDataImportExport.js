@@ -165,7 +165,7 @@ export function useDataImportExport({
         if (deleteInput !== 'ELIMINAR') return;
         try {
             triggerHaptic && triggerHaptic();
-            await storageService.removeItem('bodega_sales_v1');
+            await storageService.setItem('bodega_sales_v1', []);
             auditLog('SISTEMA', 'HISTORIAL_BORRADO', 'Historial de ventas eliminado completamente');
             showToast('Historial de ventas eliminado exitosamente', 'success');
             setTimeout(() => window.location.reload(), 1500);
