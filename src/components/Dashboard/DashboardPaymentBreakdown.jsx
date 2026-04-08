@@ -39,11 +39,9 @@ export default function DashboardPaymentBreakdown({
             displayAmount = `$ ${data.total.toFixed(2)}`;
         } else if (data.currency === 'USD') {
             totalBsEquiv = data.total * bcvRate;
-            pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0;
             displayAmount = `$ ${data.total.toFixed(2)}`;
         } else if (data.currency === 'COP') {
             totalBsEquiv = (data.total / (tasaCop || 1)) * bcvRate;
-            pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0;
             displayAmount = `${fmtCop(data.total)} COP`;
         }
 

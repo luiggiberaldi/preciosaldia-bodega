@@ -278,15 +278,12 @@ export default function ReportsMetricsTab({
 
                     if (data.currency === 'FIADO') {
                         totalBsEquiv = data.total * bcvRate;
-                        pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;
                         displayAmount = `$ ${data.total.toFixed(2)}`;
                     } else if (data.currency === 'USD') {
                         totalBsEquiv = data.total * bcvRate;
-                        pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;
                         displayAmount = `$ ${data.total.toFixed(2)}`;
                     } else if (data.currency === 'COP') {
                         totalBsEquiv = (data.total / (tasaCop || 1)) * bcvRate;
-                        pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;
                         displayAmount = `${fmtCop(data.total)} COP`;
                     }
 
