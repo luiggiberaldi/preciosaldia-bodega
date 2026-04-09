@@ -138,7 +138,10 @@ export default function SalesHistory({
                                             {s.items.map((item, i) => (
                                                 <div key={i} className={`flex justify-between items-center text-xs ${isCanceled ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'}`}>
                                                     <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
-                                                    <span className="font-medium">${(item.priceUsd * item.qty).toFixed(2)}</span>
+                                                    <span className="font-medium text-right">
+                                                        <span>${(item.priceUsd * item.qty).toFixed(2)}</span>
+                                                        <span className="text-slate-400 font-normal ml-1">· {formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span>
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
@@ -155,6 +158,7 @@ export default function SalesHistory({
                                             <div className="flex items-center gap-1 self-start mt-0.5 bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400 font-bold px-1.5 py-0.5 rounded-md border border-orange-100 dark:border-orange-800/40">
                                                 <CornerDownLeft size={10} />
                                                 <span>−${s.changeUsd.toFixed(2)}</span>
+                                                <span className="font-normal opacity-75">/ −{formatBs(s.changeBs || s.changeUsd * (s.rate || bcvRate))} Bs</span>
                                             </div>
                                         )}
                                     </div>
