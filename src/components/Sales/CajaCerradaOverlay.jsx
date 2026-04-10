@@ -3,12 +3,12 @@ import { DollarSign } from 'lucide-react';
 
 export default function CajaCerradaOverlay({ cartCount, onOpenApertura }) {
     return (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-y-auto min-h-0">
             <div className="w-24 h-24 sm:w-32 sm:h-32 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-6 shadow-sm border-4 border-white dark:border-slate-900">
                 <DollarSign size={48} className="text-emerald-500" />
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-slate-100 mb-3 tracking-tight">Caja Cerrada</h2>
-            <p className="text-slate-500 dark:text-slate-400 max-w-sm mb-10 text-sm sm:text-base leading-relaxed">
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mb-6 sm:mb-10 text-sm sm:text-base leading-relaxed">
                 Para comenzar a registrar ventas o escanear productos, primero debes aperturar la caja indicando el fondo inicial del turno.
             </p>
             <button
