@@ -219,7 +219,7 @@ export async function generateTicketPDF(sale, bcvRate) {
                 const isCop = p.currency === 'COP';
                 const isBs = !isCop && (p.currency ? p.currency !== 'USD' : (p.methodId.includes('_bs') || p.methodId === 'pago_movil'));
                 const val = isCop
-                    ? 'COP ' + (p.amountBs || (p.amountUsd * (sale.tasaCop || 1))).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    ? 'COP ' + (p.amountInput || (p.amountUsd * (sale.tasaCop || 1))).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                     : isBs
                     ? 'Bs ' + formatBs(p.amountBs || (p.amountUsd * rate))
                     : '$' + (p.amountUsd || 0).toFixed(2);

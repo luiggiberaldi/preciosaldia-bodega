@@ -271,7 +271,7 @@ export default function ReportsMetricsTab({
 
                 const toBsEquiv = (data) => {
                     if (data.currency === 'USD' || data.currency === 'FIADO') return data.total * bcvRate;
-                    if (data.currency === 'COP') return (data.total / (tasaCop || 1)) * bcvRate;
+                    if (data.currency === 'COP') return tasaCop > 0 ? (data.total / tasaCop) * bcvRate : 0;
                     return data.total;
                 };
 
