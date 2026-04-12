@@ -22,7 +22,10 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useOfflineQueue } from './hooks/useOfflineQueue';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import CommandPalette from './components/CommandPalette';
-// LockScreen and useAutoLock removed - single-user app
+import LockScreen from './components/security/LockScreen';
+import { useAutoLock } from './hooks/useAutoLock';
+import { useAuthStore } from './hooks/store/useAuthStore';
+import { LogOut } from 'lucide-react';
 import { purgeOldEntries } from './services/auditService';
 import { useCloudSync } from './hooks/useCloudSync';
 
@@ -39,6 +42,15 @@ export default function App() {
   const { isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg, deviceId } = useSecurity();
   const { isOnline, cacheRates } = useOfflineQueue();
   useAutoBackup(isPremium, isDemo, deviceId);
+
+  const { usuarioActivo, requireLogin } = useAuthStore();
+  const { logout } = useAuthStore();
+  useAutoLock();
+
+  // Al recargar la página, cerrar sesión si el login está activado
+  useEffect(() => {
+    if (requireLogin) logout();
+  }, []);
 
   // Si el usuario pierde acceso premium y estaba en inventario, redirigir a inicio
   useEffect(() => {
@@ -160,20 +172,27 @@ export default function App() {
     };
   }, []);
 
+  const isCajero = requireLogin && usuarioActivo?.rol === 'CAJERO';
+
   const ALL_TABS = [
     { id: 'inicio', label: 'Inicio', icon: Home },
     { id: 'ventas', label: 'Vender', icon: ShoppingCart },
     { id: 'catalogo', label: 'Inventario', icon: Store, premiumOnly: true },
     { id: 'clientes', label: 'Contactos', icon: Users },
-    { id: 'reportes', label: 'Reportes', icon: BarChart3 },
+    { id: 'reportes', label: 'Reportes', icon: BarChart3, adminOnly: true },
   ];
-  const TABS = ALL_TABS.filter(tab => !tab.premiumOnly || isPremium);
+  const TABS = ALL_TABS.filter(tab =>
+    (!tab.premiumOnly || isPremium) && (!tab.adminOnly || !isCajero)
+  );
 
   return (
     <div className="font-sans antialiased bg-slate-50 dark:bg-black h-[100dvh] flex flex-col overflow-clip transition-colors duration-300">
 
       {/* Terms and Conditions Overlay (First Use) */}
       <TermsOverlay />
+
+      {/* Lock Screen — solo si login está activado y no hay sesión activa */}
+      {requireLogin && !usuarioActivo && <LockScreen />}
 
 
       {/* Offline Banner */}
@@ -230,7 +249,7 @@ export default function App() {
 
       <CartProvider>
       <ProductProvider rates={rates}>
-        <main className={`flex-1 min-h-0 w-full max-w-md md:max-w-3xl lg:max-w-none lg:px-6 mx-auto relative ${isKeyboardOpen ? 'pb-4' : 'pb-24'} flex flex-col overflow-y-auto`}>
+        <main className={`flex-1 min-h-0 w-full max-w-md md:max-w-2xl lg:max-w-5xl xl:max-w-7xl px-0 lg:px-6 xl:px-8 mx-auto relative ${isKeyboardOpen ? 'pb-4' : 'pb-24'} flex flex-col overflow-y-auto`}>
 
           {/* Hidden Admin Trigger Area */}
         <div
@@ -258,7 +277,7 @@ export default function App() {
 
         <div className={`flex-1 flex flex-col ${activeTab === 'inicio' ? '' : 'hidden'}`}>
           <ErrorBoundary>
-            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={(tab) => { if (tab === 'ajustes') { setShowSettings(true); } else { setActiveTab(tab); } }} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} isDemo={isDemo} demoTimeLeft={demoTimeLeft} />
+            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={(tab) => { if (tab === 'ajustes') { if (!isCajero) setShowSettings(true); } else { setActiveTab(tab); } }} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} isDemo={isDemo} demoTimeLeft={demoTimeLeft} />
           </ErrorBoundary>
         </div>
 
@@ -307,7 +326,7 @@ export default function App() {
 
       {/* Bottom Nav — hidden in POS mode for full-screen selling */}
       {!isKeyboardOpen && (
-        <div className="fixed bottom-0 left-0 right-0 px-6 pb-[env(safe-area-inset-bottom)] pt-0 mb-4 max-w-md md:max-w-lg mx-auto z-30 pointer-events-none animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-0 left-0 right-0 px-3 sm:px-6 pb-[env(safe-area-inset-bottom)] pt-0 mb-4 max-w-md md:max-w-2xl lg:max-w-5xl xl:max-w-7xl mx-auto z-30 pointer-events-none animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xl rounded-2xl p-1 flex justify-between items-center shadow-2xl shadow-slate-900/30 border border-white/10 ring-1 ring-black/5 pointer-events-auto">
             {TABS.map(tab => (
               <TabButton
@@ -319,6 +338,17 @@ export default function App() {
                 data-tour={`tab-${tab.id}`}
               />
             ))}
+
+            {/* Logout — solo si el login está activado */}
+            {requireLogin && usuarioActivo && (
+              <button
+                onClick={() => { triggerHaptic(); logout(); }}
+                className="flex flex-col items-center justify-center gap-0.5 py-2 px-3 rounded-xl text-slate-400 hover:text-rose-400 transition-colors active:scale-90"
+                title={`Cerrar sesión (${usuarioActivo.nombre})`}
+              >
+                <LogOut size={18} strokeWidth={2} />
+              </button>
+            )}
 
             {installPrompt && activeTab === 'inicio' && (
               <button onClick={() => { triggerHaptic(); handleInstall(); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 bg-brand text-white shadow-md animate-pulse">

@@ -4,6 +4,7 @@ import { showToast } from '../components/Toast';
 import { Package, Plus, Trash2, X, Store, Tag, Pencil, Banknote, Search, ChevronLeft, ChevronRight, AlertTriangle, Box, LayoutGrid, List, Minus, ArrowUpDown, Clock, Percent, Printer, CheckSquare } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ProductShareModal } from '../components/ProductShareModal';
+import { useAuthStore } from '../hooks/store/useAuthStore';
 
 import ShareInventoryModal from '../components/ShareInventoryModal';
 import { formatBs, formatUsd, smartCashRounding } from '../utils/calculatorUtils';
@@ -42,7 +43,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         tasaCop,
         adjustStock: baseAdjustStock
     } = useProductContext();
-    const isCajero = false; // Single-user mode: owner has full access
+    const isCajero = useAuthStore(s => s.requireLogin && s.usuarioActivo?.rol === 'CAJERO');
     const { log: auditLog } = useAudit();
 
     // Envolver adjustStock para incluir registro de movimiento + haptic
@@ -91,13 +92,13 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         const mode = localStorage.getItem('bodega_inventory_view') || 'grid';
         if (mode === 'list') return 25;
         const w = window.innerWidth;
-        return w >= 1536 ? 24 : w >= 1280 ? 20 : w >= 1024 ? 16 : 8;
+        return w >= 1536 ? 30 : w >= 1280 ? 24 : w >= 1024 ? 20 : w >= 768 ? 12 : w >= 640 ? 9 : 8;
     });
     useEffect(() => {
         const handleResize = () => {
             if (viewMode === 'grid') {
                 const w = window.innerWidth;
-                setItemsPerPage(w >= 1536 ? 24 : w >= 1280 ? 20 : w >= 1024 ? 16 : 8);
+                setItemsPerPage(w >= 1536 ? 30 : w >= 1280 ? 24 : w >= 1024 ? 20 : w >= 768 ? 12 : w >= 640 ? 9 : 8);
             }
         };
         window.addEventListener('resize', handleResize);
@@ -109,7 +110,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         setViewMode(next);
         localStorage.setItem('bodega_inventory_view', next);
         setCurrentPage(1);
-        setItemsPerPage(next === 'list' ? 25 : (() => { const w = window.innerWidth; return w >= 1536 ? 24 : w >= 1280 ? 20 : w >= 1024 ? 16 : 8; })());
+        setItemsPerPage(next === 'list' ? 25 : (() => { const w = window.innerWidth; return w >= 1536 ? 30 : w >= 1280 ? 24 : w >= 1024 ? 20 : w >= 768 ? 12 : w >= 640 ? 9 : 8; })());
         triggerHaptic && triggerHaptic();
     };
 
@@ -482,10 +483,10 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                         {viewMode === 'grid' ? (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
                             {paginatedProducts.map(p => (
-                                <SwipeableItem 
+                                <SwipeableItem
                                     key={p.id}
-                                    onEdit={() => handleEdit(p)}
-                                    onDelete={() => handleDelete(p.id)}
+                                    onEdit={isCajero ? undefined : () => handleEdit(p)}
+                                    onDelete={isCajero ? undefined : () => handleDelete(p.id)}
                                     triggerHaptic={triggerHaptic}
                                 >
                                     <ProductCard
@@ -497,9 +498,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                         tasaCop={tasaCop}
                                         onAdjustStock={adjustStock}
                                         onShare={setShareProduct}
-                                        onEdit={handleEdit}
-                                        onDelete={handleDelete}
-                                        readOnly={false}
+                                        onEdit={isCajero ? undefined : handleEdit}
+                                        onDelete={isCajero ? undefined : handleDelete}
+                                        readOnly={isCajero}
                                         daysRemaining={
                                             salesVelocityMap[p.id] > 0 && (p.stock ?? 0) > 0
                                                 ? Math.round((p.stock ?? 0) / salesVelocityMap[p.id])

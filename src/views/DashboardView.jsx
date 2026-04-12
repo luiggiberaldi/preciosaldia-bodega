@@ -19,6 +19,7 @@ import { useProductContext } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import { useSecurity } from '../hooks/useSecurity';
 import { useAudit } from '../hooks/useAudit';
+import { useAuthStore } from '../hooks/store/useAuthStore';
 import { getLocalISODate } from '../utils/dateHelpers';
 import Skeleton from '../components/Skeleton';
 import { useDashboardData } from '../hooks/useDashboardData';
@@ -30,6 +31,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const { notifyCierrePendiente, requestPermission } = useNotifications();
     const { deviceId } = useSecurity();
     const isAdmin = true;
+    const isCajero = useAuthStore(s => s.requireLogin && s.usuarioActivo?.rol === 'CAJERO');
     const { log: auditLog } = useAudit();
     const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
@@ -235,7 +237,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     return (
         <div
             ref={scrollRef}
-            className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-3 sm:p-6 overflow-y-auto scrollbar-hide"
+            className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-3 sm:p-5 lg:p-6 xl:p-8 overflow-y-auto scrollbar-hide"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -259,6 +261,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
                 <div className="flex items-center gap-2">
                     <SyncStatus />
+                    {!isCajero && (
                     <button
                         onClick={() => { triggerHaptic(); onNavigate('ajustes'); }}
                         className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-300 rounded-full shadow-sm hover:shadow active:scale-95 transition-all outline-none"
@@ -266,11 +269,12 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     >
                         <Settings size={22} className="text-slate-700 dark:text-slate-200" />
                     </button>
+                    )}
                 </div>
             </div>
 
             {/* Acciones Rápidas */}
-            <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
                 <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('ventas'); } }} className="bg-brand hover:bg-brand-dark text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-2 shadow-sm shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all">
                     <ShoppingCart size={22} />
                     <span className="text-xs font-bold">Vender</span>
@@ -285,6 +289,32 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </button>
             </div>
 
+            {/* ── CAJERO: vista simplificada ── */}
+            {isCajero ? (
+                <div className="grid grid-cols-2 gap-3 mb-5">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-indigo-50 dark:bg-indigo-900/10 rounded-full blur-2xl" />
+                        <div className="w-9 h-9 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center mb-2">
+                            <ShoppingCart size={18} className="text-indigo-500" />
+                        </div>
+                        <p className="text-2xl font-black text-slate-800 dark:text-white leading-none">{todaySales.length}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">{todaySales.length === 1 ? 'venta hoy' : 'ventas hoy'}</p>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-50 dark:bg-emerald-900/10 rounded-full blur-2xl" />
+                        <div className="w-9 h-9 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center mb-2">
+                            <Package size={18} className="text-emerald-500" />
+                        </div>
+                        <p className="text-2xl font-black text-slate-800 dark:text-white leading-none">{todayItemsSold}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">{todayItemsSold === 1 ? 'artículo vendido' : 'artículos vendidos'}</p>
+                    </div>
+                </div>
+            ) : (
+            /* ── ADMIN: layout completo ── */
+            <div className="lg:grid lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_340px] lg:gap-6 lg:items-start">
+
+            {/* LEFT: Stats + Payment + Chart */}
+            <div>
             {/* Stats Cards */}
             <DashboardStats
                 isDemo={isDemo}
@@ -328,6 +358,10 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 }}
             />
 
+            </div>{/* end LEFT column */}
+
+            {/* RIGHT: Low stock + Top products */}
+            <div>
             {/* Bajo Stock */}
             {lowStockProducts.length > 0 && (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-amber-200 dark:border-amber-800/30 shadow-sm mb-5">
@@ -377,12 +411,16 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
             )}
 
+            </div>{/* end RIGHT column */}
+            </div>/* end two-col grid */
+            )}{/* end isCajero conditional */}
+
             <SalesHistory
                 sales={sales}
                 recentSales={recentSales}
                 bcvRate={bcvRate}
                 totalSalesCount={sales.length}
-                isAdmin={isAdmin}
+                isAdmin={!isCajero}
                 onVoidSale={handleVoidSale}
                 onShareWhatsApp={handleShareWhatsApp}
                 onDownloadPDF={handleDownloadPDF}

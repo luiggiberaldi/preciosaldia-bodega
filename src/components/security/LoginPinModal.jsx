@@ -2,16 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Delete, Loader2 } from 'lucide-react';
 import LoginAvatar from './LoginAvatar';
 
-const PIN_LENGTH = 4;
-
 export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
+  const pinLength = user?.rol === 'ADMIN' ? 6 : 4;
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [lockoutMsg, setLockoutMsg] = useState('');
   const [processing, setProcessing] = useState(false);
   const inputRef = useRef(null);
 
-  // Focus el input invisible al abrir
   useEffect(() => {
     if (isOpen) {
       setPin('');
@@ -21,15 +19,14 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
     }
   }, [isOpen]);
 
-  // Auto-submit cuando se completan los 4 dígitos
   useEffect(() => {
-    if (pin.length === PIN_LENGTH && !processing) {
+    if (pin.length === pinLength && !processing) {
       handleSubmit();
     }
   }, [pin]);
 
   const handleSubmit = async () => {
-    if (pin.length !== PIN_LENGTH || processing) return;
+    if (pin.length !== pinLength || processing) return;
     setProcessing(true);
     setLockoutMsg('');
 
@@ -49,11 +46,10 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
       setTimeout(() => setError(false), 600);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-    // Si fue exitoso, el componente padre cierra el modal
   };
 
   const handlePadPress = (digit) => {
-    if (pin.length >= PIN_LENGTH || processing || lockoutMsg) return;
+    if (pin.length >= pinLength || processing || lockoutMsg) return;
     setLockoutMsg('');
     setPin(prev => prev + digit);
   };
@@ -73,23 +69,21 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
         className="relative bg-slate-900/95 backdrop-blur-2xl rounded-3xl p-8 w-full max-w-sm mx-4 shadow-2xl border border-white/10 animate-in zoom-in-95 duration-300"
         onClick={e => e.stopPropagation()}
       >
-        {/* Cerrar */}
         <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors rounded-full hover:bg-white/10">
           <X size={20} />
         </button>
 
-        {/* Avatar + Nombre */}
         <div className="flex flex-col items-center mb-8">
           <div className="mb-4">
             <LoginAvatar user={user} />
           </div>
           <h2 className="text-xl font-bold text-white">{userName}</h2>
-          <p className="text-xs text-slate-400 mt-1">Ingresa tu PIN de 4 digitos</p>
+          <p className="text-xs text-slate-400 mt-1">Ingresa tu PIN de {pinLength} dígitos</p>
         </div>
 
         {/* PIN Dots */}
         <div className={`flex justify-center gap-3 mb-4 ${error ? 'animate-shake' : ''}`}>
-          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+          {Array.from({ length: pinLength }).map((_, i) => (
             <div
               key={i}
               className={`w-4 h-4 rounded-full border-2 transition-all duration-200 ${
@@ -103,23 +97,21 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
           ))}
         </div>
 
-        {/* Lockout message */}
         {lockoutMsg && (
           <div className="mb-4 px-4 py-2 bg-red-500/20 border border-red-500/40 rounded-xl text-center">
             <p className="text-red-400 text-sm font-semibold">{lockoutMsg}</p>
           </div>
         )}
 
-        {/* Input invisible para teclado nativo */}
         <input
           ref={inputRef}
           type="tel"
-          maxLength={PIN_LENGTH}
+          maxLength={pinLength}
           value={pin}
           disabled={!!lockoutMsg}
           onChange={e => {
             if (lockoutMsg) return;
-            const val = e.target.value.replace(/\D/g, '').slice(0, PIN_LENGTH);
+            const val = e.target.value.replace(/\D/g, '').slice(0, pinLength);
             setPin(val);
           }}
           className="absolute opacity-0 w-0 h-0"
@@ -138,8 +130,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
               {n}
             </button>
           ))}
-          {/* Fila inferior */}
-          <div /> {/* Espacio vacio */}
+          <div />
           <button
             onClick={() => handlePadPress('0')}
             className="h-14 rounded-xl bg-slate-800/80 text-white text-xl font-bold hover:bg-slate-700 active:scale-90 active:bg-brand/30 transition-all duration-150 border border-white/5 shadow-lg"
@@ -154,7 +145,6 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
           </button>
         </div>
 
-        {/* Processing */}
         {processing && (
           <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm rounded-3xl flex items-center justify-center">
             <Loader2 className="animate-spin text-brand" size={32} />
@@ -162,7 +152,6 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
         )}
       </div>
 
-      {/* Shake Animation */}
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }

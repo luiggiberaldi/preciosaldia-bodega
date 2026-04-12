@@ -16,22 +16,22 @@ export default function LockScreen() {
   };
 
   return (
-    <div className="fixed inset-0 z-[250] bg-slate-950 text-white font-sans overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[250] bg-slate-50 text-slate-800 font-sans overflow-hidden flex flex-col">
       {/* Background glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-[30%] -left-[15%] w-[600px] h-[600px] bg-indigo-600/8 rounded-full blur-[120px]" />
-        <div className="absolute -bottom-[30%] -right-[15%] w-[600px] h-[600px] bg-emerald-600/8 rounded-full blur-[120px]" />
+        <div className="absolute -top-[30%] -left-[15%] w-[600px] h-[600px] bg-sky-500/10 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-[30%] -right-[15%] w-[600px] h-[600px] bg-teal-400/10 rounded-full blur-[120px]" />
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center flex-1 p-6">
         {/* Header */}
         <div className="text-center mb-14">
           <div className="flex justify-center mb-6">
-            <img src="/logodark.png" alt="Logo" className="h-14 sm:h-16 w-auto object-contain drop-shadow-md" />
+            <img src="/logo.png" alt="Logo" className="h-24 sm:h-32 w-auto object-contain drop-shadow-md" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-light tracking-[0.15em] text-slate-300">
+          <h1 className="text-2xl sm:text-3xl font-light tracking-[0.15em] text-slate-600">
             Quien esta{' '}
-            <strong className="text-white font-bold">operando</strong>?
+            <strong className="text-slate-900 font-bold">operando</strong>?
           </h1>
         </div>
 
@@ -47,11 +47,18 @@ export default function LockScreen() {
         </div>
       </div>
 
-      {/* Footer sutil */}
-      <div className="relative z-10 pb-6 text-center">
-        <p className="text-[10px] text-slate-600 font-medium tracking-wider">
-          PIN de 4 digitos requerido
+      {/* Footer */}
+      <div className="relative z-10 pb-6 text-center flex flex-col items-center gap-3">
+        <p className="text-[10px] text-slate-400 font-medium tracking-wider">
+          Admin: 6 dígitos · Cajero: 4 dígitos
         </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400/70 hover:text-slate-500 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+          Recargar
+        </button>
       </div>
 
       {/* PIN Modal */}

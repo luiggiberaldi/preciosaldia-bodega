@@ -64,10 +64,10 @@ export default function UserCard({ user, onClick }) {
 
           {/* Text floating below */}
           <CardItem translateZ="60" className="text-center w-full mt-8 group-hover/card:text-primary transition-colors space-y-1">
-            <h3 className="text-lg font-bold text-white drop-shadow-md">
+            <h3 className="text-lg font-bold text-slate-800 drop-shadow-sm">
               {toTitleCase(user.nombre)}
             </h3>
-            <span className={`block text-[9px] font-black uppercase tracking-[0.2em] ${isAdmin ? 'text-purple-400' : 'text-emerald-400'}`}>
+            <span className={`block text-[9px] font-black uppercase tracking-[0.2em] ${isAdmin ? 'text-purple-600' : 'text-emerald-600'}`}>
               {user.rol === 'ADMIN' ? 'Administrador' : 'Cajero'}
             </span>
           </CardItem>

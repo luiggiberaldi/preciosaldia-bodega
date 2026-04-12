@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { logEvent } from '../../services/auditService';
 
 const DEFAULT_USERS = [
-    { id: 1, nombre: 'Administrador', rol: 'ADMIN', pin: '1234' },
+    { id: 1, nombre: 'Administrador', rol: 'ADMIN', pin: '123456' },
     { id: 2, nombre: 'Cajero', rol: 'CAJERO', pin: '0000' }
 ];
 
@@ -128,10 +128,20 @@ export const useAuthStore = create(
         }),
         {
             name: 'abasto-auth-storage', // Nombre para localStorage
-            partialize: (state) => ({ 
-                usuarios: state.usuarios, 
+            partialize: (state) => ({
+                usuarios: state.usuarios,
                 requireLogin: state.requireLogin,
             }),
+            // Migrar PINs de 4 dígitos a 6 dígitos en usuarios por defecto
+            onRehydrateStorage: () => (state) => {
+                if (!state) return;
+                const migrated = state.usuarios.map(u => {
+                    if (u.id === 1 && u.pin === '1234') return { ...u, pin: '123456' };
+                    if (u.id === 2 && u.pin === '000000') return { ...u, pin: '0000' };
+                    return u;
+                });
+                state.usuarios = migrated;
+            },
             storage: {
                 getItem: (name) => {
                     const str = localStorage.getItem(name);

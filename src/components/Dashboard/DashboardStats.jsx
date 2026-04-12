@@ -13,10 +13,10 @@ export default function DashboardStats({
     triggerHaptic, onDailyClose,
 }) {
     return (
-        <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
             {/* Licencia Demo */}
             {isDemo && demoTimeLeft && (
-                <div className="col-span-2 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-4 shadow-sm relative overflow-hidden text-white flex items-center justify-between">
+                <div className="col-span-2 lg:col-span-4 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-4 shadow-sm relative overflow-hidden text-white flex items-center justify-between">
                     <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
                     <div className="flex items-center gap-3 relative z-10">
                         <div className="w-10 h-10 bg-black/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -66,7 +66,7 @@ export default function DashboardStats({
 
             {/* Egresos del Día */}
             {todayExpensesUsd > 0 && (
-                <div className="col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-orange-200 dark:border-orange-800/30 shadow-sm relative overflow-hidden">
+                <div className="col-span-2 lg:col-span-4 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-orange-200 dark:border-orange-800/30 shadow-sm relative overflow-hidden">
                     <div className="absolute -right-4 -top-4 w-16 h-16 bg-orange-50 dark:bg-orange-900/10 rounded-full blur-2xl"></div>
                     <div className="flex items-center justify-between relative z-10">
                         <div className="flex items-center gap-3">
@@ -114,7 +114,7 @@ export default function DashboardStats({
             </div>
 
             {/* BOTON CERRAR CAJA */}
-            <div className="col-span-2">
+            <div className="col-span-2 lg:col-span-4">
                 {(todayCashFlow.length > 0 || todaySales.length > 0) ? (
                     <button
                         onClick={onDailyClose}
@@ -150,7 +150,7 @@ export default function DashboardStats({
             {totalDeudas.count > 0 && (
                 <div
                     onClick={() => { setShowTopDeudas(!showTopDeudas); triggerHaptic && triggerHaptic(); }}
-                    className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-red-100 dark:border-red-800/30 shadow-sm relative overflow-hidden col-span-2 cursor-pointer active:scale-[0.99] transition-all"
+                    className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-red-100 dark:border-red-800/30 shadow-sm relative overflow-hidden col-span-2 lg:col-span-4 cursor-pointer active:scale-[0.99] transition-all"
                 >
                     <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-50 dark:bg-red-900/10 rounded-full blur-2xl"></div>
                     <div className="flex items-center justify-between relative z-10">

@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { showToast } from '../components/Toast';
 import PaymentMethodsManager from '../components/Settings/PaymentMethodsManager';
-// UsersManager removed - single-user app
 import AuditLogViewer from '../components/Settings/AuditLogViewer';
 import { useSecurity } from '../hooks/useSecurity';
 import { useProductContext } from '../context/ProductContext';
@@ -14,17 +13,19 @@ import ShareInventoryModal from '../components/ShareInventoryModal';
 import { useAudit } from '../hooks/useAudit';
 import SettingsTabNegocio from '../components/Settings/tabs/SettingsTabNegocio';
 import SettingsTabVentas from '../components/Settings/tabs/SettingsTabVentas';
-// SettingsTabUsuarios removed - single-user app
+import SettingsTabUsuarios from '../components/Settings/tabs/SettingsTabUsuarios';
 import SettingsTabSistema from '../components/Settings/tabs/SettingsTabSistema';
 import { Toggle, SectionCard } from '../components/Settings/SettingsUI';
 import { useCloudBackup } from '../hooks/useCloudBackup';
 import { useDataImportExport } from '../hooks/useDataImportExport';
+import { useAuthStore } from '../hooks/store/useAuthStore';
 
 
 // ───────────────────────────────────────────────────── Tab Config
 const TABS = [
     { id: 'negocio', label: 'Negocio', icon: Store },
     { id: 'ventas', label: 'Ventas', icon: CreditCard },
+    { id: 'usuarios', label: 'Usuarios', icon: Users },
     { id: 'sistema', label: 'Sistema', icon: Database },
 ];
 
@@ -38,7 +39,10 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
         tasaCop: calculatedTasaCop
     } = useProductContext();
 
-    const isAdmin = true; // Single-user mode: owner is always admin
+    const { requireLogin, setRequireLogin, usuarioActivo } = useAuthStore();
+    const [autoLockMinutes, setAutoLockMinutes] = useState(() => localStorage.getItem('admin_auto_lock_minutes') || '3');
+
+    const isAdmin = !requireLogin || !usuarioActivo || usuarioActivo.rol === 'ADMIN';
 
     const { deviceId, forceHeartbeat } = useSecurity();
     const { log: auditLog } = useAudit();
@@ -209,6 +213,18 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                         <SettingsTabVentas
                             allowNegativeStock={allowNegativeStock} setAllowNegativeStock={setAllowNegativeStock}
                             forceHeartbeat={forceHeartbeat}
+                            showToast={showToast}
+                            triggerHaptic={triggerHaptic}
+                        />
+                    )}
+
+                    {/* ═══ TAB: USUARIOS ═══ */}
+                    {activeTab === 'usuarios' && (
+                        <SettingsTabUsuarios
+                            requireLogin={requireLogin}
+                            setRequireLogin={setRequireLogin}
+                            autoLockMinutes={autoLockMinutes}
+                            setAutoLockMinutes={setAutoLockMinutes}
                             showToast={showToast}
                             triggerHaptic={triggerHaptic}
                         />
