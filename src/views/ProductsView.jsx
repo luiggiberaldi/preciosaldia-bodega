@@ -246,6 +246,13 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         setPriceUsd((parseFloat(val) / effectiveRate).toFixed(2));
     };
 
+    const handlePriceCopChange = (val) => {
+        if (!val || parseFloat(val) <= 0) { setPriceUsd(''); setPriceBs(''); return; }
+        const usd = parseFloat(val) / tasaCop;
+        setPriceUsd(usd.toFixed(2));
+        setPriceBs((usd * effectiveRate).toFixed(2));
+    };
+
     const handleCostUsdChange = (val) => {
         setCostUsd(val);
         if (!val || parseFloat(val) <= 0) { setCostBs(''); return; }
@@ -658,6 +665,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 unit={unit} setUnit={setUnit}
                 priceUsd={priceUsd} handlePriceUsdChange={handlePriceUsdChange}
                 priceBs={priceBs} handlePriceBsChange={handlePriceBsChange}
+                handlePriceCopChange={handlePriceCopChange}
                 costUsd={costUsd} handleCostUsdChange={handleCostUsdChange}
                 costBs={costBs} handleCostBsChange={handleCostBsChange}
                 stock={stock} setStock={setStock}

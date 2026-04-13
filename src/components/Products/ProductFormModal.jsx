@@ -21,6 +21,7 @@ export default function ProductFormModal({
     unit, setUnit,
     priceUsd, handlePriceUsdChange,
     priceBs, handlePriceBsChange,
+    handlePriceCopChange,
     costUsd, handleCostUsdChange,
     costBs, handleCostBsChange,
     stock, setStock,
@@ -302,7 +303,27 @@ export default function ProductFormModal({
                             )}
                         </div>
                     </div>
-                    
+
+                    {/* ─── COP INPUT (solo si copEnabled) ─── */}
+                    {copEnabled && (
+                        <div className="relative">
+                            <label className="text-[10px] sm:text-xs font-bold text-amber-600 dark:text-amber-400 ml-1 mb-1 block uppercase tracking-wider">
+                                Precio de Venta (COP){priceSuffix}
+                            </label>
+                            <input
+                                type="number"
+                                inputMode="decimal"
+                                placeholder="Ej: 16.000"
+                                onChange={e => handlePriceCopChange(e.target.value)}
+                                className="w-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 p-3.5 pr-10 sm:p-4 sm:pr-10 rounded-xl font-black text-amber-800 dark:text-amber-400 outline-none focus:ring-2 focus:ring-amber-500/50 transition-all text-sm sm:text-base"
+                            />
+                            <Banknote size={16} className="absolute right-3 top-[38px] sm:top-[42px] text-amber-400" />
+                            <p className="text-[10px] text-amber-600/70 dark:text-amber-500/60 mt-1 ml-1">
+                                Calcula automáticamente el precio en $ y Bs
+                            </p>
+                        </div>
+                    )}
+
                     {/* ─── COP PREVIEW ─── */}
                     {copEnabled && parsedPrice > 0 && (
                         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200/50 dark:border-amber-800/30 p-2.5 rounded-xl flex items-center justify-between text-sm animate-in fade-in slide-in-from-top-1">
