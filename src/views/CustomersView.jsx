@@ -28,6 +28,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
 
     const usuarioActivo = useAuthStore(state => state.usuarioActivo);
     const isAdmin = !usuarioActivo || usuarioActivo.rol === 'ADMIN';
+    const isCajero = usuarioActivo?.rol === 'CAJERO';
 
     // Modal de Abono / Crédito
     const [transactionModal, setTransactionModal] = useState({ isOpen: false, type: null, customer: null }); // type: 'ABONO' | 'CREDITO'
@@ -62,6 +63,11 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
 
     // ── ESTADOS DE PROVEEDORES ──
     const [activeTab, setActiveTab] = useState('clientes'); // 'clientes' | 'proveedores'
+
+    // Cajero no puede ver proveedores — forzar a clientes si accedió antes
+    useEffect(() => {
+        if (isCajero && activeTab === 'proveedores') setActiveTab('clientes');
+    }, [isCajero, activeTab]);
 
     const {
         suppliers, invoices, selectedSupplier,
@@ -175,12 +181,14 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                         >
                             <Users size={18} /> Clientes
                         </button>
-                        <button
-                            onClick={() => { setActiveTab('proveedores'); triggerHaptic && triggerHaptic(); }}
-                            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'proveedores' ? 'bg-white dark:bg-slate-900 shadow-sm text-purple-600 dark:text-purple-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
-                        >
-                            <Truck size={18} /> Proveedores
-                        </button>
+                        {!isCajero && (
+                            <button
+                                onClick={() => { setActiveTab('proveedores'); triggerHaptic && triggerHaptic(); }}
+                                className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'proveedores' ? 'bg-white dark:bg-slate-900 shadow-sm text-purple-600 dark:text-purple-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                            >
+                                <Truck size={18} /> Proveedores
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -262,12 +270,14 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                     >
                         <Users size={18} /> Clientes
                     </button>
-                    <button
-                        onClick={() => { setActiveTab('proveedores'); triggerHaptic && triggerHaptic(); }}
-                        className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'proveedores' ? 'bg-white dark:bg-slate-900 shadow-sm text-purple-600 dark:text-purple-400 scale-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
-                    >
-                        <Truck size={18} /> Proveedores
-                    </button>
+                    {!isCajero && (
+                        <button
+                            onClick={() => { setActiveTab('proveedores'); triggerHaptic && triggerHaptic(); }}
+                            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'proveedores' ? 'bg-white dark:bg-slate-900 shadow-sm text-purple-600 dark:text-purple-400 scale-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                        >
+                            <Truck size={18} /> Proveedores
+                        </button>
+                    )}
                 </div>
             </div>
 

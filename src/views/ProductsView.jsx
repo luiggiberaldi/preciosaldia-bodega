@@ -72,6 +72,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     // Modal UI States
     const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [highPriceConfirm, setHighPriceConfirm] = useState(null); // { price, pendingData }
 
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [isBulkPriceOpen, setIsBulkPriceOpen] = useState(false);
@@ -273,6 +274,18 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
             category, lowStockAlert
         }, effectiveRate);
 
+        // Advertencia si el precio parece inusualmente alto
+        const parsedPrice = parseFloat(priceUsd) || 0;
+        if (parsedPrice > 500 && !highPriceConfirm) {
+            setHighPriceConfirm({ price: parsedPrice, pendingData: productData });
+            return;
+        }
+
+        _commitSave(productData);
+    };
+
+    const _commitSave = (productData) => {
+        setHighPriceConfirm(null);
         if (editingId) {
             setProducts(products.map(p =>
                 p.id === editingId ? { ...p, ...productData, image: image || p.image } : p
@@ -664,6 +677,37 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 categories={categories}
                 productMovements={editingId ? productMovements : null}
             />
+
+            {/* Confirmación precio alto */}
+            {highPriceConfirm && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+                        <div className="flex flex-col items-center text-center space-y-3">
+                            <div className="w-14 h-14 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center">
+                                <AlertTriangle size={28} className="text-amber-500" />
+                            </div>
+                            <h4 className="text-base font-black text-slate-800 dark:text-white">Precio inusualmente alto</h4>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                El precio <span className="font-black text-amber-600">${highPriceConfirm.price.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span> parece muy elevado. ¿Es correcto o fue un error de tipeo?
+                            </p>
+                            <div className="flex gap-2 w-full pt-1">
+                                <button
+                                    onClick={() => setHighPriceConfirm(null)}
+                                    className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    Corregir
+                                </button>
+                                <button
+                                    onClick={() => _commitSave(highPriceConfirm.pendingData)}
+                                    className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-colors"
+                                >
+                                    Sí, es correcto
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Share Modal */}
             <ProductShareModal

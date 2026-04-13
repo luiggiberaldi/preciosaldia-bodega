@@ -48,7 +48,22 @@ export async function getAllPaymentMethods() {
     });
 
     // 2. Extraer los métodos custom guardados y rehidratar el icono
-    const rawCustom = saved.filter(m => !m.isFactory);
+    let rawCustom = saved.filter(m => !m.isFactory);
+
+    // 2b. Migración: corregir métodos custom con nombre de pesos colombianos
+    //     pero moneda BS — claramente mal configurados, deben ser COP.
+    const COP_KEYWORDS = ['peso', 'cop', 'colombiano', 'pesos col'];
+    let hadCurrencyFix = false;
+    rawCustom = rawCustom.map(m => {
+        if (m.currency === 'BS') {
+            const norm = _normLabel(m.label);
+            if (COP_KEYWORDS.some(kw => norm.includes(kw))) {
+                hadCurrencyFix = true;
+                return { ...m, currency: 'COP' };
+            }
+        }
+        return m;
+    });
 
     // 3. Deduplicar: eliminar custom methods cuyo nombre normalizado ya existe
     //    (sea en fábrica o en otro custom anterior)
@@ -65,8 +80,8 @@ export async function getAllPaymentMethods() {
         }
     }
 
-    // Si se eliminaron duplicados, persistir la lista limpia en segundo plano
-    if (hadDuplicates) {
+    // Si se eliminaron duplicados o se corrigieron monedas, persistir la lista limpia
+    if (hadDuplicates || hadCurrencyFix) {
         const cleaned = [...mergedFactory, ...dedupedCustom];
         storageService.setItem(PM_KEY, cleaned.map(({ Icon, ...rest }) => rest)).catch(() => {});
     }
