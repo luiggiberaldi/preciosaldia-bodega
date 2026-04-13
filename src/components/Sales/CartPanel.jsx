@@ -102,6 +102,11 @@ export default function CartPanel({
                                                 <p className="text-[10px] sm:text-[11px] font-medium text-slate-400">
                                                     {item.exactBs != null ? formatBs(item.exactBs) : formatBs(mulR(item.priceUsd, effectiveRate))} Bs
                                                 </p>
+                                                {copEnabled && tasaCop > 0 && (
+                                                    <p className="text-[10px] sm:text-[11px] font-medium text-amber-500">
+                                                        {Math.round(item.priceUsd * tasaCop).toLocaleString('es-CO')} COP
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

@@ -39,7 +39,7 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                         <p className="text-4xl font-black text-slate-900 mb-1 tracking-tighter">${receipt.totalUsd.toFixed(2)}</p>
                         <p className="text-lg font-bold text-slate-500 mb-2">{formatBs(receipt.totalBs)} Bs</p>
                         {receipt.copEnabled && receipt.tasaCop > 0 && (
-                            <p className="text-base font-bold text-amber-500 mb-2">{(receipt.totalCop || (receipt.totalUsd * receipt.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>
+                            <p className="text-base font-bold text-amber-500 mb-2">{Math.round(receipt.totalCop || (receipt.totalUsd * receipt.tasaCop)).toLocaleString('es-CO')} COP</p>
                         )}
 
                         <div className="inline-flex items-center flex-wrap justify-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600 mt-2">
@@ -59,8 +59,20 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                     <div className="flex-1 pr-4">
                                         <span className="font-bold text-slate-700 block leading-tight">{item.name}</span>
                                         <span className="text-xs text-slate-400">{item.isWeight ? `${item.qty.toFixed(3)} Kg` : `${item.qty} u`} × ${item.priceUsd.toFixed(2)}</span>
+                                        {receipt.copEnabled && receipt.tasaCop > 0 && (
+                                            <span className="text-xs text-amber-500 block">
+                                                {(item.priceUsd * receipt.tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP c/u
+                                            </span>
+                                        )}
                                     </div>
-                                    <span className="font-black text-slate-900">${(item.priceUsd * item.qty).toFixed(2)}</span>
+                                    <div className="text-right">
+                                        <span className="font-black text-slate-900 block">${(item.priceUsd * item.qty).toFixed(2)}</span>
+                                        {receipt.copEnabled && receipt.tasaCop > 0 && (
+                                            <span className="text-xs font-bold text-amber-500">
+                                                {(item.priceUsd * item.qty * receipt.tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>

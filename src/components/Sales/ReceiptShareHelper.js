@@ -19,7 +19,13 @@ export function buildReceiptWhatsAppUrl(receipt, currentRate) {
             ? `${parseFloat(item.qty).toFixed(3)} kg`
             : `${item.qty} und`;
         const sub = (item.priceUsd * item.qty).toFixed(2);
-        return `- ${item.name}\n  ${qty} x $${parseFloat(item.priceUsd).toFixed(2)} = $${sub}`;
+        let line = `- ${item.name}\n  ${qty} x $${parseFloat(item.priceUsd).toFixed(2)} = $${sub}`;
+        if (r.copEnabled && r.tasaCop > 0) {
+            const copUnit = (item.priceUsd * r.tasaCop).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+            const copSub = (item.priceUsd * item.qty * r.tasaCop).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+            line += ` (${copSub} COP)`;
+        }
+        return line;
     }).join('\n');
 
     // Pagos
@@ -27,7 +33,7 @@ export function buildReceiptWhatsAppUrl(receipt, currentRate) {
         const isCop = p.currency === 'COP';
         const isBs = p.currency === 'BS';
         const val = isCop
-            ? `COP ${(p.amountBs ?? p.amountUsd * (r.tasaCop || 1)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            ? `COP ${(p.amountInput ?? p.amountUsd * (r.tasaCop || 1)).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
             : isBs
             ? `Bs ${Math.ceil(p.amountBs ?? p.amountUsd * r.rate)}`
             : `$${parseFloat(p.amountUsd).toFixed(2)}`;

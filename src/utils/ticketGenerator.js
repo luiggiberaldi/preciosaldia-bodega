@@ -132,7 +132,13 @@ export async function generateTicketPDF(sale, bcvRate) {
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(6);
             doc.setTextColor(...MUTED);
-            doc.text('$' + item.priceUsd.toFixed(2) + ' c/u  ·  Bs ' + formatBs(subBs), M + 10, y);
+            let detailLine = '$' + item.priceUsd.toFixed(2) + ' c/u  ·  Bs ' + formatBs(subBs);
+            if (sale.tasaCop > 0) {
+                const copUnit = (item.priceUsd * sale.tasaCop).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                const copSub = (sub * sale.tasaCop).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                detailLine += '  ·  ' + copUnit + ' COP';
+            }
+            doc.text(detailLine, M + 10, y);
             y += 6;
         });
     }

@@ -22,6 +22,7 @@ export default function ProductFormModal({
     priceUsd, handlePriceUsdChange,
     priceBs, handlePriceBsChange,
     handlePriceCopChange,
+    priceCop,
     costUsd, handleCostUsdChange,
     costBs, handleCostBsChange,
     stock, setStock,
@@ -255,7 +256,7 @@ export default function ProductFormModal({
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 mb-1 block uppercase tracking-wider">
-                                Costo ($){priceSuffix}
+                                Costo ({copEnabled ? 'USD' : '$'}){priceSuffix}
                             </label>
                             <input type="number" inputMode="decimal" value={costUsd} onChange={e => handleCostUsdChange(e.target.value)} placeholder="1.00"
                                 className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
@@ -280,11 +281,32 @@ export default function ProductFormModal({
                         </div>
                     )}
 
+                    {/* ─── COP INPUT (primero si copEnabled) ─── */}
+                    {copEnabled && (
+                        <div className="relative">
+                            <label className="text-[10px] sm:text-xs font-bold text-amber-600 dark:text-amber-400 ml-1 mb-1 block uppercase tracking-wider">
+                                Precio de Venta (Pesos COP){priceSuffix}
+                            </label>
+                            <input
+                                type="number"
+                                inputMode="decimal"
+                                placeholder="Ej: 15000"
+                                value={priceCop}
+                                onChange={e => handlePriceCopChange(e.target.value)}
+                                className="w-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 p-3.5 pr-10 sm:p-4 sm:pr-10 rounded-xl font-black text-amber-800 dark:text-amber-400 outline-none focus:ring-2 focus:ring-amber-500/50 transition-all text-sm sm:text-base"
+                            />
+                            <Banknote size={16} className="absolute right-3 top-[38px] sm:top-[42px] text-amber-400" />
+                            <p className="text-[10px] text-amber-600/70 dark:text-amber-500/60 mt-1 ml-1">
+                                Calcula automáticamente el precio en USD y Bs
+                            </p>
+                        </div>
+                    )}
+
                     {/* ─── PRICE SECTION ─── */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="relative">
                             <label className="text-[10px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400 ml-1 mb-1 block uppercase tracking-wider">
-                                Precio de Venta ($){priceSuffix}
+                                Precio de Venta ({copEnabled ? 'USD' : '$'}){priceSuffix}
                             </label>
                             <input type="number" inputMode="decimal" value={priceUsd} onChange={e => handlePriceUsdChange(e.target.value)} placeholder="1.50"
                                 className="w-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30 p-3.5 pr-10 sm:p-4 sm:pr-10 rounded-xl font-black text-emerald-800 dark:text-emerald-400 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm sm:text-base" />
@@ -304,23 +326,16 @@ export default function ProductFormModal({
                         </div>
                     </div>
 
-                    {/* ─── COP INPUT (solo si copEnabled) ─── */}
-                    {copEnabled && (
-                        <div className="relative">
-                            <label className="text-[10px] sm:text-xs font-bold text-amber-600 dark:text-amber-400 ml-1 mb-1 block uppercase tracking-wider">
-                                Precio de Venta (COP){priceSuffix}
-                            </label>
-                            <input
-                                type="number"
-                                inputMode="decimal"
-                                placeholder="Ej: 16.000"
-                                onChange={e => handlePriceCopChange(e.target.value)}
-                                className="w-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 p-3.5 pr-10 sm:p-4 sm:pr-10 rounded-xl font-black text-amber-800 dark:text-amber-400 outline-none focus:ring-2 focus:ring-amber-500/50 transition-all text-sm sm:text-base"
-                            />
-                            <Banknote size={16} className="absolute right-3 top-[38px] sm:top-[42px] text-amber-400" />
-                            <p className="text-[10px] text-amber-600/70 dark:text-amber-500/60 mt-1 ml-1">
-                                Calcula automáticamente el precio en $ y Bs
-                            </p>
+                    {/* ─── COP CONFUSION WARNING ─── */}
+                    {copEnabled && parsedPrice >= 100 && (
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 p-2.5 rounded-xl flex items-center gap-2 text-xs animate-in fade-in slide-in-from-top-1">
+                            <AlertTriangle size={16} className="text-red-500 shrink-0" />
+                            <span className="text-red-700 dark:text-red-400 font-medium">
+                                {parsedPrice >= 1000
+                                    ? `¿Seguro que son $${parsedPrice.toLocaleString()} USD? Si es en pesos colombianos, usa el campo "Pesos COP" arriba.`
+                                    : `Precio alto en USD ($${parsedPrice.toFixed(2)}). Si es en pesos colombianos, usa el campo "Pesos COP" arriba.`
+                                }
+                            </span>
                         </div>
                     )}
 
@@ -334,7 +349,7 @@ export default function ProductFormModal({
                                 <Banknote size={16} /> COP
                             </span>
                             <span className="font-black text-amber-600 dark:text-amber-400 text-lg">
-                                {(parsedPrice * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {Math.round(parsedPrice * tasaCop).toLocaleString('es-CO')}
                             </span>
                         </div>
                     )}
@@ -373,7 +388,7 @@ export default function ProductFormModal({
                                         <div className="w-full bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 p-2.5 rounded-xl text-xs flex items-center justify-between">
                                             <span className="text-amber-700/70 dark:text-amber-500/70 font-bold">Unidad Suelta COP:</span>
                                             <span className="font-black text-amber-600 dark:text-amber-400">
-                                                 {(effectiveUnitPrice * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP
+                                                 {Math.round(effectiveUnitPrice * tasaCop).toLocaleString('es-CO')} COP
                                             </span>
                                         </div>
                                     </div>
@@ -483,7 +498,7 @@ export default function ProductFormModal({
                                     <div className="flex justify-between"><span className="text-slate-400">Categoría:</span><span className="font-bold text-slate-700 dark:text-white">{categories.find(c => c.id === category)?.label || category}</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">Tipo:</span><span className="font-bold text-slate-700 dark:text-white">{PACKAGING_TYPES.find(p => p.id === packagingType)?.label}</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">Precio USD/BS:</span><span className="font-bold text-emerald-600">${parsedPrice.toFixed(2)}{priceSuffix} / {(parsedPrice * effectiveRate).toFixed(2)} Bs</span></div>
-                                    {copEnabled && <div className="flex justify-between"><span className="text-amber-500/80">Precio COP:</span><span className="font-bold text-amber-600">{(parsedPrice * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP{priceSuffix}</span></div>}
+                                    {copEnabled && tasaCop > 0 && <div className="flex justify-between"><span className="text-amber-500/80">Precio COP:</span><span className="font-bold text-amber-600">{Math.round(parsedPrice * tasaCop).toLocaleString('es-CO')} COP{priceSuffix}</span></div>}
                                     {parsedCost > 0 && <div className="flex justify-between"><span className="text-slate-400">Costo:</span><span className="font-bold text-slate-600">${parsedCost.toFixed(2)}{priceSuffix}</span></div>}
                                     {mainMarginPct !== null && <div className="flex justify-between"><span className="text-slate-400">Margen:</span><span className={`font-black ${mainMarginPct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{mainMarginPct.toFixed(1)}%</span></div>}
                                     {isLote && <div className="flex justify-between"><span className="text-slate-400">Uds/Lote:</span><span className="font-bold text-indigo-500">{parsedUnits}</span></div>}

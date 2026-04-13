@@ -74,8 +74,8 @@ export default function ProductCard({
                             {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                         </p>
                         <p className="text-[11px] font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
-                        {copEnabled && (
-                            <p className="text-[11px] font-bold text-amber-500/80 mt-0.5">{valCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>
+                        {copEnabled && tasaCop > 0 && (
+                            <p className="text-[11px] font-bold text-amber-500/80 mt-0.5">{Math.round(valCop).toLocaleString('es-CO')} COP</p>
                         )}
                         {p.unit === 'paquete' && p.sellByUnit && (
                             <p className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mt-0.5 flex items-center gap-0.5">

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Database, Palette, Fingerprint, Upload, Download, Share2,
-    Check, Sun, Moon, ChevronRight, Trash2, AlertTriangle, FileText
+    Check, Sun, Moon, ChevronRight, Trash2, AlertTriangle, FileText, ZoomIn, ZoomOut, RotateCcw
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import AuditLogViewer from '../AuditLogViewer';
@@ -16,6 +16,24 @@ export default function SettingsTabSistema({
     setShowDeleteConfirm,
     triggerHaptic,
 }) {
+    const [uiScale, setUiScale] = useState(() => {
+        const saved = parseInt(localStorage.getItem('ui_scale'));
+        return saved >= 60 && saved <= 140 ? saved : 100;
+    });
+
+    useEffect(() => {
+        document.documentElement.style.zoom = `${uiScale}%`;
+        localStorage.setItem('ui_scale', uiScale.toString());
+    }, [uiScale]);
+
+    const adjustScale = (delta) => {
+        setUiScale(prev => {
+            const next = Math.max(60, Math.min(140, prev + delta));
+            triggerHaptic?.();
+            return next;
+        });
+    };
+
     return (
         <>
             {/* Datos y Respaldo */}
@@ -79,6 +97,60 @@ export default function SettingsTabSistema({
                         color="indigo"
                         onChange={() => { toggleTheme(); triggerHaptic?.(); }}
                     />
+                </div>
+
+                {/* Zoom / Escala de pantalla */}
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-3 mb-3">
+                        <ZoomIn size={18} className="text-blue-500" />
+                        <div>
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Tamaño de Pantalla</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Ajusta si la interfaz se ve muy grande o muy pequeña</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => adjustScale(-5)}
+                            disabled={uiScale <= 60}
+                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 transition-all active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                            <ZoomOut size={16} />
+                        </button>
+                        <div className="flex-1 relative">
+                            <input
+                                type="range"
+                                min="60"
+                                max="140"
+                                step="5"
+                                value={uiScale}
+                                onChange={e => { setUiScale(parseInt(e.target.value)); triggerHaptic?.(); }}
+                                className="w-full h-2 rounded-full appearance-none cursor-pointer bg-slate-200 dark:bg-slate-700 accent-blue-500"
+                            />
+                            <div className="flex justify-between mt-1 px-0.5">
+                                <span className="text-[8px] text-slate-400">60%</span>
+                                <span className="text-[8px] text-slate-400">100%</span>
+                                <span className="text-[8px] text-slate-400">140%</span>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => adjustScale(5)}
+                            disabled={uiScale >= 140}
+                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400 transition-all active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                            <ZoomIn size={16} />
+                        </button>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 rounded-lg">{uiScale}%</span>
+                        {uiScale !== 100 && (
+                            <button
+                                onClick={() => { setUiScale(100); triggerHaptic?.(); }}
+                                className="text-[10px] font-bold text-slate-400 hover:text-blue-500 flex items-center gap-1 transition-colors"
+                            >
+                                <RotateCcw size={12} /> Restablecer
+                            </button>
+                        )}
+                    </div>
                 </div>
             </SectionCard>
 

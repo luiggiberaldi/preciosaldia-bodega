@@ -115,6 +115,12 @@ export default function App() {
     else root.classList.remove('dark');
     localStorage.setItem('theme', theme);
 
+    // Apply saved UI scale
+    const savedScale = parseInt(localStorage.getItem('ui_scale'));
+    if (savedScale >= 60 && savedScale <= 140) {
+      root.style.zoom = `${savedScale}%`;
+    }
+
     // Update theme-color meta for mobile browsers
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f172a' : '#f8fafc');

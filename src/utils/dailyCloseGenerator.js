@@ -170,21 +170,26 @@ export async function generateDailyClosePDF({
             ['Diferencia Bs', `Bs ${formatBs(reconData.diffBs)}`]
         ];
 
+        // Add COP rows if COP data exists
+        if (reconData.declaredCop != null && (reconData.declaredCop > 0 || reconData.diffCop !== 0)) {
+            reconRows.push(['Declarado (COP)', `COP ${Math.round(reconData.declaredCop).toLocaleString('es-CO')}`]);
+            reconRows.push(['Diferencia COP', `COP ${Math.round(reconData.diffCop).toLocaleString('es-CO')}`]);
+        }
+
         reconRows.forEach(([label, value], i) => {
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(7);
             doc.setTextColor(...BODY);
             doc.text(label, M, y);
-            
+
             doc.setFont('helvetica', 'bold');
-            if (i >= 2) {
-                // Use raw diff values for coloring (avoid parsing formatted strings)
-                // i=2 → diffUsd, i=3 → diffBs
-                const rawDiff = i === 2 ? reconData.diffUsd : reconData.diffBs;
-                const threshold = i === 2 ? 0.05 : 1; // USD: 5c tolerance, Bs: 1 Bs tolerance
-                if (Math.abs(rawDiff) <= threshold) doc.setTextColor(...MUTED); // cuadra
-                else if (rawDiff < 0) doc.setTextColor(...RED);   // faltante
-                else doc.setTextColor(...GREEN);                    // sobrante
+            const isDiffRow = label.startsWith('Diferencia');
+            if (isDiffRow) {
+                const rawDiff = label.includes('USD') ? reconData.diffUsd : label.includes('Bs') ? reconData.diffBs : reconData.diffCop;
+                const threshold = label.includes('USD') ? 0.05 : label.includes('Bs') ? 1 : 100;
+                if (Math.abs(rawDiff) <= threshold) doc.setTextColor(...MUTED);
+                else if (rawDiff < 0) doc.setTextColor(...RED);
+                else doc.setTextColor(...GREEN);
             } else {
                 doc.setTextColor(...INK);
             }

@@ -122,6 +122,23 @@ export function useCheckoutCalculations({
                 }
             }
 
+            // Capa 1b — Confusión USD → COP (monto muy bajo en COP)
+            if (m.currency === 'COP' && safeTasaCop > 100) {
+                const expectedCop = cartTotalUsd * safeTasaCop;
+                // If user entered a value that looks like USD in COP field (e.g., 50 instead of 200,000)
+                if (val < expectedCop * 0.05 && val > 0 && val <= cartTotalUsd * 2) {
+                    return {
+                        type: 'currency_confusion',
+                        title: 'Posible error de moneda',
+                        lines: [
+                            `Ingresaste COP ${val.toLocaleString('es-CO')} pero el total en pesos es ${Math.round(expectedCop).toLocaleString('es-CO')} COP.`,
+                            `¿Ingresaste dólares en el campo de pesos?`,
+                        ],
+                        isRound: false,
+                    };
+                }
+            }
+
             // Capa 2 — Umbral proporcional según tamaño de venta
             const threshold = cartTotalUsd <= 10  ? { factor: 4,   minDiff: 15 }
                             : cartTotalUsd <= 50  ? { factor: 3,   minDiff: 30 }

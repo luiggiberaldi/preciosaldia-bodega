@@ -117,6 +117,37 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     // Selección múltiple para etiquetas
     const [selectedIds, setSelectedIds] = useState(new Set());
+
+    // ─── COP PRICE CORRECTION ─────────────────────────────────
+    const [copCorrectionDismissed, setCopCorrectionDismissed] = useState(false);
+    const suspectCopProducts = useMemo(() => {
+        if (!copEnabled || !tasaCop || tasaCop <= 0) return [];
+        // Products with priceUsdt >= 500 are likely COP values stored as USD
+        return products.filter(p => p.priceUsdt >= 500);
+    }, [products, copEnabled, tasaCop]);
+
+    const handleFixCopPrices = () => {
+        if (suspectCopProducts.length === 0 || !tasaCop || tasaCop <= 0) return;
+        const idsToFix = new Set(suspectCopProducts.map(p => p.id));
+        setProducts(prev =>
+            prev.map(p => {
+                if (!idsToFix.has(p.id)) return p;
+                const correctedUsd = parseFloat((p.priceUsdt / tasaCop).toFixed(4));
+                const updated = { ...p, priceUsdt: correctedUsd };
+                if (p.unitPriceUsd && p.unitPriceUsd > 0) {
+                    updated.unitPriceUsd = parseFloat((p.unitPriceUsd / tasaCop).toFixed(4));
+                }
+                if (p.costUsd && p.costUsd >= 500) {
+                    updated.costUsd = parseFloat((p.costUsd / tasaCop).toFixed(4));
+                    updated.costBs = parseFloat((updated.costUsd * effectiveRate).toFixed(2));
+                }
+                return updated;
+            })
+        );
+        showToast(`${suspectCopProducts.length} productos corregidos: pesos → USD`, 'success');
+        auditLog('INVENTARIO', 'CORRECCION_COP_A_USD', `Corregidos ${suspectCopProducts.length} productos de COP a USD con tasa ${tasaCop}`);
+        setCopCorrectionDismissed(true);
+    };
     
     const handleToggleSelect = (id) => {
         const newSet = new Set(selectedIds);
@@ -234,20 +265,27 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     };
 
     // ─── HANDLERS BIMONEDA ──────────────────────────────────
+    const [priceCop, setPriceCop] = useState('');
+
     const handlePriceUsdChange = (val) => {
         setPriceUsd(val);
-        if (!val || parseFloat(val) <= 0) { setPriceBs(''); return; }
+        if (!val || parseFloat(val) <= 0) { setPriceBs(''); setPriceCop(''); return; }
         setPriceBs((parseFloat(val) * effectiveRate).toFixed(2));
+        if (copEnabled && tasaCop > 0) setPriceCop(Math.round(parseFloat(val) * tasaCop).toString());
     };
 
     const handlePriceBsChange = (val) => {
         setPriceBs(val);
-        if (!val || parseFloat(val) <= 0) { setPriceUsd(''); return; }
-        setPriceUsd((parseFloat(val) / effectiveRate).toFixed(2));
+        if (!val || parseFloat(val) <= 0) { setPriceUsd(''); setPriceCop(''); return; }
+        const usd = parseFloat(val) / effectiveRate;
+        setPriceUsd(usd.toFixed(2));
+        if (copEnabled && tasaCop > 0) setPriceCop(Math.round(usd * tasaCop).toString());
     };
 
     const handlePriceCopChange = (val) => {
+        setPriceCop(val);
         if (!val || parseFloat(val) <= 0) { setPriceUsd(''); setPriceBs(''); return; }
+        if (tasaCop <= 0) return;
         const usd = parseFloat(val) / tasaCop;
         setPriceUsd(usd.toFixed(2));
         setPriceBs((usd * effectiveRate).toFixed(2));
@@ -313,6 +351,12 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const handleEdit = async (product) => {
         triggerHaptic && triggerHaptic();
         populateForm(product, effectiveRate);
+        // Set COP price for editing
+        if (copEnabled && tasaCop > 0 && product.priceUsdt > 0) {
+            setPriceCop(Math.round(product.priceUsdt * tasaCop).toString());
+        } else {
+            setPriceCop('');
+        }
 
         setIsModalOpen(true);
 
@@ -350,6 +394,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     const handleClose = () => {
         resetForm();
+        setPriceCop('');
         setIsModalOpen(false);
         setProductMovements([]);
     };
@@ -428,6 +473,38 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 triggerHaptic={triggerHaptic}
                 onSelectAllToast={() => showToast('Todo el inventario seleccionado', 'success')}
             />
+
+            {/* ─── COP PRICE CORRECTION BANNER ─── */}
+            {copEnabled && suspectCopProducts.length > 0 && !copCorrectionDismissed && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 p-3 rounded-xl mb-3 shrink-0 animate-in slide-in-from-top-2">
+                    <div className="flex items-start gap-2">
+                        <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-red-700 dark:text-red-400">
+                                {suspectCopProducts.length} producto{suspectCopProducts.length > 1 ? 's' : ''} con precios que parecen ser pesos colombianos
+                            </p>
+                            <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-0.5">
+                                Ej: {suspectCopProducts.slice(0, 2).map(p => `${p.name} ($${p.priceUsdt.toLocaleString()})`).join(', ')}
+                                {suspectCopProducts.length > 2 ? ` y ${suspectCopProducts.length - 2} más` : ''}
+                            </p>
+                            <div className="flex gap-2 mt-2">
+                                <button
+                                    onClick={handleFixCopPrices}
+                                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
+                                >
+                                    Corregir: convertir de COP a USD (tasa: {tasaCop?.toLocaleString()})
+                                </button>
+                                <button
+                                    onClick={() => setCopCorrectionDismissed(true)}
+                                    className="px-3 py-1.5 text-xs font-bold text-red-500 hover:text-red-700 dark:text-red-400"
+                                >
+                                    Ignorar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* --- ACTION BAR SELECCION --- */}
             {selectedIds.size > 0 && (
@@ -606,8 +683,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                             <div className="hidden sm:block">
                                                 <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${(p.priceUsdt || 0).toFixed(2)}</p>
                                                 <p className="text-[10px] text-slate-400 font-medium">{formatBs(valBs)} Bs</p>
-                                                {copEnabled && (
-                                                    <p className="text-[10px] font-bold text-amber-500/80 mt-0.5">{(p.priceUsdt * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>
+                                                {copEnabled && tasaCop > 0 && (
+                                                    <p className="text-[10px] font-bold text-amber-500/80 mt-0.5">{Math.round(p.priceUsdt * tasaCop).toLocaleString('es-CO')} COP</p>
                                                 )}
                                             </div>
                                             <div className="hidden sm:block">
@@ -666,6 +743,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 priceUsd={priceUsd} handlePriceUsdChange={handlePriceUsdChange}
                 priceBs={priceBs} handlePriceBsChange={handlePriceBsChange}
                 handlePriceCopChange={handlePriceCopChange}
+                priceCop={priceCop}
                 costUsd={costUsd} handleCostUsdChange={handleCostUsdChange}
                 costBs={costBs} handleCostBsChange={handleCostBsChange}
                 stock={stock} setStock={setStock}
