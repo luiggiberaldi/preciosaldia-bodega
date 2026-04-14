@@ -104,6 +104,7 @@ export default function CartPanel({
                                                             {formatCop(item.priceUsd * tasaCop)} COP
                                                         </p>
                                                         <p className="text-[10px] sm:text-[11px] font-medium text-slate-400">USD {item.priceUsd.toFixed(2)}</p>
+                                                        <p className="text-[10px] sm:text-[11px] font-medium text-slate-400">{item.exactBs != null ? formatBs(item.exactBs) : formatBs(mulR(item.priceUsd, effectiveRate))} Bs</p>
                                                     </>
                                                 ) : (
                                                     <>
@@ -123,6 +124,11 @@ export default function CartPanel({
                                                 : `$${mulR(item.priceUsd, item.qty).toFixed(2)}`
                                             }
                                         </p>
+                                        {copEnabled && tasaCop > 0 && (
+                                            <p className="text-[10px] text-slate-400 font-medium text-right">
+                                                USD {mulR(item.priceUsd, item.qty).toFixed(2)} · {formatBs(mulR(item.priceUsd, item.qty) * effectiveRate)} Bs
+                                            </p>
+                                        )}
                                         <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-100 dark:border-slate-700">
                                             <button aria-label="Quitar uno" onClick={() => updateQty(item.id, item.isWeight ? -0.1 : -1)} className="w-7 sm:w-8 h-7 sm:h-8 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors rounded-l-md active:bg-slate-200 dark:active:bg-slate-700"><Minus size={14} strokeWidth={3} /></button>
                                             
@@ -180,6 +186,9 @@ export default function CartPanel({
                                 {discountData.type === 'percentage' ? `${discountData.value}%` : 'Fijo'}
                             </span>
                             <span className="font-black">{copEnabled && tasaCop > 0 ? `-${formatCop(discountData.amountUsd * tasaCop)} COP` : `-$${discountData.amountUsd.toFixed(2)}`}</span>
+                            {copEnabled && tasaCop > 0 && (
+                                <span className="text-[9px] font-medium text-amber-600/70 dark:text-amber-400/70 ml-1">-USD {discountData.amountUsd.toFixed(2)}</span>
+                            )}
                         </div>
                     )}
                 </button>
@@ -190,7 +199,7 @@ export default function CartPanel({
                         {discountData?.active && (
                             <div className="flex flex-col mt-0.5 fade-in slide-in-from-left-2 animate-in duration-300">
                                 <span className="text-[11px] sm:text-xs font-bold text-slate-400 line-through decoration-red-400/70">
-                                    Subtotal: {copEnabled && tasaCop > 0 ? `${formatCop(cartSubtotalUsd * tasaCop)} COP` : `$${cartSubtotalUsd.toFixed(2)}`}
+                                    Subtotal: {copEnabled && tasaCop > 0 ? `${formatCop(cartSubtotalUsd * tasaCop)} COP · USD ${cartSubtotalUsd.toFixed(2)} · ${formatBs(cartSubtotalBs)} Bs` : `$${cartSubtotalUsd.toFixed(2)}`}
                                 </span>
                             </div>
                         )}
@@ -206,6 +215,11 @@ export default function CartPanel({
                                 : `$${cartTotalUsd.toFixed(2)}`
                             }
                         </p>
+                        {copEnabled && tasaCop > 0 && (
+                            <p className="text-[11px] font-bold text-slate-400 text-right sm:text-right">
+                                USD {cartTotalUsd.toFixed(2)} · {formatBs(cartTotalBs)} Bs
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -217,7 +231,7 @@ export default function CartPanel({
                 {copEnabled && tasaCop > 0 && (
                     <div className="hidden sm:flex justify-between items-center px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-xl">
                         <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-500 tracking-widest uppercase">Dólares (USD)</span>
-                        <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">${cartTotalUsd.toFixed(2)}</span>
+                        <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">USD {cartTotalUsd.toFixed(2)}</span>
                     </div>
                 )}
 

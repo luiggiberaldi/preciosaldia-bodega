@@ -376,8 +376,8 @@ export default function ReportsMetricsTab({
                                 <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Dólares</span>
                                 <span className={`text-xs font-black ${totalVueltoUsd > 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                     {totalVueltoUsd > 0
-                                        ? (copEnabled && tasaCop > 0 ? `${formatCop(Math.abs(netoUsd) * tasaCop)} COP neto` : `$${Math.abs(netoUsd).toFixed(2)} neto`)
-                                        : (copEnabled && tasaCop > 0 ? `${formatCop(subtotalUsd * tasaCop)} COP` : `$${subtotalUsd.toFixed(2)}`)}
+                                        ? (copEnabled && tasaCop > 0 ? `${formatCop(Math.abs(netoUsd) * tasaCop)} COP neto · USD ${Math.abs(netoUsd).toFixed(2)}` : `$${Math.abs(netoUsd).toFixed(2)} neto`)
+                                        : (copEnabled && tasaCop > 0 ? `${formatCop(subtotalUsd * tasaCop)} COP · USD ${subtotalUsd.toFixed(2)}` : `$${subtotalUsd.toFixed(2)}`)}
                                 </span>
                             </div>
                             <div className="space-y-4">

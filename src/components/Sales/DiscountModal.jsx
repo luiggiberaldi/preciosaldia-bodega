@@ -125,7 +125,7 @@ export default function DiscountModal({
                             <span className="text-slate-500 font-medium">Subtotal:</span>
                             <span className="text-slate-700 dark:text-slate-300 font-bold">
                                 {copEnabled && tasaCop > 0
-                                    ? `${formatCop(cartSubtotalUsd * tasaCop)} COP`
+                                    ? `${formatCop(cartSubtotalUsd * tasaCop)} COP · USD ${cartSubtotalUsd.toFixed(2)}`
                                     : `USD ${cartSubtotalUsd.toFixed(2)}`}
                             </span>
                         </div>
@@ -133,7 +133,7 @@ export default function DiscountModal({
                             <span className="text-red-500 font-medium tracking-tight">Descuento aplicado:</span>
                             <span className="text-red-500 font-black">
                                 -{copEnabled && tasaCop > 0
-                                    ? `${formatCop(discountAmountUsd * tasaCop)} COP`
+                                    ? `${formatCop(discountAmountUsd * tasaCop)} COP / USD ${discountAmountUsd.toFixed(2)}`
                                     : `USD ${discountAmountUsd.toFixed(2)}`}
                             </span>
                         </div>

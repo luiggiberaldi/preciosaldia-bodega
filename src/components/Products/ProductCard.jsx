@@ -75,7 +75,7 @@ export default function ProductCard({
                                 <p className="text-lg lg:text-base font-black text-amber-600 dark:text-amber-400 leading-none">
                                     {formatCop(valCop)} <span className="text-[10px] font-bold text-amber-600/50 dark:text-amber-400/50">COP {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                                 </p>
-                                <p className="text-[11px] font-bold text-slate-400 mt-1">USD {formatUsd(p.priceUsdt)}</p>
+                                <p className="text-[11px] font-bold text-slate-400 mt-1">USD {formatUsd(p.priceUsdt)} · {formatBs(valBs)} Bs</p>
                             </>
                         ) : (
                             <>
@@ -89,7 +89,7 @@ export default function ProductCard({
                             <p className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mt-0.5 flex items-center gap-0.5">
                                 <Layers size={10} />
                                 {copEnabled && tasaCop > 0
-                                    ? `${formatCop((p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)) * tasaCop)} COP / ud`
+                                    ? `${formatCop((p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)) * tasaCop)} COP / ud · USD ${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)}`
                                     : `$${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud`
                                 }
                             </p>

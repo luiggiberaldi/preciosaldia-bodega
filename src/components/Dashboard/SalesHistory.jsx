@@ -130,7 +130,7 @@ export default function SalesHistory({
                                             : `$${(s.totalUsd || 0).toFixed(2)}`}
                                     </p>
                                     {copEnabled && tasaCop > 0 && (
-                                        <p className="text-[10px] text-slate-400 font-medium">USD {(s.totalUsd || 0).toFixed(2)}</p>
+                                        <p className="text-[10px] text-slate-400 font-medium">USD {(s.totalUsd || 0).toFixed(2)} · {formatBs((s.totalBs || (s.totalUsd || 0) * (s.rate || bcvRate)))} Bs</p>
                                     )}
                                     <div className="flex justify-end mt-0.5">
                                         {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
@@ -149,7 +149,7 @@ export default function SalesHistory({
                                                     <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
                                                     <span className="font-medium text-right">
                                                         {copEnabled && tasaCop > 0
-                                                            ? <><span>{formatCop(item.priceUsd * item.qty * tasaCop)} COP</span><span className="text-slate-400 font-normal ml-1">· USD {(item.priceUsd * item.qty).toFixed(2)}</span></>
+                                                            ? <><span>{formatCop(item.priceUsd * item.qty * tasaCop)} COP</span><span className="text-slate-400 font-normal ml-1">· USD {(item.priceUsd * item.qty).toFixed(2)} · {formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></>
                                                             : <><span>${(item.priceUsd * item.qty).toFixed(2)}</span><span className="text-slate-400 font-normal ml-1">· {formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></>}
                                                     </span>
                                                 </div>
@@ -168,7 +168,7 @@ export default function SalesHistory({
                                             <div className="flex items-center gap-1 self-start mt-0.5 bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400 font-bold px-1.5 py-0.5 rounded-md border border-orange-100 dark:border-orange-800/40">
                                                 <CornerDownLeft size={10} />
                                                 {copEnabled && tasaCop > 0
-                                                    ? <><span>−{formatCop(s.changeUsd * tasaCop)} COP</span><span className="font-normal opacity-75">/ −USD {s.changeUsd.toFixed(2)}</span></>
+                                                    ? <><span>−{formatCop(s.changeUsd * tasaCop)} COP</span><span className="font-normal opacity-75">/ −USD {s.changeUsd.toFixed(2)} / −{formatBs(s.changeBs || s.changeUsd * (s.rate || bcvRate))} Bs</span></>
                                                     : <><span>−${s.changeUsd.toFixed(2)}</span><span className="font-normal opacity-75">/ −{formatBs(s.changeBs || s.changeUsd * (s.rate || bcvRate))} Bs</span></>}
                                             </div>
                                         )}

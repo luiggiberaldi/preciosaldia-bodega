@@ -89,7 +89,7 @@ export default function DashboardStats({
                                         : <>-$<AnimatedCounter value={todayExpensesUsd} /></>}
                                 </p>
                                 {copEnabled && tasaCop > 0 && (
-                                    <p className="text-[10px] text-orange-400">USD {todayExpensesUsd.toFixed(2)}</p>
+                                    <p className="text-[10px] text-orange-400">USD {todayExpensesUsd.toFixed(2)} · {formatBs(todayExpensesUsd * bcvRate)} Bs</p>
                                 )}
                             </div>
                         </div>
@@ -146,7 +146,7 @@ export default function DashboardStats({
                             </div>
                             <div className="text-left">
                                 <p className="text-sm font-black">Cerrar Caja</p>
-                                <p className="text-[11px] font-medium text-white/70">{copEnabled && tasaCop > 0 ? `${formatCop(todayTotalUsd * tasaCop)} COP` : `$${todayTotalUsd.toFixed(2)}`} | {todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'}</p>
+                                <p className="text-[11px] font-medium text-white/70">{copEnabled && tasaCop > 0 ? `${formatCop(todayTotalUsd * tasaCop)} COP · USD ${todayTotalUsd.toFixed(2)}` : `$${todayTotalUsd.toFixed(2)}`} | {todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'}</p>
                             </div>
                         </div>
                         <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center group-hover:translate-x-1 transition-transform">

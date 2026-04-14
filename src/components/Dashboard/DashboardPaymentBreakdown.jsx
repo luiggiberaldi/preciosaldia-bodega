@@ -62,7 +62,13 @@ export default function DashboardPaymentBreakdown({
                     </span>
                     <div className="text-right flex items-center gap-2">
                         <span className="font-bold text-slate-700 dark:text-white">{displayAmount}</span>
-                        {data.currency !== 'FIADO' && <span className="text-[10px] text-slate-400 font-medium w-8 text-right">{pct.toFixed(0)}%</span>}
+                        {data.currency !== 'FIADO' && data.currency !== 'USD' && <span className="text-[10px] text-slate-400 font-medium w-8 text-right">{pct.toFixed(0)}%</span>}
+                        {data.currency === 'USD' && (
+                            <div className="text-[10px] text-slate-400 font-medium">
+                                {copEnabled && tasaCop > 0 && <span>USD {data.total.toFixed(2)} · </span>}
+                                {formatBs(bsEquiv)} Bs
+                            </div>
+                        )}
                         {data.currency === 'FIADO' && (
                             <div className="text-[10px] text-slate-400 font-medium">
                                 {copEnabled && tasaCop > 0 && <span>USD {data.total.toFixed(2)} · </span>}
@@ -124,7 +130,7 @@ export default function DashboardPaymentBreakdown({
                             </span>
                             {copEnabled && tasaCop > 0 && (
                                 <div className="text-[10px] text-slate-400 font-medium">
-                                    USD {fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}
+                                    USD {fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)} · {formatBs(fiadoMethods.reduce((s, [,d]) => s + d.total, 0) * bcvRate)} Bs
                                 </div>
                             )}
                         </div>
@@ -171,8 +177,8 @@ export default function DashboardPaymentBreakdown({
                         {copEnabled && tasaCop > 0 && (
                             <div className="text-[10px] text-slate-400 font-medium">
                                 {totalVueltoUsd > 0
-                                    ? `${netoUsd < 0 ? '−' : ''}USD ${Math.abs(netoUsd).toFixed(2)} neto`
-                                    : `USD ${subtotalUsd.toFixed(2)}`}
+                                    ? `${netoUsd < 0 ? '−' : ''}USD ${Math.abs(netoUsd).toFixed(2)} neto · ${formatBs(Math.abs(netoUsd) * bcvRate)} Bs`
+                                    : `USD ${subtotalUsd.toFixed(2)} · ${formatBs(subtotalUsd * bcvRate)} Bs`}
                             </div>
                         )}
                     </div>
