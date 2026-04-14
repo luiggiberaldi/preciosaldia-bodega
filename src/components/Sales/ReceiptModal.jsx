@@ -67,7 +67,9 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                         {receipt.copEnabled && receipt.tasaCop > 0 ? (
                                             <>
                                                 <span className="text-xs text-slate-400">{item.isWeight ? `${item.qty.toFixed(3)} Kg` : `${item.qty} u`} × {formatCop(item.priceUsd * receipt.tasaCop)} COP</span>
-                                                <span className="text-xs text-slate-400 block">USD {item.priceUsd.toFixed(2)} · {formatBs(item.priceUsd * (receipt.rate || 0))} Bs c/u</span>
+                                                <span className="text-xs text-slate-400 block">
+                                                    <span className="text-emerald-600">USD {item.priceUsd.toFixed(2)}</span> · <span className="text-blue-500">{formatBs(item.priceUsd * (receipt.rate || 0))} Bs</span> c/u
+                                                </span>
                                             </>
                                         ) : (
                                             <span className="text-xs text-slate-400">{item.isWeight ? `${item.qty.toFixed(3)} Kg` : `${item.qty} u`} × ${item.priceUsd.toFixed(2)}</span>
@@ -77,8 +79,8 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                         {receipt.copEnabled && receipt.tasaCop > 0 ? (
                                             <>
                                                 <span className="font-black text-slate-900 block">{formatCop(item.priceUsd * item.qty * receipt.tasaCop)} COP</span>
-                                                <span className="text-xs text-slate-400">USD {(item.priceUsd * item.qty).toFixed(2)}</span>
-                                                <span className="text-xs text-slate-400 block">{formatBs(item.priceUsd * item.qty * (receipt.rate || 0))} Bs</span>
+                                                <span className="text-xs text-emerald-600">USD {(item.priceUsd * item.qty).toFixed(2)}</span>
+                                                <span className="text-xs text-blue-500 block">{formatBs(item.priceUsd * item.qty * (receipt.rate || 0))} Bs</span>
                                             </>
                                         ) : (
                                             <span className="font-black text-slate-900">${(item.priceUsd * item.qty).toFixed(2)}</span>

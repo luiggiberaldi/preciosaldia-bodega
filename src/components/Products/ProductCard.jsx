@@ -75,7 +75,10 @@ export default function ProductCard({
                                 <p className="text-lg lg:text-base font-black text-amber-600 dark:text-amber-400 leading-none">
                                     {formatCop(valCop)} <span className="text-[10px] font-bold text-amber-600/50 dark:text-amber-400/50">COP {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                                 </p>
-                                <p className="text-[11px] font-bold text-slate-400 mt-1">USD {formatUsd(p.priceUsdt)} · {formatBs(valBs)} Bs</p>
+                                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded">USD {formatUsd(p.priceUsdt)}</span>
+                                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">{formatBs(valBs)} Bs</span>
+                                </div>
                             </>
                         ) : (
                             <>

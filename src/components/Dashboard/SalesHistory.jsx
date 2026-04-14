@@ -130,7 +130,11 @@ export default function SalesHistory({
                                             : `$${(s.totalUsd || 0).toFixed(2)}`}
                                     </p>
                                     {copEnabled && tasaCop > 0 && (
-                                        <p className="text-[10px] text-slate-400 font-medium">USD {(s.totalUsd || 0).toFixed(2)} · {formatBs((s.totalBs || (s.totalUsd || 0) * (s.rate || bcvRate)))} Bs</p>
+                                        <p className="text-[10px] font-medium">
+                                            <span className="text-emerald-600 dark:text-emerald-400">USD {(s.totalUsd || 0).toFixed(2)}</span>
+                                            <span className="text-slate-300 mx-0.5">|</span>
+                                            <span className="text-blue-500 dark:text-blue-400">{formatBs((s.totalBs || (s.totalUsd || 0) * (s.rate || bcvRate)))} Bs</span>
+                                        </p>
                                     )}
                                     <div className="flex justify-end mt-0.5">
                                         {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
@@ -149,7 +153,7 @@ export default function SalesHistory({
                                                     <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
                                                     <span className="font-medium text-right">
                                                         {copEnabled && tasaCop > 0
-                                                            ? <><span>{formatCop(item.priceUsd * item.qty * tasaCop)} COP</span><span className="text-slate-400 font-normal ml-1">· USD {(item.priceUsd * item.qty).toFixed(2)} · {formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></>
+                                                            ? <><span>{formatCop(item.priceUsd * item.qty * tasaCop)} COP</span><span className="font-normal ml-1"><span className="text-emerald-600 dark:text-emerald-400">USD {(item.priceUsd * item.qty).toFixed(2)}</span> · <span className="text-blue-500 dark:text-blue-400">{formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></span></>
                                                             : <><span>${(item.priceUsd * item.qty).toFixed(2)}</span><span className="text-slate-400 font-normal ml-1">· {formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></>}
                                                     </span>
                                                 </div>

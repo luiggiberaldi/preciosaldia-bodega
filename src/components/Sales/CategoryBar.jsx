@@ -97,8 +97,10 @@ export default function CategoryBar({
                                         }
                                     </p>
                                     {copEnabled && tasaCop > 0 && (
-                                        <p className="text-[9px] text-slate-400 font-medium leading-tight">
-                                            USD {p.priceUsdt?.toFixed(2)} · {formatBs(p.priceUsdt * (effectiveRate || 0))} Bs
+                                        <p className="text-[8px] leading-tight mt-0.5">
+                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">USD {p.priceUsdt?.toFixed(2)}</span>
+                                            <span className="text-slate-300 mx-0.5">|</span>
+                                            <span className="font-bold text-blue-500 dark:text-blue-400">{formatBs(p.priceUsdt * (effectiveRate || 0))} Bs</span>
                                         </p>
                                     )}
                                     <p className="text-[9px] text-slate-400 font-medium">{isOut ? 'Agotado' : `${p.stock ?? 0} disp.`}</p>
