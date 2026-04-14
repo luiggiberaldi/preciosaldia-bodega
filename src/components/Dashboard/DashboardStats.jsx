@@ -131,7 +131,30 @@ export default function DashboardStats({
                 </div>
                 <p className="text-xl font-black text-slate-800 dark:text-white leading-none">{formatBs(bcvRate)} <span className="text-xs font-bold text-slate-400">Bs/$</span></p>
                 <p className="text-[11px] text-slate-400 mt-1">Tasa BCV actual</p>
+                {copEnabled && tasaCop > 0 && bcvRate > 0 && (
+                    <p className="text-[10px] font-bold text-amber-500 dark:text-amber-400 mt-1.5 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded inline-block">
+                        1 COP ≈ {formatBs(bcvRate / tasaCop)} Bs
+                    </p>
+                )}
             </div>
+
+            {/* Tasa COP — solo visible cuando COP está activo */}
+            {copEnabled && tasaCop > 0 && (
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-amber-200 dark:border-amber-800/30 shadow-sm relative overflow-hidden">
+                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-amber-50 dark:bg-amber-900/10 rounded-full blur-2xl"></div>
+                    <div className="flex items-center justify-between mb-2 relative z-10">
+                        <div className="w-9 h-9 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
+                            <span className="text-amber-600 dark:text-amber-400 font-black text-[11px]">COP</span>
+                        </div>
+                    </div>
+                    <div className="relative z-10">
+                        <p className="text-xl font-black text-amber-600 dark:text-amber-400 leading-none">
+                            {tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-bold text-amber-500/60">COP/$</span>
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-1">Tasa COP aplicada</p>
+                    </div>
+                </div>
+            )}
 
             {/* BOTON CERRAR CAJA */}
             <div className="col-span-2 lg:col-span-4">
