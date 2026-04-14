@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, Send, Ban, ChevronDown, ChevronUp, Trash2, Shuffle, Recycle, Receipt, Printer, LockIcon, CornerDownLeft } from 'lucide-react';
-import { formatBs } from '../../utils/calculatorUtils';
+import { formatBs, formatCop } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../../config/paymentMethods';
 import EmptyState from '../EmptyState';
 import { printerSerial } from '../../services/PrinterSerial';
@@ -17,7 +17,9 @@ export default function SalesHistory({
     onRequestClientForTicket,
     onRecycleSale,
     onPrintTicket,
-    isAdmin
+    isAdmin,
+    copEnabled,
+    tasaCop
 }) {
     const [expandedSaleId, setExpandedSaleId] = useState(null);
     const [printingId, setPrintingId] = useState(null);
@@ -122,7 +124,14 @@ export default function SalesHistory({
                                     </p>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <p className={`text-sm font-black ${isCanceled ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>${(s.totalUsd || 0).toFixed(2)}</p>
+                                    <p className={`text-sm font-black ${isCanceled ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>
+                                        {copEnabled && tasaCop > 0
+                                            ? <>{formatCop((s.totalUsd || 0) * tasaCop)} <span className="text-[10px] font-medium text-slate-400">COP</span></>
+                                            : `$${(s.totalUsd || 0).toFixed(2)}`}
+                                    </p>
+                                    {copEnabled && tasaCop > 0 && (
+                                        <p className="text-[10px] text-slate-400 font-medium">USD {(s.totalUsd || 0).toFixed(2)}</p>
+                                    )}
                                     <div className="flex justify-end mt-0.5">
                                         {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
                                     </div>
@@ -139,8 +148,9 @@ export default function SalesHistory({
                                                 <div key={i} className={`flex justify-between items-center text-xs ${isCanceled ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'}`}>
                                                     <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
                                                     <span className="font-medium text-right">
-                                                        <span>${(item.priceUsd * item.qty).toFixed(2)}</span>
-                                                        <span className="text-slate-400 font-normal ml-1">· {formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span>
+                                                        {copEnabled && tasaCop > 0
+                                                            ? <><span>{formatCop(item.priceUsd * item.qty * tasaCop)} COP</span><span className="text-slate-400 font-normal ml-1">· USD {(item.priceUsd * item.qty).toFixed(2)}</span></>
+                                                            : <><span>${(item.priceUsd * item.qty).toFixed(2)}</span><span className="text-slate-400 font-normal ml-1">· {formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></>}
                                                     </span>
                                                 </div>
                                             ))}
@@ -157,8 +167,9 @@ export default function SalesHistory({
                                         {s.changeUsd > 0 && (
                                             <div className="flex items-center gap-1 self-start mt-0.5 bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400 font-bold px-1.5 py-0.5 rounded-md border border-orange-100 dark:border-orange-800/40">
                                                 <CornerDownLeft size={10} />
-                                                <span>−${s.changeUsd.toFixed(2)}</span>
-                                                <span className="font-normal opacity-75">/ −{formatBs(s.changeBs || s.changeUsd * (s.rate || bcvRate))} Bs</span>
+                                                {copEnabled && tasaCop > 0
+                                                    ? <><span>−{formatCop(s.changeUsd * tasaCop)} COP</span><span className="font-normal opacity-75">/ −USD {s.changeUsd.toFixed(2)}</span></>
+                                                    : <><span>−${s.changeUsd.toFixed(2)}</span><span className="font-normal opacity-75">/ −{formatBs(s.changeBs || s.changeUsd * (s.rate || bcvRate))} Bs</span></>}
                                             </div>
                                         )}
                                     </div>

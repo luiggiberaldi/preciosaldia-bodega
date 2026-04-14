@@ -435,6 +435,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     if (onNavigate) onNavigate('ventas');
                 }}
                 onPrintTicket={handlePrintTicket}
+                copEnabled={copEnabled}
+                tasaCop={tasaCop}
             />
 
             {/* Empty state */}

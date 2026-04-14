@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { X, Users, Receipt, Wallet, ArrowLeftRight, AlertTriangle } from 'lucide-react';
-import { formatBs } from '../../utils/calculatorUtils';
+import { formatBs, formatCop } from '../../utils/calculatorUtils';
 import { mulR, divR, subR } from '../../utils/dinero';
 import { useCheckoutCalculations } from '../../hooks/useCheckoutCalculations';
 import CheckoutPaymentBars from './CheckoutPaymentBars';
@@ -91,13 +91,11 @@ export default function CheckoutModal({
                         <div className="flex flex-col items-center justify-center space-y-1 mb-3 pb-3 border-b border-slate-200/50 dark:border-slate-800/50">
                             <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
                                 <span>Subtotal:</span>
-                                <span>${cartSubtotalUsd.toFixed(2)}</span>
-                                <span className="text-[10px]">&bull;</span>
-                                <span className="text-xs">Bs {formatBs(cartSubtotalBs)}</span>
+                                <span>{copEnabled && tasaCop > 0 ? `${formatCop(cartSubtotalUsd * tasaCop)} COP` : `$${cartSubtotalUsd.toFixed(2)}`}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm font-black text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-lg">
                                 <span>Descuento ({discountData.type === 'percentage' ? `${discountData.value}%` : 'Fijo'}):</span>
-                                <span>-${discountData.amountUsd.toFixed(2)}</span>
+                                <span>{copEnabled && tasaCop > 0 ? `-${formatCop(discountData.amountUsd * tasaCop)} COP` : `-$${discountData.amountUsd.toFixed(2)}`}</span>
                             </div>
                         </div>
                     )}
@@ -105,16 +103,24 @@ export default function CheckoutModal({
                         {discountData?.active ? 'Total Final' : 'Total a Pagar'}
                     </p>
                     <div className="text-center">
-                        <span className={`text-4xl sm:text-5xl font-black ${discountData?.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
-                            ${cartTotalUsd.toFixed(2)}
-                        </span>
-                        <span className="block text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                            Bs {formatBs(cartTotalBs)}
-                        </span>
-                        {copEnabled && (
-                            <span className="block text-sm sm:text-base font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                                COP {(cartTotalUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
+                        {copEnabled && tasaCop > 0 ? (
+                            <>
+                                <span className={`text-4xl sm:text-5xl font-black ${discountData?.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
+                                    {formatCop(cartTotalUsd * tasaCop)} COP
+                                </span>
+                                <span className="block text-sm sm:text-base font-bold text-slate-500 mt-1">
+                                    USD {cartTotalUsd.toFixed(2)} · Bs {formatBs(cartTotalBs)}
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <span className={`text-4xl sm:text-5xl font-black ${discountData?.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
+                                    ${cartTotalUsd.toFixed(2)}
+                                </span>
+                                <span className="block text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                                    Bs {formatBs(cartTotalBs)}
+                                </span>
+                            </>
                         )}
                     </div>
                 </div>
@@ -141,19 +147,25 @@ export default function CheckoutModal({
                         </p>
                         <div className="flex items-end justify-between">
                             <div className="flex flex-col">
-                                <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                                    ${isPaid ? changeUsd.toFixed(2) : remainingUsd.toFixed(2)}
-                                </span>
+                                {copEnabled && tasaCop > 0 ? (
+                                    <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                                        {formatCop((isPaid ? changeUsd : remainingUsd) * tasaCop)} COP
+                                    </span>
+                                ) : (
+                                    <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                                        ${isPaid ? changeUsd.toFixed(2) : remainingUsd.toFixed(2)}
+                                    </span>
+                                )}
                             </div>
                             <div className="flex flex-col text-right">
+                                {copEnabled && tasaCop > 0 && (
+                                    <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
+                                        USD {(isPaid ? changeUsd : remainingUsd).toFixed(2)}
+                                    </span>
+                                )}
                                 <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
                                     Bs {formatBs(isPaid ? changeBs : remainingBs)}
                                 </span>
-                                {copEnabled && (
-                                    <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
-                                        COP {isPaid ? (changeUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (remainingUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </span>
-                                )}
                             </div>
                         </div>
 
@@ -229,7 +241,7 @@ export default function CheckoutModal({
                                             </p>
                                             <p className="text-[9px] font-medium text-orange-500 leading-tight mt-0.5">
                                                 Fondo actual:
-                                                <span className="font-bold ml-1">${currentFloatUsd.toFixed(2)}</span> y
+                                                <span className="font-bold ml-1">USD {currentFloatUsd.toFixed(2)}</span> y
                                                 <span className="font-bold ml-1">Bs {formatBs(currentFloatBs)}</span>
                                             </p>
                                         </div>
@@ -256,7 +268,7 @@ export default function CheckoutModal({
                             onClick={handleSaldoFavor}
                             className="w-full py-2.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 font-bold text-sm rounded-xl transition-all flex items-center justify-center gap-2"
                         >
-                            <Wallet size={16} /> Usar Saldo a Favor (${Math.abs(selectedCustomer.deuda).toFixed(2)})
+                            <Wallet size={16} /> Usar Saldo a Favor ({copEnabled && tasaCop > 0 ? `${formatCop(Math.abs(selectedCustomer.deuda) * tasaCop)} COP` : `$${Math.abs(selectedCustomer.deuda).toFixed(2)}`})
                         </button>
                     </div>
                 )}
@@ -284,7 +296,7 @@ export default function CheckoutModal({
                     {isPaid ? (
                         <><Receipt size={18} /> CONFIRMAR VENTA</>
                     ) : selectedCustomerId ? (
-                        <><Users size={18} /> FIAR RESTANTE (${remainingUsd.toFixed(2)})</>
+                        <><Users size={18} /> FIAR RESTANTE ({copEnabled && tasaCop > 0 ? `${formatCop(remainingUsd * tasaCop)} COP` : `$${remainingUsd.toFixed(2)}`})</>
                     ) : (
                         <><Receipt size={18} /> INGRESA LOS PAGOS</>
                     )}
@@ -308,8 +320,8 @@ export default function CheckoutModal({
                         <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-2xl p-4 sm:p-5 mb-5">
                             <div className="text-center mb-3">
                                 <p className="text-[11px] sm:text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Monto a fiar</p>
-                                <p className="text-3xl sm:text-4xl font-black text-amber-600">${remainingUsd.toFixed(2)}</p>
-                                <p className="text-sm sm:text-base font-bold text-amber-500/70 mt-0.5">{formatBs(remainingBs)} Bs</p>
+                                <p className="text-3xl sm:text-4xl font-black text-amber-600">{copEnabled && tasaCop > 0 ? `${formatCop(remainingUsd * tasaCop)} COP` : `$${remainingUsd.toFixed(2)}`}</p>
+                                <p className="text-sm sm:text-base font-bold text-amber-500/70 mt-0.5">{copEnabled && tasaCop > 0 ? `USD ${remainingUsd.toFixed(2)} · ` : ''}{formatBs(remainingBs)} Bs</p>
                             </div>
                             <div className="border-t border-amber-200/50 dark:border-amber-800/20 pt-3 space-y-2">
                                 <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
@@ -317,7 +329,7 @@ export default function CheckoutModal({
                                 </p>
                                 {totalPaidUsd > 0.01 && (
                                     <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
-                                        El cliente abona <span className="font-bold text-emerald-600">${totalPaidUsd.toFixed(2)}</span> ahora y el restante queda pendiente.
+                                        El cliente abona <span className="font-bold text-emerald-600">{copEnabled && tasaCop > 0 ? `${formatCop(totalPaidUsd * tasaCop)} COP` : `$${totalPaidUsd.toFixed(2)}`}</span> ahora y el restante queda pendiente.
                                     </p>
                                 )}
                                 {totalPaidUsd <= 0.01 && (
@@ -328,7 +340,7 @@ export default function CheckoutModal({
                                 {selectedCustomer && (selectedCustomer.deuda || 0) > 0.01 && (
                                     <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-lg p-2.5 mt-2">
                                         <p className="text-[11px] sm:text-xs font-bold text-red-600 dark:text-red-400">
-                                            Este cliente ya tiene una deuda de ${(selectedCustomer.deuda || 0).toFixed(2)}. La deuda total pasara a ser ${((selectedCustomer.deuda || 0) + remainingUsd).toFixed(2)}.
+                                            Este cliente ya tiene una deuda de {copEnabled && tasaCop > 0 ? `${formatCop((selectedCustomer.deuda || 0) * tasaCop)} COP` : `$${(selectedCustomer.deuda || 0).toFixed(2)}`}. La deuda total pasara a ser {copEnabled && tasaCop > 0 ? `${formatCop(((selectedCustomer.deuda || 0) + remainingUsd) * tasaCop)} COP` : `$${((selectedCustomer.deuda || 0) + remainingUsd).toFixed(2)}`}.
                                         </p>
                                     </div>
                                 )}

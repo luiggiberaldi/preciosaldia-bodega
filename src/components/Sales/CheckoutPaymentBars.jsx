@@ -69,7 +69,7 @@ function PaymentBar({ method, styles, barValues, effectiveRate, tasaCop, onBarCh
                         ? `${styles.titleBg} ${styles.title} ${styles.border}`
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
                         }`}>
-                        {method.currency === 'USD' ? '$' : method.currency === 'COP' ? 'COP' : 'Bs'}
+                        {method.currency === 'USD' ? 'USD' : method.currency === 'COP' ? 'COP' : 'Bs'}
                     </span>
                 </div>
                 <button
@@ -81,7 +81,7 @@ function PaymentBar({ method, styles, barValues, effectiveRate, tasaCop, onBarCh
             </div>
             {equivUsd && (
                 <p className="text-[11px] font-bold text-blue-500 dark:text-blue-400 mt-1 ml-1">
-                    ≈ ${equivUsd}
+                    ≈ USD {equivUsd}
                 </p>
             )}
         </div>

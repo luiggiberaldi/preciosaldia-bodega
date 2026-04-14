@@ -154,6 +154,10 @@ class PrinterSerial {
         const formatBsLocal = (n) =>
             new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 
+        const isCop = sale.copEnabled && sale.tasaCop > 0;
+        const fmtUsd = (v) => isCop ? `USD ${parseFloat(v).toFixed(2)}` : `$${parseFloat(v).toFixed(2)}`;
+        const fmtCopLocal = (v) => Math.round(v).toLocaleString('es-CO');
+
         const chunks = [CMD.INIT];
 
         // ── Header ────────────────────────────────────────────────
@@ -175,7 +179,7 @@ class PrinterSerial {
                 const qtyLabel = item.isWeight
                     ? `${item.qty.toFixed(3)}kg`
                     : `${item.qty}u`;
-                const lineTotal = `$${(item.priceUsd * item.qty).toFixed(2)}`;
+                const lineTotal = fmtUsd(item.priceUsd * item.qty);
                 const nameLine = `${qtyLabel} ${item.name}`;
                 // Truncate name if too long
                 const maxNameLen = w - lineTotal.length - 1;
@@ -184,27 +188,33 @@ class PrinterSerial {
                     : nameLine;
                 chunks.push(encode(twoCol(nameShort, lineTotal, w) + '\n'));
                 // Price per unit line (indented)
-                chunks.push(encode(`  @ $${item.priceUsd.toFixed(2)}/u\n`));
+                chunks.push(encode(`  @ ${fmtUsd(item.priceUsd)}/u\n`));
             }
         }
         chunks.push(encode(line(w)));
 
         // ── Totals ────────────────────────────────────────────────
         if (sale.discountAmountUsd > 0) {
-            chunks.push(encode(twoCol('Subtotal:', `$${(sale.cartSubtotalUsd || sale.totalUsd).toFixed(2)}`, w) + '\n'));
+            chunks.push(encode(twoCol('Subtotal:', fmtUsd(sale.cartSubtotalUsd || sale.totalUsd), w) + '\n'));
             const discLabel = sale.discountType === 'percentage'
                 ? `Descuento (${sale.discountValue}%):`
                 : 'Descuento:';
-            chunks.push(encode(twoCol(discLabel, `-$${sale.discountAmountUsd.toFixed(2)}`, w) + '\n'));
+            chunks.push(encode(twoCol(discLabel, `-${fmtUsd(sale.discountAmountUsd)}`, w) + '\n'));
         }
 
         chunks.push(CMD.BOLD_ON);
-        chunks.push(encode(twoCol('TOTAL:', `$${(sale.totalUsd || 0).toFixed(2)}`, w) + '\n'));
-        chunks.push(CMD.BOLD_OFF);
+        if (isCop) {
+            chunks.push(encode(twoCol('TOTAL:', `${fmtCopLocal((sale.totalUsd || 0) * sale.tasaCop)} COP`, w) + '\n'));
+            chunks.push(CMD.BOLD_OFF);
+            chunks.push(encode(twoCol('USD:', fmtUsd(sale.totalUsd || 0), w) + '\n'));
+        } else {
+            chunks.push(encode(twoCol('TOTAL:', fmtUsd(sale.totalUsd || 0), w) + '\n'));
+            chunks.push(CMD.BOLD_OFF);
+        }
         const effectiveRate = sale.rate || rate;
         if (effectiveRate > 0) {
             chunks.push(encode(twoCol('Bs:', formatBsLocal(sale.totalBs), w) + '\n'));
-            chunks.push(encode(`  @ ${formatBsLocal(effectiveRate)} Bs/$\n`));
+            chunks.push(encode(`  @ ${formatBsLocal(effectiveRate)} Bs/${isCop ? 'USD' : '$'}\n`));
         }
 
         // ── Payment methods ────────────────────────────────────────
@@ -215,13 +225,13 @@ class PrinterSerial {
                 const pmtLabel = p.methodLabel || p.methodId || 'Efectivo';
                 let pmtAmount = '';
                 if (p.currency === 'USD' || (!p.currency && p.amountUsd)) {
-                    pmtAmount = `$${(p.amountUsd || 0).toFixed(2)}`;
+                    pmtAmount = `USD ${(p.amountUsd || 0).toFixed(2)}`;
                 } else if (p.currency === 'BS') {
                     pmtAmount = `${formatBsLocal(p.amountBs || 0)} Bs`;
                 } else if (p.currency === 'COP') {
                     pmtAmount = `${(p.amountCop || 0).toLocaleString('es-CO', { minimumFractionDigits: 2 })} COP`;
                 } else {
-                    pmtAmount = `$${(p.amountUsd || 0).toFixed(2)}`;
+                    pmtAmount = `USD ${(p.amountUsd || 0).toFixed(2)}`;
                 }
                 chunks.push(encode(twoCol(`  ${pmtLabel}:`, pmtAmount, w) + '\n'));
             }
@@ -229,7 +239,7 @@ class PrinterSerial {
 
         // ── Change ─────────────────────────────────────────────────
         if (sale.changeUsd > 0) {
-            chunks.push(encode(twoCol('Vuelto:', `$${sale.changeUsd.toFixed(2)}`, w) + '\n'));
+            chunks.push(encode(twoCol('Vuelto:', fmtUsd(sale.changeUsd), w) + '\n'));
         }
         if (sale.changeBs > 0) {
             chunks.push(encode(twoCol('Vuelto Bs:', `${formatBsLocal(sale.changeBs)} Bs`, w) + '\n'));

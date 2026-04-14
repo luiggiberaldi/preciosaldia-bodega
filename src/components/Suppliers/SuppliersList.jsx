@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Truck, Plus, Search, CheckCircle2, Phone } from 'lucide-react';
-import { formatUsd, formatBs } from '../../utils/calculatorUtils';
+import { formatUsd, formatBs, formatCop } from '../../utils/calculatorUtils';
 import EmptyState from '../EmptyState';
 import SwipeableItem from '../SwipeableItem';
 
@@ -40,10 +40,14 @@ export default function SuppliersList({
                             <p className="text-sm font-medium text-purple-100 flex items-center gap-1.5 mb-1">
                                 Cuentas por Pagar
                             </p>
-                            <h3 className="text-4xl font-black tracking-tight">${formatUsd(totalDebtUsd)}</h3>
+                            <h3 className="text-4xl font-black tracking-tight">
+                                {copEnabled && tasaCop > 0
+                                    ? `${formatCop(totalDebtUsd * tasaCop)} COP`
+                                    : `USD ${formatUsd(totalDebtUsd)}`}
+                            </h3>
                             <div className="flex flex-col mt-1">
+                                {copEnabled && tasaCop > 0 && <p className="text-sm font-bold text-purple-200">USD {formatUsd(totalDebtUsd)}</p>}
                                 {bcvRate > 0 && <p className="text-sm font-bold text-purple-200">{formatBs(totalDebtUsd * bcvRate)} Bs</p>}
-                                {copEnabled && tasaCop > 0 && <p className="text-sm font-bold text-amber-200">{(totalDebtUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
                             </div>
                         </div>
                         {isAdmin && (
@@ -140,9 +144,13 @@ export default function SuppliersList({
                                 <div className="text-right shrink-0">
                                     {supplier.deuda > 0 ? (
                                         <>
-                                            <p className="text-sm font-black text-red-500 leading-tight">-${formatUsd(supplier.deuda)}</p>
+                                            <p className="text-sm font-black text-red-500 leading-tight">
+                                                -{copEnabled && tasaCop > 0
+                                                    ? `${formatCop(supplier.deuda * tasaCop)} COP`
+                                                    : `USD ${formatUsd(supplier.deuda)}`}
+                                            </p>
+                                            {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-red-400/80">-USD {formatUsd(supplier.deuda)}</p>}
                                             {bcvRate > 0 && <p className="text-[10px] font-bold text-red-400/80">-{formatBs(supplier.deuda * bcvRate)} Bs</p>}
-                                            {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-amber-500/80">-{(supplier.deuda * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
                                             <p className="text-[9px] font-bold text-red-500 bg-red-50 dark:bg-red-900/30 px-1.5 py-0.5 rounded inline-block mt-0.5 uppercase tracking-wider">Deuda</p>
                                         </>
                                     ) : (

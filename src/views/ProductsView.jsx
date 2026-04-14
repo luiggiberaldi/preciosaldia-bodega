@@ -681,10 +681,16 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
                                             {/* Desktop columns */}
                                             <div className="hidden sm:block">
-                                                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${(p.priceUsdt || 0).toFixed(2)}</p>
-                                                <p className="text-[10px] text-slate-400 font-medium">{formatBs(valBs)} Bs</p>
-                                                {copEnabled && tasaCop > 0 && (
-                                                    <p className="text-[10px] font-bold text-amber-500/80 mt-0.5">{Math.round(p.priceUsdt * tasaCop).toLocaleString('es-CO')} COP</p>
+                                                {copEnabled && tasaCop > 0 ? (
+                                                    <>
+                                                        <p className="text-sm font-black text-amber-600 dark:text-amber-400">{Math.round(p.priceUsdt * tasaCop).toLocaleString('es-CO')} COP</p>
+                                                        <p className="text-[10px] text-slate-400 font-medium">USD {(p.priceUsdt || 0).toFixed(2)}</p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${(p.priceUsdt || 0).toFixed(2)}</p>
+                                                        <p className="text-[10px] text-slate-400 font-medium">{formatBs(valBs)} Bs</p>
+                                                    </>
                                                 )}
                                             </div>
                                             <div className="hidden sm:block">

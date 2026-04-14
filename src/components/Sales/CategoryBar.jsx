@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Package, Calculator, ChevronDown } from 'lucide-react';
 import { BODEGA_CATEGORIES, CATEGORY_ICONS } from '../../config/categories';
+import { formatCop } from '../../utils/calculatorUtils';
 
 const PAGE_SIZE = 30;
 
@@ -13,6 +14,8 @@ export default function CategoryBar({
     searchTerm = '',
     onOpenCustomAmount,
     products = [],
+    copEnabled,
+    tasaCop,
 }) {
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
@@ -86,7 +89,12 @@ export default function CategoryBar({
                                         }
                                     </div>
                                     <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2 mb-1">{p.name}</p>
-                                    <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400">${p.priceUsdt?.toFixed(2)}</p>
+                                    <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400">
+                                        {copEnabled && tasaCop > 0
+                                            ? `${formatCop(p.priceUsdt * tasaCop)} COP`
+                                            : `$${p.priceUsdt?.toFixed(2)}`
+                                        }
+                                    </p>
                                     <p className="text-[9px] text-slate-400 font-medium">{isOut ? 'Agotado' : `${p.stock ?? 0} disp.`}</p>
                                 </button>
                             );

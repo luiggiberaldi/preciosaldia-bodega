@@ -41,17 +41,19 @@ export const generarEtiquetas = async (productos, effectiveRate, copEnabled, tas
         const titleHeight = safeLines.length * (11 * 0.3527 * 1.2);
         safeY += titleHeight + 2;
 
-        // --- 2. PRECIO PRINCIPAL (USD) ---
+        // --- 2. PRECIO PRINCIPAL (USD or COP) ---
         doc.setFont("helvetica", "bold");
         doc.setFontSize(26);
 
         const priceUsdRaw = p.priceUsdt || 0;
-        const textUsd = `$${priceUsdRaw.toFixed(2)}`;
+        const textUsd = copEnabled && tasaCop > 0
+            ? `${(priceUsdRaw * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
+            : `$${priceUsdRaw.toFixed(2)}`;
 
         doc.text(textUsd, centerX, safeY, { align: "center", baseline: "top" });
         safeY += (26 * 0.3527 * 0.8) + 2;
 
-        // --- 3. PRECIOS SECUNDARIOS (BS / COP) ---
+        // --- 3. PRECIOS SECUNDARIOS (BS / COP or USD) ---
         doc.setFont("helvetica", "normal");
         doc.setFontSize(12);
 
@@ -64,8 +66,8 @@ export const generarEtiquetas = async (productos, effectiveRate, copEnabled, tas
 
         if (copEnabled && tasaCop > 0) {
             doc.setFontSize(10);
-            const textCop = `${(priceUsdRaw * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`;
-            doc.text(textCop, centerX, safeY, { align: "center", baseline: "top" });
+            const textSecondary = `USD ${priceUsdRaw.toFixed(2)}`;
+            doc.text(textSecondary, centerX, safeY, { align: "center", baseline: "top" });
         }
 
         // --- 4. FOOTER (Fecha y Unidad) ---

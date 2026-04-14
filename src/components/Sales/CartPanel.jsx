@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShoppingCart, Plus, Minus, X, CheckCircle, Package, Trash2, DollarSign, Percent } from 'lucide-react';
-import { formatBs } from '../../utils/calculatorUtils';
+import { formatBs, formatCop } from '../../utils/calculatorUtils';
 import { mulR } from '../../utils/dinero';
 
 export default function CartPanel({
@@ -98,20 +98,31 @@ export default function CartPanel({
                                         <div className="flex-1 min-w-0 pr-1">
                                             <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight mb-0.5 sm:mb-1 truncate">{item.name}</p>
                                             <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                                                <p className="text-[10px] sm:text-[11px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-1 sm:px-1.5 rounded">${item.priceUsd.toFixed(2)}</p>
-                                                <p className="text-[10px] sm:text-[11px] font-medium text-slate-400">
-                                                    {item.exactBs != null ? formatBs(item.exactBs) : formatBs(mulR(item.priceUsd, effectiveRate))} Bs
-                                                </p>
-                                                {copEnabled && tasaCop > 0 && (
-                                                    <p className="text-[10px] sm:text-[11px] font-medium text-amber-500">
-                                                        {Math.round(item.priceUsd * tasaCop).toLocaleString('es-CO')} COP
-                                                    </p>
+                                                {copEnabled && tasaCop > 0 ? (
+                                                    <>
+                                                        <p className="text-[10px] sm:text-[11px] font-black text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-1 sm:px-1.5 rounded">
+                                                            {formatCop(item.priceUsd * tasaCop)} COP
+                                                        </p>
+                                                        <p className="text-[10px] sm:text-[11px] font-medium text-slate-400">USD {item.priceUsd.toFixed(2)}</p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className="text-[10px] sm:text-[11px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-1 sm:px-1.5 rounded">${item.priceUsd.toFixed(2)}</p>
+                                                        <p className="text-[10px] sm:text-[11px] font-medium text-slate-400">
+                                                            {item.exactBs != null ? formatBs(item.exactBs) : formatBs(mulR(item.priceUsd, effectiveRate))} Bs
+                                                        </p>
+                                                    </>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-end shrink-0 gap-1.5 sm:gap-2">
-                                        <p className="text-sm sm:text-base font-black text-slate-800 dark:text-white">${mulR(item.priceUsd, item.qty).toFixed(2)}</p>
+                                        <p className="text-sm sm:text-base font-black text-slate-800 dark:text-white">
+                                            {copEnabled && tasaCop > 0
+                                                ? `${formatCop(mulR(item.priceUsd, item.qty) * tasaCop)} COP`
+                                                : `$${mulR(item.priceUsd, item.qty).toFixed(2)}`
+                                            }
+                                        </p>
                                         <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-100 dark:border-slate-700">
                                             <button aria-label="Quitar uno" onClick={() => updateQty(item.id, item.isWeight ? -0.1 : -1)} className="w-7 sm:w-8 h-7 sm:h-8 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors rounded-l-md active:bg-slate-200 dark:active:bg-slate-700"><Minus size={14} strokeWidth={3} /></button>
                                             
@@ -168,7 +179,7 @@ export default function CartPanel({
                             <span className="text-[10px] sm:text-xs font-bold bg-amber-200 dark:bg-amber-800/80 px-2 py-0.5 rounded-md">
                                 {discountData.type === 'percentage' ? `${discountData.value}%` : 'Fijo'}
                             </span>
-                            <span className="font-black">-${discountData.amountUsd.toFixed(2)}</span>
+                            <span className="font-black">{copEnabled && tasaCop > 0 ? `-${formatCop(discountData.amountUsd * tasaCop)} COP` : `-$${discountData.amountUsd.toFixed(2)}`}</span>
                         </div>
                     )}
                 </button>
@@ -179,7 +190,7 @@ export default function CartPanel({
                         {discountData?.active && (
                             <div className="flex flex-col mt-0.5 fade-in slide-in-from-left-2 animate-in duration-300">
                                 <span className="text-[11px] sm:text-xs font-bold text-slate-400 line-through decoration-red-400/70">
-                                    Subtotal: ${cartSubtotalUsd.toFixed(2)}
+                                    Subtotal: {copEnabled && tasaCop > 0 ? `${formatCop(cartSubtotalUsd * tasaCop)} COP` : `$${cartSubtotalUsd.toFixed(2)}`}
                                 </span>
                             </div>
                         )}
@@ -190,7 +201,10 @@ export default function CartPanel({
                             <span className="text-[11px] font-bold text-slate-500 sm:hidden">{formatBs(cartTotalBs)} Bs</span>
                         </div>
                         <p className={`text-2xl sm:text-3xl font-black leading-none tracking-tight transition-colors ${discountData?.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
-                            ${cartTotalUsd.toFixed(2)}
+                            {copEnabled && tasaCop > 0
+                                ? `${formatCop(cartTotalUsd * tasaCop)} COP`
+                                : `$${cartTotalUsd.toFixed(2)}`
+                            }
                         </p>
                     </div>
                 </div>
@@ -200,10 +214,10 @@ export default function CartPanel({
                     <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">{formatBs(cartTotalBs)} Bs</span>
                 </div>
 
-                {copEnabled && (
-                    <div className="hidden sm:flex justify-between items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 rounded-xl">
-                        <span className="text-[11px] font-black text-amber-600 dark:text-amber-500 tracking-widest uppercase">Pesos (COP)</span>
-                        <span className="text-xl font-black text-amber-600 dark:text-amber-400">{(cartTotalUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                {copEnabled && tasaCop > 0 && (
+                    <div className="hidden sm:flex justify-between items-center px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-xl">
+                        <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-500 tracking-widest uppercase">Dólares (USD)</span>
+                        <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">${cartTotalUsd.toFixed(2)}</span>
                     </div>
                 )}
 

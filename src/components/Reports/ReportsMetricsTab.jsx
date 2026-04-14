@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Calendar, DollarSign, TrendingUp, ShoppingBag, Package, ChevronDown, ChevronUp, Clock, Send, Ban, Shuffle, Search, X, Recycle, LockIcon, CornerDownLeft } from 'lucide-react';
-import { formatBs } from '../../utils/calculatorUtils';
+import { formatBs, formatCop } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../../config/paymentMethods';
 import { generateTicketPDF } from '../../utils/ticketGenerator';
 import EmptyState from '../EmptyState';
@@ -218,8 +218,8 @@ export default function ReportsMetricsTab({
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatCard icon={ShoppingBag} label="Ventas" value={salesForStats.length} color="emerald" />
-                <StatCard icon={DollarSign} label="Ingresos" value={`$${totalUsd.toFixed(2)}`} sub={`${formatBs(totalBs)} Bs`} color="blue" />
-                <StatCard icon={TrendingUp} label="Ganancia" value={bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00'} sub={`${formatBs(profit)} Bs`} color="indigo" />
+                <StatCard icon={DollarSign} label="Ingresos" value={copEnabled && tasaCop > 0 ? `${formatCop(totalUsd * tasaCop)} COP` : `$${totalUsd.toFixed(2)}`} sub={copEnabled && tasaCop > 0 ? `USD ${totalUsd.toFixed(2)} · ${formatBs(totalBs)} Bs` : `${formatBs(totalBs)} Bs`} color="blue" />
+                <StatCard icon={TrendingUp} label="Ganancia" value={copEnabled && tasaCop > 0 ? `${formatCop((bcvRate > 0 ? profit / bcvRate : 0) * tasaCop)} COP` : (bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00')} sub={copEnabled && tasaCop > 0 ? `USD ${bcvRate > 0 ? (profit / bcvRate).toFixed(2) : '0.00'} · ${formatBs(profit)} Bs` : `${formatBs(profit)} Bs`} color="indigo" />
                 <StatCard icon={Package} label="Artículos" value={totalItems} color="amber" />
             </div>
 
@@ -235,7 +235,7 @@ export default function ReportsMetricsTab({
                             const dayLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('es-VE', { day: 'numeric', month: 'short' });
                             return (
                                 <div key={day.date} className="flex-1 flex flex-col items-center gap-0.5">
-                                    <span className="text-[8px] font-bold text-slate-400">${day.total.toFixed(0)}</span>
+                                    <span className="text-[8px] font-bold text-slate-400">{copEnabled && tasaCop > 0 ? `${Math.round(day.total * tasaCop)}` : `$${day.total.toFixed(0)}`}</span>
                                     <div className="w-full flex justify-center">
                                         <div
                                             className="w-full max-w-[24px] rounded-t-md bg-gradient-to-t from-indigo-500 to-indigo-400 transition-all duration-500"
@@ -376,8 +376,8 @@ export default function ReportsMetricsTab({
                                 <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Dólares</span>
                                 <span className={`text-xs font-black ${totalVueltoUsd > 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                     {totalVueltoUsd > 0
-                                        ? `$${Math.abs(netoUsd).toFixed(2)} neto`
-                                        : `$${subtotalUsd.toFixed(2)}`}
+                                        ? (copEnabled && tasaCop > 0 ? `${formatCop(Math.abs(netoUsd) * tasaCop)} COP neto` : `$${Math.abs(netoUsd).toFixed(2)} neto`)
+                                        : (copEnabled && tasaCop > 0 ? `${formatCop(subtotalUsd * tasaCop)} COP` : `$${subtotalUsd.toFixed(2)}`)}
                                 </span>
                             </div>
                             <div className="space-y-4">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Truck, Save, Pencil, FileText, CreditCard, Clock, Phone, Trash2, ArrowUpRight, CheckCircle2 } from 'lucide-react';
-import { formatUsd, formatBs } from '../../utils/calculatorUtils';
+import { formatUsd, formatBs, formatCop } from '../../utils/calculatorUtils';
 
 export function AddSupplierModal({ onClose, onSave, editingSupplier = null }) {
     const [name, setName] = useState(editingSupplier?.name || '');
@@ -62,7 +62,7 @@ export function AddSupplierModal({ onClose, onSave, editingSupplier = null }) {
     );
 }
 
-export function AddInvoiceModal({ supplier, bcvRate, onClose, onSave }) {
+export function AddInvoiceModal({ supplier, bcvRate, tasaCop, copEnabled, onClose, onSave }) {
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [amountUsd, setAmountUsd] = useState('');
     const [dueDate, setDueDate] = useState('');
@@ -105,8 +105,8 @@ export function AddInvoiceModal({ supplier, bcvRate, onClose, onSave }) {
                     <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Monto Total a Pagar (USD) *</label>
                         <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-slate-400">$</span>
-                            <input type="number" required min="0.01" step="0.01" value={amountUsd} onChange={e => setAmountUsd(e.target.value)} className="w-full form-input border rounded-xl px-3 py-2 pl-8 text-lg font-black dark:bg-slate-950" />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-slate-400">USD</span>
+                            <input type="number" required min="0.01" step="0.01" value={amountUsd} onChange={e => setAmountUsd(e.target.value)} className="w-full form-input border rounded-xl px-3 py-2 pl-12 text-lg font-black dark:bg-slate-950" />
                         </div>
                         {amountUsd && bcvRate > 0 && <p className="text-[10px] text-slate-500 mt-1 text-right">Equivale a {formatBs(parseFloat(amountUsd) * bcvRate)} Bs</p>}
                     </div>
@@ -154,7 +154,7 @@ export function PayInvoiceModal({ supplier, bcvRate, tasaCop, copEnabled, active
                     <button onClick={onClose} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-full"><X size={18} /></button>
                 </div>
                 <form onSubmit={handleSave} className="p-5 space-y-4">
-                    <p className="text-xs text-slate-500 -mt-2 mb-2">Deuda total: <strong>${formatUsd(supplier.deuda)}</strong></p>
+                    <p className="text-xs text-slate-500 -mt-2 mb-2">Deuda total: <strong>{copEnabled && tasaCop > 0 ? `${formatCop(supplier.deuda * tasaCop)} COP` : `USD ${formatUsd(supplier.deuda)}`}</strong></p>
                     
                     {/* Moneda */}
                     <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
@@ -168,13 +168,13 @@ export function PayInvoiceModal({ supplier, bcvRate, tasaCop, copEnabled, active
                     {/* Input */}
                     <div>
                         <div className="relative">
-                            <span className={`absolute left-3 top-1/2 -translate-y-1/2 font-black text-lg ${currencyMode === 'BS' ? 'text-blue-500' : 'text-emerald-500'}`}>{currencyMode === 'BS' ? 'Bs' : currencyMode === 'COP' ? 'COP' : '$'}</span>
+                            <span className={`absolute left-3 top-1/2 -translate-y-1/2 font-black text-lg ${currencyMode === 'BS' ? 'text-blue-500' : 'text-emerald-500'}`}>{currencyMode === 'BS' ? 'Bs' : currencyMode === 'COP' ? 'COP' : 'USD'}</span>
                             <input type="number" step="0.01" required value={amount} onChange={e => setAmount(e.target.value)} className={`w-full form-input border rounded-xl px-3 py-3 ${currencyMode === 'BS' ? 'pl-10' : 'pl-12'} text-2xl font-black dark:bg-slate-950`} autoFocus />
                         </div>
                         {amount && bcvRate > 0 && (
                             <div className="mt-2 text-right">
                                 <p className="text-[10px] text-slate-500">
-                                    Equivale a {currencyMode === 'BS' ? `$${formatUsd(parseFloat(amount)/bcvRate)}` : currencyMode === 'COP' ? `$${formatUsd(parseFloat(amount)/tasaCop)}` : `${formatBs(parseFloat(amount)*bcvRate)} Bs`}
+                                    Equivale a {currencyMode === 'BS' ? `USD ${formatUsd(parseFloat(amount)/bcvRate)}` : currencyMode === 'COP' ? `USD ${formatUsd(parseFloat(amount)/tasaCop)}` : `${formatBs(parseFloat(amount)*bcvRate)} Bs`}
                                 </p>
                                 {currencyMode !== 'COP' && copEnabled && tasaCop > 0 && (
                                      <p className="text-[10px] text-slate-500">
@@ -247,10 +247,14 @@ export function SupplierDetailsSheet({ supplier, isOpen, isAdmin, onClose, onAdd
                     {/* Deuda / Saldo */}
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 rounded-xl px-4 py-3 text-center">
                         <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Total por Pagar</p>
-                        <p className="text-3xl font-black text-red-600 dark:text-red-400">${formatUsd(supplier.deuda)}</p>
+                        <p className="text-3xl font-black text-red-600 dark:text-red-400">
+                            {copEnabled && tasaCop > 0
+                                ? `${formatCop(supplier.deuda * tasaCop)} COP`
+                                : `USD ${formatUsd(supplier.deuda)}`}
+                        </p>
                         <div className="flex items-center justify-center gap-2 mt-1">
+                            {copEnabled && tasaCop > 0 && <p className="text-xs font-bold text-red-400/80">USD {formatUsd(supplier.deuda)}</p>}
                             {bcvRate > 0 && <p className="text-xs font-bold text-red-400/80">{formatBs(supplier.deuda * bcvRate)} Bs</p>}
-                            {copEnabled && tasaCop > 0 && <p className="text-xs font-bold text-amber-500/80">• {(supplier.deuda * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
                         </div>
                     </div>
 
@@ -289,7 +293,10 @@ export function SupplierDetailsSheet({ supplier, isOpen, isAdmin, onClose, onAdd
                                             </div>
                                             <div className="text-right">
                                                 <p className={`text-sm font-black ${isInvoice ? 'text-red-500' : 'text-emerald-500'}`}>
-                                                    {isInvoice ? '+' : '-'}${formatUsd(isInvoice ? record.amountUsd : Math.abs(record.totalUsd || 0))}
+                                                    {isInvoice ? '+' : '-'}
+                                                    {copEnabled && tasaCop > 0
+                                                        ? `${formatCop((isInvoice ? record.amountUsd : Math.abs(record.totalUsd || 0)) * tasaCop)} COP`
+                                                        : `USD ${formatUsd(isInvoice ? record.amountUsd : Math.abs(record.totalUsd || 0))}`}
                                                 </p>
                                             </div>
                                         </div>

@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { formatBs } from './calculatorUtils';
+import { formatBs, formatCop } from './calculatorUtils';
 import { getPaymentLabel, toTitleCase } from '../config/paymentMethods';
 
 /**
@@ -35,6 +35,11 @@ export async function generateDailyClosePDF({
         + (saleRows * 45);
 
     const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H] });
+
+    // COP mode detection
+    const isCop = localStorage.getItem('cop_enabled') === 'true' && parseFloat(localStorage.getItem('tasa_cop') || '0') > 0;
+    const tasaCop = parseFloat(localStorage.getItem('tasa_cop') || '0');
+    const fmtUsd = (v) => isCop ? `USD ${parseFloat(v).toFixed(2)}` : `$${parseFloat(v).toFixed(2)}`;
 
     // ── Paleta ──
     const INK = [33, 37, 41];
@@ -105,15 +110,21 @@ export async function generateDailyClosePDF({
     // ════════════════════════════════════
     y = sectionTitle('RESUMEN GENERAL', y);
 
+    const usdLabel = isCop ? 'USD' : '$';
     const statsRows = [
         ['Ventas realizadas', `${sales.length}`],
         ['Artículos vendidos', `${todayItemsSold}`],
-        ['Ingresos brutos ($)', `$${todayTotalUsd.toFixed(2)}`],
+        [`Ingresos brutos (${usdLabel})`, fmtUsd(todayTotalUsd)],
         ['Ingresos brutos (Bs)', `Bs ${formatBs(todayTotalBs)}`],
-        ['Ganancia estimada ($)', `$${(bcvRate > 0 ? (todayProfit / bcvRate) : 0).toFixed(2)}`],
+        [`Ganancia estimada (${usdLabel})`, fmtUsd(bcvRate > 0 ? (todayProfit / bcvRate) : 0)],
         ['Ganancia estimada (Bs)', `Bs ${formatBs(todayProfit)}`],
-        ['Tasa BCV', `Bs ${formatBs(bcvRate)} / $1`],
+        ['Tasa BCV', `Bs ${formatBs(bcvRate)} / ${isCop ? 'USD 1' : '$1'}`],
     ];
+
+    if (isCop && tasaCop > 0) {
+        statsRows.push(['Tasa COP', `${tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / USD 1`]);
+        statsRows.splice(3, 0, ['Ingresos brutos (COP)', `${formatCop(todayTotalUsd * tasaCop)} COP`]);
+    }
 
     statsRows.forEach(([label, value]) => {
         doc.setFont('helvetica', 'normal');
@@ -138,7 +149,7 @@ export async function generateDailyClosePDF({
         Object.entries(paymentBreakdown).forEach(([methodId, data]) => {
             const label = toTitleCase(getPaymentLabel(methodId, data.label));
             const val = data.currency === 'USD'
-                ? `$${data.total.toFixed(2)}`
+                ? fmtUsd(data.total)
                 : data.currency === 'COP'
                 ? `COP ${data.total.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 : `Bs ${formatBs(data.total)}`;
@@ -164,9 +175,9 @@ export async function generateDailyClosePDF({
         y = sectionTitle('CUADRE DE CAJA FISICA', y);
 
         const reconRows = [
-            ['Declarado (USD)', `$${reconData.declaredUsd.toFixed(2)}`],
+            ['Declarado (USD)', fmtUsd(reconData.declaredUsd)],
             ['Declarado (Bs)', `Bs ${formatBs(reconData.declaredBs)}`],
-            ['Diferencia USD', `$${reconData.diffUsd.toFixed(2)}`],
+            ['Diferencia USD', fmtUsd(reconData.diffUsd)],
             ['Diferencia Bs', `Bs ${formatBs(reconData.diffBs)}`]
         ];
 
@@ -208,7 +219,7 @@ export async function generateDailyClosePDF({
         y = sectionTitle('FONDO INICIAL (APERTURA)', y);
 
         const aperturaRows = [];
-        if (apertura.openingUsd > 0) aperturaRows.push(['Efectivo USD inicial', `$${apertura.openingUsd.toFixed(2)}`]);
+        if (apertura.openingUsd > 0) aperturaRows.push(['Efectivo USD inicial', fmtUsd(apertura.openingUsd)]);
         if (apertura.openingBs > 0) aperturaRows.push(['Efectivo Bs inicial', `Bs ${formatBs(apertura.openingBs)}`]);
         if (apertura.sellerName) aperturaRows.push(['Cajero apertura', apertura.sellerName]);
 
@@ -247,7 +258,7 @@ export async function generateDailyClosePDF({
 
             doc.setFontSize(6);
             doc.setTextColor(...MUTED);
-            doc.text(`${p.qty} vendidos · $${p.revenue.toFixed(2)} · Bs ${formatBs(p.revenue * bcvRate)}`, M + 5, y);
+            doc.text(`${p.qty} vendidos · ${fmtUsd(p.revenue)} · Bs ${formatBs(p.revenue * bcvRate)}`, M + 5, y);
             y += 5;
         });
 
@@ -278,7 +289,7 @@ export async function generateDailyClosePDF({
 
         doc.setFont('helvetica', 'bold');
         if (isCanceled) { doc.setTextColor(...RED); } else { doc.setTextColor(...GREEN); }
-        const totalStr = isCanceled ? 'ANULADA' : `$${(s.totalUsd || 0).toFixed(2)}`;
+        const totalStr = isCanceled ? 'ANULADA' : fmtUsd(s.totalUsd || 0);
         doc.text(totalStr, RIGHT, y, { align: 'right' });
         y += 4;
 
@@ -291,7 +302,7 @@ export async function generateDailyClosePDF({
                 doc.setFontSize(6);
                 doc.setTextColor(...MUTED);
                 doc.text(`  ${qty} ${name}`, M, y);
-                doc.text(`$${(item.priceUsd * item.qty).toFixed(2)}`, RIGHT, y, { align: 'right' });
+                doc.text(fmtUsd(item.priceUsd * item.qty), RIGHT, y, { align: 'right' });
                 y += 3.5;
             });
 
@@ -301,7 +312,7 @@ export async function generateDailyClosePDF({
                 doc.setFontSize(6);
                 doc.setTextColor(...RED);
                 doc.text(`  Descuento aplicado`, M, y);
-                doc.text(`-$${s.discountAmountUsd.toFixed(2)}`, RIGHT, y, { align: 'right' });
+                doc.text(`-${fmtUsd(s.discountAmountUsd)}`, RIGHT, y, { align: 'right' });
                 y += 3.5;
             }
         }
@@ -310,8 +321,8 @@ export async function generateDailyClosePDF({
         if (!isCanceled && s.payments && s.payments.length > 0) {
             s.payments.forEach(p => {
                 const label = toTitleCase(p.methodLabel || getPaymentLabel(p.methodId) || 'Pago');
-                const val = p.currency === 'USD' 
-                    ? `$${(p.amountUsd !== undefined ? p.amountUsd : p.amount).toFixed(2)}` 
+                const val = p.currency === 'USD'
+                    ? fmtUsd(p.amountUsd !== undefined ? p.amountUsd : p.amount)
                     : `Bs ${formatBs(p.amountBs !== undefined ? p.amountBs : p.amount)}`;
                 doc.setFontSize(6);
                 doc.setTextColor(...MUTED);
@@ -332,7 +343,7 @@ export async function generateDailyClosePDF({
             doc.setTextColor(...MUTED); 
             
             let changeText = '  Vuelto Entregado: ';
-            if (s.changeUsd > 0) changeText += `$${s.changeUsd.toFixed(2)}`;
+            if (s.changeUsd > 0) changeText += fmtUsd(s.changeUsd);
             if (s.changeBs > 0 && s.changeUsd > 0) changeText += ` + `;
             if (s.changeBs > 0) changeText += `Bs ${formatBs(s.changeBs)}`;
             

@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { formatBs } from './calculatorUtils';
+import { formatBs, formatCop } from './calculatorUtils';
 import {
     INK, BODY, MUTED, GREEN, RULE, RED,
     PDF_WIDTH, PDF_MARGIN, PDF_CENTER_X, PDF_RIGHT,
@@ -22,6 +22,8 @@ export async function generateTicketPDF(sale, bcvRate) {
     const RIGHT = PDF_RIGHT;
 
     const rate = sale.rate || bcvRate || 1;
+    const isCop = sale.copEnabled && sale.tasaCop > 0;
+    const fmtUsd = (v) => isCop ? `USD ${parseFloat(v).toFixed(2)}` : `$${parseFloat(v).toFixed(2)}`;
     const itemCount = sale.items?.length || 0;
     const paymentCount = sale.payments?.length || 0;
     const hasFiado = sale.fiadoUsd > 0;
@@ -126,16 +128,21 @@ export async function generateTicketPDF(sale, bcvRate) {
             doc.text(`${qty}${unit}`, M, y);
             doc.text(name, M + 10, y);
             doc.setFont('helvetica', 'bold');
-            doc.text('$' + sub.toFixed(2), RIGHT, y, { align: 'right' });
+            doc.text(isCop ? formatCop(sub * sale.tasaCop) + ' COP' : '$' + sub.toFixed(2), RIGHT, y, { align: 'right' });
             y += 4;
 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(6);
             doc.setTextColor(...MUTED);
-            let detailLine = '$' + item.priceUsd.toFixed(2) + ' c/u  ·  Bs ' + formatBs(subBs);
-            if (sale.tasaCop > 0) {
+            let detailLine = isCop
+                ? 'USD ' + item.priceUsd.toFixed(2) + ' c/u  ·  Bs ' + formatBs(subBs)
+                : '$' + item.priceUsd.toFixed(2) + ' c/u  ·  Bs ' + formatBs(subBs);
+            if (isCop) {
+                const copUnit = formatCop(item.priceUsd * sale.tasaCop);
+                const copSub = formatCop(sub * sale.tasaCop);
+                detailLine += '  ·  ' + copUnit + ' COP c/u';
+            } else if (sale.tasaCop > 0) {
                 const copUnit = (item.priceUsd * sale.tasaCop).toLocaleString('es-CO', { maximumFractionDigits: 0 });
-                const copSub = (sub * sale.tasaCop).toLocaleString('es-CO', { maximumFractionDigits: 0 });
                 detailLine += '  ·  ' + copUnit + ' COP';
             }
             doc.text(detailLine, M + 10, y);
@@ -152,10 +159,10 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(...MUTED);
-    doc.text('Tasa BCV: Bs ' + formatBs(rate) + ' por $1', CX, y, { align: 'center' });
+    doc.text('Tasa BCV: Bs ' + formatBs(rate) + ' por ' + (isCop ? 'USD 1' : '$1'), CX, y, { align: 'center' });
     y += 5;
     if (sale.tasaCop > 0) {
-        doc.text('Tasa COP: ' + sale.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' por $1', CX, y, { align: 'center' });
+        doc.text('Tasa COP: ' + sale.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' por USD 1', CX, y, { align: 'center' });
         y += 5;
     }
     y += 3;
@@ -169,12 +176,12 @@ export async function generateTicketPDF(sale, bcvRate) {
     if (sale.discountAmountUsd > 0) {
         doc.setTextColor(...BODY);
         doc.text('SUBTOTAL:', M, y);
-        doc.text('$' + (sale.cartSubtotalUsd?.toFixed(2) || (sale.totalUsd + sale.discountAmountUsd).toFixed(2)), RIGHT, y, { align: 'right' });
+        doc.text(fmtUsd(sale.cartSubtotalUsd || (sale.totalUsd + sale.discountAmountUsd)), RIGHT, y, { align: 'right' });
         y += 5;
         doc.setTextColor(...RED);
         const discountLabel = sale.discountType === 'percentage' ? `DESCUENTO (${sale.discountValue}%):` : 'DESCUENTO:';
         doc.text(discountLabel, M, y);
-        doc.text('-$' + sale.discountAmountUsd.toFixed(2), RIGHT, y, { align: 'right' });
+        doc.text('-' + fmtUsd(sale.discountAmountUsd), RIGHT, y, { align: 'right' });
         y += 7;
     }
 
@@ -185,7 +192,9 @@ export async function generateTicketPDF(sale, bcvRate) {
     // Monto USD — GRANDE
     doc.setFontSize(20);
     doc.setTextColor(...GREEN);
-    const totalUsdStr = '$' + parseFloat(sale.totalUsd || 0).toFixed(2);
+    const totalUsdStr = isCop
+        ? formatCop((sale.totalCop || (sale.totalUsd * sale.tasaCop))) + ' COP'
+        : '$' + parseFloat(sale.totalUsd || 0).toFixed(2);
     doc.text(totalUsdStr, CX, y, { align: 'center' });
     y += 8;
 
@@ -196,8 +205,13 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.text(totalBsStr, CX, y, { align: 'center' });
     y += 6;
 
-    // Monto COP
-    if (sale.copEnabled && sale.tasaCop > 0) {
+    // Monto COP / USD secondary
+    if (isCop) {
+        doc.setFontSize(10);
+        doc.setTextColor(...BODY);
+        doc.text('USD ' + parseFloat(sale.totalUsd || 0).toFixed(2), CX, y, { align: 'center' });
+        y += 8;
+    } else if (sale.copEnabled && sale.tasaCop > 0) {
         doc.setFontSize(10);
         doc.setTextColor(...BODY);
         const totalCopStr = 'COP ' + (sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -222,13 +236,13 @@ export async function generateTicketPDF(sale, bcvRate) {
 
         if (sale.payments && sale.payments.length > 0) {
             sale.payments.forEach(p => {
-                const isCop = p.currency === 'COP';
-                const isBs = !isCop && (p.currency ? p.currency !== 'USD' : (p.methodId.includes('_bs') || p.methodId === 'pago_movil'));
-                const val = isCop
+                const pIsCop = p.currency === 'COP';
+                const isBs = !pIsCop && (p.currency ? p.currency !== 'USD' : (p.methodId.includes('_bs') || p.methodId === 'pago_movil'));
+                const val = pIsCop
                     ? 'COP ' + (p.amountInput || (p.amountUsd * (sale.tasaCop || 1))).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                     : isBs
                     ? 'Bs ' + formatBs(p.amountBs || (p.amountUsd * rate))
-                    : '$' + (p.amountUsd || 0).toFixed(2);
+                    : 'USD ' + (p.amountUsd || 0).toFixed(2);
 
                 doc.setFont('helvetica', 'normal');
                 doc.setFontSize(7.5);
@@ -248,7 +262,7 @@ export async function generateTicketPDF(sale, bcvRate) {
             doc.setFontSize(8);
             doc.setTextColor(...RED);
             doc.text('Deuda pendiente:', M, y);
-            doc.text('$' + sale.fiadoUsd.toFixed(2), RIGHT, y, { align: 'right' });
+            doc.text(fmtUsd(sale.fiadoUsd), RIGHT, y, { align: 'right' });
             y += 4;
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(6.5);

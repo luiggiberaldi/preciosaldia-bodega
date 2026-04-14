@@ -1,6 +1,6 @@
 import React from 'react';
 import { DollarSign } from 'lucide-react';
-import { formatBs } from '../../utils/calculatorUtils';
+import { formatBs, formatCop } from '../../utils/calculatorUtils';
 import { getPaymentLabel, toTitleCase, getPaymentIcon, PAYMENT_ICONS } from '../../config/paymentMethods';
 
 export default function DashboardPaymentBreakdown({
@@ -45,8 +45,12 @@ export default function DashboardPaymentBreakdown({
         const pct = grandTotalBsEquiv > 0 ? (bsEquiv / grandTotalBsEquiv * 100) : 0;
 
         let displayAmount = `${formatBs(data.total)} Bs`;
-        if (data.currency === 'FIADO') displayAmount = `$ ${data.total.toFixed(2)}`;
-        else if (data.currency === 'USD') displayAmount = `$ ${data.total.toFixed(2)}`;
+        if (data.currency === 'FIADO') displayAmount = copEnabled && tasaCop > 0
+            ? `${formatCop(data.total * tasaCop)} COP`
+            : `USD ${data.total.toFixed(2)}`;
+        else if (data.currency === 'USD') displayAmount = copEnabled && tasaCop > 0
+            ? `${formatCop(data.total * tasaCop)} COP`
+            : `USD ${data.total.toFixed(2)}`;
         else if (data.currency === 'COP') displayAmount = `${fmtCop(data.total)} COP`;
 
         return (
@@ -60,7 +64,10 @@ export default function DashboardPaymentBreakdown({
                         <span className="font-bold text-slate-700 dark:text-white">{displayAmount}</span>
                         {data.currency !== 'FIADO' && <span className="text-[10px] text-slate-400 font-medium w-8 text-right">{pct.toFixed(0)}%</span>}
                         {data.currency === 'FIADO' && (
-                            <div className="text-[10px] text-slate-400 font-medium">{formatBs(bsEquiv)} Bs</div>
+                            <div className="text-[10px] text-slate-400 font-medium">
+                                {copEnabled && tasaCop > 0 && <span>USD {data.total.toFixed(2)} · </span>}
+                                {formatBs(bsEquiv)} Bs
+                            </div>
                         )}
                     </div>
                 </div>
@@ -77,7 +84,11 @@ export default function DashboardPaymentBreakdown({
         const bsEquiv = toBsEquiv(data);
         const pct = grandTotalBsEquiv > 0 ? (bsEquiv / grandTotalBsEquiv * 100) : 0;
         const isUsd = data.currency === 'USD';
-        const displayAmount = isUsd ? `$ ${data.total.toFixed(2)}` : `${formatBs(data.total)} Bs`;
+        const displayAmount = isUsd
+            ? (copEnabled && tasaCop > 0
+                ? `${formatCop(data.total * tasaCop)} COP`
+                : `USD ${data.total.toFixed(2)}`)
+            : `${formatBs(data.total)} Bs`;
 
         return (
             <div key={method}>
@@ -105,7 +116,18 @@ export default function DashboardPaymentBreakdown({
                 <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Por Cobrar</span>
-                        <span className="text-xs font-black text-amber-600 dark:text-amber-400">${fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span>
+                        <div className="text-right">
+                            <span className="text-xs font-black text-amber-600 dark:text-amber-400">
+                                {copEnabled && tasaCop > 0
+                                    ? `${formatCop(fiadoMethods.reduce((s, [,d]) => s + d.total, 0) * tasaCop)} COP`
+                                    : `USD ${fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}`}
+                            </span>
+                            {copEnabled && tasaCop > 0 && (
+                                <div className="text-[10px] text-slate-400 font-medium">
+                                    USD {fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}
+                                </div>
+                            )}
+                        </div>
                     </div>
                     <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
                         <div className="pl-3 space-y-3">{fiadoMethods.map(renderMethod)}</div>
@@ -136,11 +158,24 @@ export default function DashboardPaymentBreakdown({
                 <div className={copMethods.length > 0 ? 'mb-3' : ''}>
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Dolares</span>
+                    <div className="text-right">
                         <span className={`text-xs font-black ${totalVueltoUsd > 0 ? 'text-cyan-500 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                             {totalVueltoUsd > 0
-                                ? `${netoUsd < 0 ? '−' : ''}$${Math.abs(netoUsd).toFixed(2)} neto`
-                                : `$${subtotalUsd.toFixed(2)}`}
+                                ? copEnabled && tasaCop > 0
+                                    ? `${netoUsd < 0 ? '−' : ''}${formatCop(Math.abs(netoUsd) * tasaCop)} COP neto`
+                                    : `${netoUsd < 0 ? '−' : ''}USD ${Math.abs(netoUsd).toFixed(2)} neto`
+                                : copEnabled && tasaCop > 0
+                                    ? `${formatCop(subtotalUsd * tasaCop)} COP`
+                                    : `USD ${subtotalUsd.toFixed(2)}`}
                         </span>
+                        {copEnabled && tasaCop > 0 && (
+                            <div className="text-[10px] text-slate-400 font-medium">
+                                {totalVueltoUsd > 0
+                                    ? `${netoUsd < 0 ? '−' : ''}USD ${Math.abs(netoUsd).toFixed(2)} neto`
+                                    : `USD ${subtotalUsd.toFixed(2)}`}
+                            </div>
+                        )}
+                    </div>
                     </div>
                     <div className="space-y-3 pl-1 border-l-2 border-emerald-200 dark:border-emerald-800/40">
                         <div className="pl-3 space-y-3">

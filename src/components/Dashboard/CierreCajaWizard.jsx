@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, ChevronRight, DollarSign, Wallet, CheckCircle2, AlertTriangle, TrendingUp, ShoppingBag, Package, ArrowRight, Coins } from 'lucide-react';
-import { formatBs } from '../../utils/calculatorUtils';
+import { formatBs, formatCop } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentIcon, toTitleCase } from '../../config/paymentMethods';
 import { round2, subR, mulR } from '../../utils/dinero';
 
@@ -76,14 +76,27 @@ export default function CierreCajaWizard({
     // cancela una VENTA_FIADA de otro turno. El dinero ya aparece en el método de pago real.
     const paymentEntries = Object.entries(paymentBreakdown).filter(([, data]) => data.total > 0);
 
-    // Helper: format COP display  
+    // Helper: format COP display
     const fmtCop = (v) => v.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Helper: display a USD amount — COP-primary when copEnabled, otherwise bare $
+    const copActive = copEnabled && tasaCop > 0;
+    const fmtUsdAmt = (usd, { sign = '' } = {}) => {
+        if (copActive) {
+            const cop = usd * tasaCop;
+            return `${sign}${formatCop(cop)} COP`;
+        }
+        return `${sign}$${usd.toFixed(2)}`;
+    };
+    // Secondary line for USD amount (shown only in COP mode)
+    const fmtUsdSecondary = (usd, { sign = '' } = {}) =>
+        copActive ? `${sign}USD ${usd.toFixed(2)}` : null;
 
     // Helper: determine currency label for payment breakdown display
     const getCurrencyDisplay = (methodId, data) => {
         if (data.currency === 'COP') return `${fmtCop(data.total)} COP`;
         if (data.currency === 'BS' || methodId.includes('_bs') || methodId === 'pago_movil') return `${formatBs(data.total)} Bs`;
-        return `$${data.total.toFixed(2)}`;
+        return fmtUsdAmt(data.total);
     };
 
     return (
@@ -122,7 +135,10 @@ export default function CierreCajaWizard({
                             <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl p-5 text-white relative overflow-hidden">
                                 <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
                                 <p className="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-1">Ingresos brutos del dia</p>
-                                <p className="text-3xl font-black">${todayTotalUsd.toFixed(2)}</p>
+                                <p className="text-3xl font-black">{fmtUsdAmt(todayTotalUsd)}</p>
+                                {copActive && (
+                                    <p className="text-sm font-bold text-indigo-200 mt-0.5">USD {todayTotalUsd.toFixed(2)}</p>
+                                )}
                                 <p className="text-sm font-bold text-indigo-200 mt-0.5">{formatBs(todayTotalBs)} Bs</p>
                                 {hasCopTransactions && todayTotalCop > 0 && (
                                     <p className="text-sm font-bold text-amber-300 mt-0.5">{fmtCop(todayTotalCop)} COP</p>
@@ -147,8 +163,13 @@ export default function CierreCajaWizard({
                                         <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">Ganancia</span>
                                     </div>
                                     <p className={`text-lg font-black ${todayProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-                                        {todayProfit >= 0 ? '+' : ''}${bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}
+                                        {todayProfit >= 0 ? '+' : ''}{fmtUsdAmt(bcvRate > 0 ? todayProfit / bcvRate : 0)}
                                     </p>
+                                    {copActive && (
+                                        <p className="text-[11px] font-bold text-emerald-500/70">
+                                            {todayProfit >= 0 ? '+' : ''}USD {bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}
+                                        </p>
+                                    )}
                                     <p className="text-[11px] font-bold text-emerald-500/70">{formatBs(todayProfit)} Bs</p>
                                 </div>
                                 <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/30 rounded-xl p-3">
@@ -157,8 +178,11 @@ export default function CierreCajaWizard({
                                         <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase">Egresos</span>
                                     </div>
                                     <p className="text-lg font-black text-orange-600 dark:text-orange-400">
-                                        -${todayExpensesUsd.toFixed(2)}
+                                        -{fmtUsdAmt(todayExpensesUsd)}
                                     </p>
+                                    {copActive && (
+                                        <p className="text-[11px] font-bold text-orange-500/70">-USD {todayExpensesUsd.toFixed(2)}</p>
+                                    )}
                                     <p className="text-[11px] font-bold text-orange-500/70">-{formatBs(todayExpensesUsd * bcvRate)} Bs</p>
                                 </div>
                             </div>
@@ -246,7 +270,7 @@ export default function CierreCajaWizard({
                                     />
                                 </div>
                                 <p className="text-[11px] text-slate-400 mt-1.5 pl-1">
-                                    Sistema espera: <span className="font-bold text-indigo-500">${expectedUsd.toFixed(2)}</span>
+                                    Sistema espera: <span className="font-bold text-indigo-500">{copActive ? `USD ${expectedUsd.toFixed(2)}` : `$${expectedUsd.toFixed(2)}`}</span>
                                 </p>
                             </div>
 
@@ -340,9 +364,9 @@ export default function CierreCajaWizard({
                                         {/* USD Row */}
                                         <div className="grid grid-cols-3 gap-0 px-4 py-3 border-b border-slate-100 dark:border-slate-700/50">
                                             <span className="text-sm font-bold text-slate-700 dark:text-slate-200">USD</span>
-                                            <span className="text-sm font-mono font-bold text-slate-500 text-center">${expectedUsd.toFixed(2)}</span>
+                                            <span className="text-sm font-mono font-bold text-slate-500 text-center">{copActive ? `USD ${expectedUsd.toFixed(2)}` : `$${expectedUsd.toFixed(2)}`}</span>
                                             <span className={`text-sm font-mono font-black text-center ${diffUsd >= -0.50 && diffUsd <= 0.50 ? 'text-emerald-600' : diffUsd < -5 || diffUsd > 5 ? 'text-red-500' : 'text-amber-600'}`}>
-                                                ${declaredUsd.toFixed(2)}
+                                                {copActive ? `USD ${declaredUsd.toFixed(2)}` : `$${declaredUsd.toFixed(2)}`}
                                             </span>
                                         </div>
                                         {/* Bs Row */}
@@ -367,7 +391,7 @@ export default function CierreCajaWizard({
                                         <div className="grid grid-cols-3 gap-0 px-4 py-3 bg-slate-100/50 dark:bg-slate-700/30">
                                             <span className="text-xs font-bold text-slate-500 uppercase">Diferencia</span>
                                             <span className={`text-sm font-mono font-black text-center ${diffUsd >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                {diffUsd >= 0 ? '+' : ''}{diffUsd.toFixed(2)}
+                                                {diffUsd >= 0 ? '+' : ''}{copActive ? `USD ${diffUsd.toFixed(2)}` : `$${diffUsd.toFixed(2)}`}
                                             </span>
                                             <span className={`text-sm font-mono font-black text-center ${diffBs >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                                                 {diffBs >= 0 ? '+' : ''}{formatBs(diffBs)}

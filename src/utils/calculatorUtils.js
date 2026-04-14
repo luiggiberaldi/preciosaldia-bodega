@@ -4,6 +4,27 @@
 // Formateadores
 export const formatBs = (val) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
 export const formatUsd = (val) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
+export const formatCop = (val) => Math.round(val).toLocaleString('es-CO');
+
+/**
+ * Format price with correct currency label when COP is enabled.
+ * @param {number} usdVal - price in USD
+ * @param {object} opts - { copEnabled, tasaCop, showUsd, showBs, effectiveRate }
+ * @returns {{ primary: string, secondary: string|null, copVal: number }}
+ */
+export const priceDisplay = (usdVal, opts = {}) => {
+    const { copEnabled, tasaCop, effectiveRate } = opts;
+    const copVal = copEnabled && tasaCop > 0 ? usdVal * tasaCop : 0;
+    const bsVal = effectiveRate > 0 ? usdVal * effectiveRate : 0;
+    return {
+        usd: `$${formatUsd(usdVal)}`,
+        usdLabel: copEnabled ? 'USD' : '$',
+        cop: copEnabled && tasaCop > 0 ? `${formatCop(copVal)} COP` : null,
+        bs: effectiveRate > 0 ? `${formatBs(bsVal)} Bs` : null,
+        copVal,
+        bsVal,
+    };
+};
 
 // [REDONDEO INTELIGENTE PARA EFECTIVO]
 // Regla: Si decimal <= 0.20 -> Redondeo abajo (Floor)

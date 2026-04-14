@@ -1,6 +1,6 @@
 import React from 'react';
 import { TrendingUp, Package, ShoppingBag, ArrowUpRight, Users, ChevronDown, ChevronUp, Key, LockIcon, CheckCircle2 } from 'lucide-react';
-import { formatBs } from '../../utils/calculatorUtils';
+import { formatBs, formatCop } from '../../utils/calculatorUtils';
 import AnimatedCounter from '../AnimatedCounter';
 
 export default function DashboardStats({
@@ -11,6 +11,7 @@ export default function DashboardStats({
     todayCashFlow,
     totalDeudas, showTopDeudas, setShowTopDeudas,
     triggerHaptic, onDailyClose,
+    copEnabled, tasaCop,
 }) {
     return (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
@@ -40,14 +41,21 @@ export default function DashboardStats({
                 <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-50 dark:bg-emerald-900/10 rounded-full blur-2xl"></div>
                 <div className="flex items-center justify-between mb-3 relative z-10">
                     <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center shadow-inner">
-                        <span className="text-emerald-600 dark:text-emerald-400 font-black text-xl">$</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-black text-xl">{copEnabled ? 'COP' : '$'}</span>
                     </div>
                     <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-lg tracking-wider">HOY</span>
                 </div>
                 <div className="relative z-10">
                     <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">$<AnimatedCounter value={todayTotalUsd} /></span>
+                        <span className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">
+                            {copEnabled && tasaCop > 0
+                                ? <>{formatCop(todayTotalUsd * tasaCop)} <span className="text-sm font-bold">COP</span></>
+                                : <>$<AnimatedCounter value={todayTotalUsd} /></>}
+                        </span>
                     </div>
+                    {copEnabled && tasaCop > 0 && (
+                        <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-0.5">USD {todayTotalUsd.toFixed(2)}</p>
+                    )}
                     <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-0.5">{formatBs(todayTotalBs)} Bs</p>
                     <p className="text-[11px] font-medium text-slate-400 mt-1">Ingresos brutos</p>
                 </div>
@@ -75,7 +83,14 @@ export default function DashboardStats({
                             </div>
                             <div>
                                 <p className="text-[11px] font-medium text-slate-400">Egresos del dia (Proveedores)</p>
-                                <p className="text-lg font-black text-orange-600 dark:text-orange-400">-$<AnimatedCounter value={todayExpensesUsd} /></p>
+                                <p className="text-lg font-black text-orange-600 dark:text-orange-400">
+                                    {copEnabled && tasaCop > 0
+                                        ? <>-{formatCop(todayExpensesUsd * tasaCop)} <span className="text-sm font-bold">COP</span></>
+                                        : <>-$<AnimatedCounter value={todayExpensesUsd} /></>}
+                                </p>
+                                {copEnabled && tasaCop > 0 && (
+                                    <p className="text-[10px] text-orange-400">USD {todayExpensesUsd.toFixed(2)}</p>
+                                )}
                             </div>
                         </div>
                         <span className="text-xs font-bold text-orange-500 bg-orange-50 dark:bg-orange-900/20 px-2.5 py-1 rounded-lg">{todayExpenses.length} {todayExpenses.length === 1 ? 'pago' : 'pagos'}</span>
@@ -94,9 +109,14 @@ export default function DashboardStats({
                 <div className="relative z-10">
                     <div className="flex items-baseline gap-1">
                         <span className={`text-2xl font-black tracking-tight ${todayProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
-                            {todayProfit >= 0 ? '+' : ''}${bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}
+                            {copEnabled && tasaCop > 0
+                                ? <>{todayProfit >= 0 ? '+' : ''}{formatCop((bcvRate > 0 ? todayProfit / bcvRate : 0) * tasaCop)} <span className="text-sm font-bold">COP</span></>
+                                : <>{todayProfit >= 0 ? '+' : ''}${bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}</>}
                         </span>
                     </div>
+                    {copEnabled && tasaCop > 0 && (
+                        <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-0.5">USD {bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}</p>
+                    )}
                     <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-0.5">{formatBs(todayProfit)} Bs</p>
                     <p className="text-[11px] font-medium text-slate-400 mt-1">Ganancia estimada</p>
                 </div>
@@ -126,7 +146,7 @@ export default function DashboardStats({
                             </div>
                             <div className="text-left">
                                 <p className="text-sm font-black">Cerrar Caja</p>
-                                <p className="text-[11px] font-medium text-white/70">${todayTotalUsd.toFixed(2)} | {todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'}</p>
+                                <p className="text-[11px] font-medium text-white/70">{copEnabled && tasaCop > 0 ? `${formatCop(todayTotalUsd * tasaCop)} COP` : `$${todayTotalUsd.toFixed(2)}`} | {todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'}</p>
                             </div>
                         </div>
                         <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center group-hover:translate-x-1 transition-transform">
@@ -160,7 +180,14 @@ export default function DashboardStats({
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-red-400 uppercase">Deudas por cobrar</p>
-                                <p className="text-xl font-black text-red-500">${totalDeudas.totalUsd.toFixed(2)}</p>
+                                <p className="text-xl font-black text-red-500">
+                                    {copEnabled && tasaCop > 0
+                                        ? <>{formatCop(totalDeudas.totalUsd * tasaCop)} <span className="text-sm font-bold">COP</span></>
+                                        : <>${totalDeudas.totalUsd.toFixed(2)}</>}
+                                </p>
+                                {copEnabled && tasaCop > 0 && (
+                                    <p className="text-[10px] text-red-400">USD {totalDeudas.totalUsd.toFixed(2)}</p>
+                                )}
                             </div>
                         </div>
                         <div className="text-right flex items-center gap-2">
@@ -184,7 +211,14 @@ export default function DashboardStats({
                                         <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{c.name}</p>
                                     </div>
                                     <div className="text-right shrink-0">
-                                        <p className="text-sm font-black text-red-500">${(c.deuda || 0).toFixed(2)}</p>
+                                        <p className="text-sm font-black text-red-500">
+                                            {copEnabled && tasaCop > 0
+                                                ? <>{formatCop((c.deuda || 0) * tasaCop)} <span className="text-[10px] font-bold">COP</span></>
+                                                : <>${(c.deuda || 0).toFixed(2)}</>}
+                                        </p>
+                                        {copEnabled && tasaCop > 0 && (
+                                            <p className="text-[9px] text-red-400/60">USD {(c.deuda || 0).toFixed(2)}</p>
+                                        )}
                                         {bcvRate > 0 && <p className="text-[9px] text-red-400/60">{formatBs((c.deuda || 0) * bcvRate)} Bs</p>}
                                     </div>
                                 </div>

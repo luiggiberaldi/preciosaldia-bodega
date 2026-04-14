@@ -148,7 +148,7 @@ export default function TransactionModal({
                                     ? `Bs ${formatBs(currentCustomer.deuda * bcvRate)}`
                                     : currencyMode === 'COP' && tasaCop > 0
                                     ? `${formatBs(currentCustomer.deuda * tasaCop)} COP`
-                                    : `$${formatUsd(currentCustomer.deuda)}`
+                                    : `USD ${formatUsd(currentCustomer.deuda)}`
                                 }
                             </button>
                         )}

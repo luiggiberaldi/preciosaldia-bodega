@@ -1,6 +1,6 @@
 import React from 'react';
 import { CheckCircle, Wallet, Send, X, Printer } from 'lucide-react';
-import { formatBs } from '../../utils/calculatorUtils';
+import { formatBs, formatCop } from '../../utils/calculatorUtils';
 import { printThermalTicket } from '../../utils/ticketGenerator';
 
 export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, currentRate }) {
@@ -36,10 +36,16 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                 C.I/RIF: {receipt.customerDocument}
                             </p>
                         )}
-                        <p className="text-4xl font-black text-slate-900 mb-1 tracking-tighter">${receipt.totalUsd.toFixed(2)}</p>
-                        <p className="text-lg font-bold text-slate-500 mb-2">{formatBs(receipt.totalBs)} Bs</p>
-                        {receipt.copEnabled && receipt.tasaCop > 0 && (
-                            <p className="text-base font-bold text-amber-500 mb-2">{Math.round(receipt.totalCop || (receipt.totalUsd * receipt.tasaCop)).toLocaleString('es-CO')} COP</p>
+                        {receipt.copEnabled && receipt.tasaCop > 0 ? (
+                            <>
+                                <p className="text-4xl font-black text-slate-900 mb-1 tracking-tighter">{formatCop(receipt.totalCop || (receipt.totalUsd * receipt.tasaCop))} COP</p>
+                                <p className="text-lg font-bold text-slate-500 mb-2">USD {receipt.totalUsd.toFixed(2)} · {formatBs(receipt.totalBs)} Bs</p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-4xl font-black text-slate-900 mb-1 tracking-tighter">${receipt.totalUsd.toFixed(2)}</p>
+                                <p className="text-lg font-bold text-slate-500 mb-2">{formatBs(receipt.totalBs)} Bs</p>
+                            </>
                         )}
 
                         <div className="inline-flex items-center flex-wrap justify-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600 mt-2">
@@ -58,19 +64,23 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                 <div key={i} className="flex justify-between items-start text-sm border-b border-slate-200/50 pb-2 last:border-0 last:pb-0">
                                     <div className="flex-1 pr-4">
                                         <span className="font-bold text-slate-700 block leading-tight">{item.name}</span>
-                                        <span className="text-xs text-slate-400">{item.isWeight ? `${item.qty.toFixed(3)} Kg` : `${item.qty} u`} × ${item.priceUsd.toFixed(2)}</span>
-                                        {receipt.copEnabled && receipt.tasaCop > 0 && (
-                                            <span className="text-xs text-amber-500 block">
-                                                {(item.priceUsd * receipt.tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP c/u
-                                            </span>
+                                        {receipt.copEnabled && receipt.tasaCop > 0 ? (
+                                            <>
+                                                <span className="text-xs text-slate-400">{item.isWeight ? `${item.qty.toFixed(3)} Kg` : `${item.qty} u`} × {formatCop(item.priceUsd * receipt.tasaCop)} COP</span>
+                                                <span className="text-xs text-slate-400 block">USD {item.priceUsd.toFixed(2)} c/u</span>
+                                            </>
+                                        ) : (
+                                            <span className="text-xs text-slate-400">{item.isWeight ? `${item.qty.toFixed(3)} Kg` : `${item.qty} u`} × ${item.priceUsd.toFixed(2)}</span>
                                         )}
                                     </div>
                                     <div className="text-right">
-                                        <span className="font-black text-slate-900 block">${(item.priceUsd * item.qty).toFixed(2)}</span>
-                                        {receipt.copEnabled && receipt.tasaCop > 0 && (
-                                            <span className="text-xs font-bold text-amber-500">
-                                                {(item.priceUsd * item.qty * receipt.tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP
-                                            </span>
+                                        {receipt.copEnabled && receipt.tasaCop > 0 ? (
+                                            <>
+                                                <span className="font-black text-slate-900 block">{formatCop(item.priceUsd * item.qty * receipt.tasaCop)} COP</span>
+                                                <span className="text-xs text-slate-400">USD {(item.priceUsd * item.qty).toFixed(2)}</span>
+                                            </>
+                                        ) : (
+                                            <span className="font-black text-slate-900">${(item.priceUsd * item.qty).toFixed(2)}</span>
                                         )}
                                     </div>
                                 </div>
@@ -90,14 +100,20 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                 {receipt.changeUsd > 0 && (
                                     <div className="flex justify-between text-emerald-600 font-bold mt-2 pt-2 border-t border-slate-200">
                                         <span>Vuelto Emitido:</span>
-                                        <span>${receipt.changeUsd.toFixed(2)} / {formatBs(receipt.changeBs)} Bs</span>
+                                        <span>{receipt.copEnabled && receipt.tasaCop > 0
+                                            ? `${formatCop(receipt.changeUsd * receipt.tasaCop)} COP / USD ${receipt.changeUsd.toFixed(2)}`
+                                            : `$${receipt.changeUsd.toFixed(2)} / ${formatBs(receipt.changeBs)} Bs`
+                                        }</span>
                                     </div>
                                 )}
 
                                 {receipt.fiadoUsd > 0 && (
                                     <div className="flex justify-between text-amber-600 font-bold mt-2 pt-2 border-t border-slate-200">
                                         <span>Pendiente (Fiado):</span>
-                                        <span>${receipt.fiadoUsd.toFixed(2)} / {formatBs(receipt.fiadoUsd * (currentRate || receipt.rate))} Bs</span>
+                                        <span>{receipt.copEnabled && receipt.tasaCop > 0
+                                            ? `${formatCop(receipt.fiadoUsd * receipt.tasaCop)} COP / USD ${receipt.fiadoUsd.toFixed(2)}`
+                                            : `$${receipt.fiadoUsd.toFixed(2)} / ${formatBs(receipt.fiadoUsd * (currentRate || receipt.rate))} Bs`
+                                        }</span>
                                     </div>
                                 )}
                             </div>

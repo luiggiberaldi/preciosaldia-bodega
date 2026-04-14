@@ -575,7 +575,8 @@ export default function SalesView({ triggerHaptic, isActive }) {
                                     triggerHaptic={triggerHaptic}
                                     searchTerm={searchTerm}
                                     onOpenCustomAmount={() => setShowCustomAmountModal(true)}
-
+                                    copEnabled={copEnabled}
+                                    tasaCop={tasaCop}
                             products={products}
                         />
                     )}

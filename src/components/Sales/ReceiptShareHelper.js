@@ -5,6 +5,8 @@
  */
 export function buildReceiptWhatsAppUrl(receipt, currentRate) {
     const r = receipt;
+    const isCop = r.copEnabled && r.tasaCop > 0;
+    const fmtUsd = (v) => isCop ? `USD ${parseFloat(v).toFixed(2)}` : `$${parseFloat(v).toFixed(2)}`;
     const fecha = new Date(r.timestamp).toLocaleDateString('es-VE', {
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit'
@@ -19,9 +21,11 @@ export function buildReceiptWhatsAppUrl(receipt, currentRate) {
             ? `${parseFloat(item.qty).toFixed(3)} kg`
             : `${item.qty} und`;
         const sub = (item.priceUsd * item.qty).toFixed(2);
-        let line = `- ${item.name}\n  ${qty} x $${parseFloat(item.priceUsd).toFixed(2)} = $${sub}`;
-        if (r.copEnabled && r.tasaCop > 0) {
-            const copUnit = (item.priceUsd * r.tasaCop).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+        const unitPrice = parseFloat(item.priceUsd).toFixed(2);
+        const subStr = isCop ? `USD ${sub}` : `$${sub}`;
+        const unitStr = isCop ? `USD ${unitPrice}` : `$${unitPrice}`;
+        let line = `- ${item.name}\n  ${qty} x ${unitStr} = ${subStr}`;
+        if (isCop) {
             const copSub = (item.priceUsd * item.qty * r.tasaCop).toLocaleString('es-CO', { maximumFractionDigits: 0 });
             line += ` (${copSub} COP)`;
         }
@@ -30,31 +34,31 @@ export function buildReceiptWhatsAppUrl(receipt, currentRate) {
 
     // Pagos
     const paymentsLines = (r.payments ?? []).map(p => {
-        const isCop = p.currency === 'COP';
+        const pIsCop = p.currency === 'COP';
         const isBs = p.currency === 'BS';
-        const val = isCop
+        const val = pIsCop
             ? `COP ${(p.amountInput ?? p.amountUsd * (r.tasaCop || 1)).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
             : isBs
             ? `Bs ${Math.ceil(p.amountBs ?? p.amountUsd * r.rate)}`
-            : `$${parseFloat(p.amountUsd).toFixed(2)}`;
+            : `USD ${parseFloat(p.amountUsd).toFixed(2)}`;
         return `  ${p.methodLabel}: ${val}`;
     }).join('\n');
 
     // Totales
     const totalBs = r.totalBs ?? (r.totalUsd * r.rate);
-    const totalUsdStr = `$${parseFloat(r.totalUsd).toFixed(2)}`;
+    const totalUsdStr = fmtUsd(r.totalUsd || 0);
     const totalBsStr = `Bs ${Math.ceil(totalBs)}`;
-    const totalCopStr = r.copEnabled && r.tasaCop > 0 ? `  /  COP ${(r.totalCop || (r.totalUsd * r.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+    const totalCopStr = isCop ? `  /  COP ${(r.totalCop || (r.totalUsd * r.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
 
     // Vuelto
     const changeLines = r.changeUsd > 0.005
-        ? `\nVUELTO: $${parseFloat(r.changeUsd).toFixed(2)}`
+        ? `\nVUELTO: ${fmtUsd(r.changeUsd)}`
         : '';
 
     // Fiado
     const fiadoRate = currentRate || r.rate || 1;
     const fiadoLine = r.fiadoUsd > 0.005
-        ? `\nPENDIENTE (fiado): $${parseFloat(r.fiadoUsd).toFixed(2)} / Bs ${Math.ceil(r.fiadoUsd * fiadoRate)}`
+        ? `\nPENDIENTE (fiado): ${fmtUsd(r.fiadoUsd)} / Bs ${Math.ceil(r.fiadoUsd * fiadoRate)}`
         : '';
 
     // Cliente

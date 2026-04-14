@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tag, Banknote, AlertTriangle, Box, Minus, Plus, Pencil, Trash2, Package, Layers, Clock, Printer } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_ICONS, UNITS } from '../../config/categories';
-import { formatUsd, formatBs, smartCashRounding } from '../../utils/calculatorUtils';
+import { formatUsd, formatBs, formatCop, smartCashRounding } from '../../utils/calculatorUtils';
 
 export default function ProductCard({
     product: p,
@@ -70,17 +70,28 @@ export default function ProductCard({
 
                 <div className="flex justify-between items-end mb-3">
                     <div>
-                        <p className="text-lg lg:text-base font-black text-emerald-600 dark:text-emerald-400 leading-none">
-                            {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
-                        </p>
-                        <p className="text-[11px] font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
-                        {copEnabled && tasaCop > 0 && (
-                            <p className="text-[11px] font-bold text-amber-500/80 mt-0.5">{Math.round(valCop).toLocaleString('es-CO')} COP</p>
+                        {copEnabled && tasaCop > 0 ? (
+                            <>
+                                <p className="text-lg lg:text-base font-black text-amber-600 dark:text-amber-400 leading-none">
+                                    {formatCop(valCop)} <span className="text-[10px] font-bold text-amber-600/50 dark:text-amber-400/50">COP {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
+                                </p>
+                                <p className="text-[11px] font-bold text-slate-400 mt-1">USD {formatUsd(p.priceUsdt)}</p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-lg lg:text-base font-black text-emerald-600 dark:text-emerald-400 leading-none">
+                                    {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
+                                </p>
+                                <p className="text-[11px] font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
+                            </>
                         )}
                         {p.unit === 'paquete' && p.sellByUnit && (
                             <p className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mt-0.5 flex items-center gap-0.5">
                                 <Layers size={10} />
-                                ${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud
+                                {copEnabled && tasaCop > 0
+                                    ? `${formatCop((p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)) * tasaCop)} COP / ud`
+                                    : `$${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud`
+                                }
                             </p>
                         )}
                     </div>

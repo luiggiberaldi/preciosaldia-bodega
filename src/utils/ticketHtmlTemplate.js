@@ -1,4 +1,4 @@
-import { formatBs } from './calculatorUtils';
+import { formatBs, formatCop } from './calculatorUtils';
 
 /**
  * Genera el HTML completo para impresión térmica de un ticket de venta.
@@ -10,6 +10,8 @@ export function buildTicketHtml(sale, bcvRate, paperConfig, settings) {
     } = paperConfig;
 
     const rate = sale.rate || bcvRate || 1;
+    const isCop = sale.copEnabled && sale.tasaCop > 0;
+    const fmtUsd = (v) => isCop ? `USD ${parseFloat(v).toFixed(2)}` : `$${parseFloat(v).toFixed(2)}`;
     const saleNum = String(sale.saleNumber || 0).padStart(7, '0');
     const d = new Date(sale.timestamp);
     const fecha = d.toLocaleDateString('es-VE');
@@ -24,27 +26,31 @@ export function buildTicketHtml(sale, bcvRate, paperConfig, settings) {
         const subBs = sub * rate;
         const maxLen = is80 ? 32 : 22;
         const name = item.name.length > maxLen ? item.name.substring(0, maxLen) + '...' : item.name;
+        const importeStr = isCop ? formatCop(sub * sale.tasaCop) + ' COP' : '$' + sub.toFixed(2);
+        const detailStr = isCop
+            ? 'USD ' + item.priceUsd.toFixed(2) + ' c/u - Bs ' + formatBs(subBs)
+            : '$' + item.priceUsd.toFixed(2) + ' c/u - Bs ' + formatBs(subBs);
         return `
             <tr>
                 <td style="text-align:left;font-size:${fBase};padding:2px 0;">${qty}${unit}</td>
                 <td style="text-align:left;font-size:${fBase};padding:2px 0;line-height:1.2;">${name}</td>
-                <td style="text-align:right;font-size:${fBase};font-weight:bold;padding:2px 0;">$${sub.toFixed(2)}</td>
+                <td style="text-align:right;font-size:${fBase};font-weight:bold;padding:2px 0;">${importeStr}</td>
             </tr>
             <tr>
                 <td></td>
-                <td colspan="2" style="font-size:${fTiny};color:#888;padding:0 0 4px;">$${item.priceUsd.toFixed(2)} c/u - Bs ${formatBs(subBs)}</td>
+                <td colspan="2" style="font-size:${fTiny};color:#888;padding:0 0 4px;">${detailStr}</td>
             </tr>`;
     }).join('');
 
     // Generar filas de pagos
     const paymentsHtml = (sale.payments || []).map(p => {
-        const isCop = p.currency === 'COP';
-        const isBs = !isCop && (p.currency ? p.currency !== 'USD' : (p.methodId?.includes('_bs') || p.methodId === 'pago_movil'));
-        const val = isCop
+        const pIsCop = p.currency === 'COP';
+        const isBs = !pIsCop && (p.currency ? p.currency !== 'USD' : (p.methodId?.includes('_bs') || p.methodId === 'pago_movil'));
+        const val = pIsCop
             ? 'COP ' + (p.amountInput || (p.amountUsd * (sale.tasaCop || 1))).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : isBs
             ? 'Bs ' + formatBs(p.amountBs || (p.amountUsd * rate))
-            : '$' + (p.amountUsd || 0).toFixed(2);
+            : 'USD ' + (p.amountUsd || 0).toFixed(2);
         return `
             <tr>
                 <td style="font-size:11px;padding:2px 0;">${p.methodLabel || 'Pago'}</td>
@@ -57,7 +63,7 @@ export function buildTicketHtml(sale, bcvRate, paperConfig, settings) {
         <div style="margin-top:6px;padding:4px 0;border-top:1px dashed #ccc;">
             <table style="width:100%"><tr>
                 <td style="color:#dc3545;font-weight:bold;font-size:11px;">Deuda pendiente:</td>
-                <td style="color:#dc3545;font-weight:bold;font-size:11px;text-align:right;">$${sale.fiadoUsd.toFixed(2)}</td>
+                <td style="color:#dc3545;font-weight:bold;font-size:11px;text-align:right;">${fmtUsd(sale.fiadoUsd)}</td>
             </tr><tr>
                 <td></td>
                 <td style="color:#dc3545;font-size:9px;text-align:right;">Bs ${formatBs(sale.fiadoUsd * fiadoRate)} (tasa actual)</td>
@@ -166,8 +172,8 @@ export function buildTicketHtml(sale, bcvRate, paperConfig, settings) {
 
     <!-- Tasa -->
     <div class="center" style="font-size:${fTiny};color:#555;margin:4px 0;">
-        <div style="margin-bottom:2px;">Tasa BCV: Bs ${formatBs(rate)} por $1</div>
-        ${sale.tasaCop > 0 ? `<div>Tasa COP: ${sale.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por $1</div>` : ''}
+        <div style="margin-bottom:2px;">Tasa BCV: Bs ${formatBs(rate)} por ${isCop ? 'USD 1' : '$1'}</div>
+        ${sale.tasaCop > 0 ? `<div>Tasa COP: ${sale.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por USD 1</div>` : ''}
     </div>
 
     <!-- Total -->
@@ -176,18 +182,18 @@ export function buildTicketHtml(sale, bcvRate, paperConfig, settings) {
         <table style="margin-bottom:6px; font-size:${fTiny}; border-bottom: 1px dashed #ccc; padding-bottom: 4px;">
             <tr>
                 <td style="text-align:left; color:#555; font-weight:bold;">SUBTOTAL:</td>
-                <td style="text-align:right; color:#555; font-weight:bold;">$${sale.cartSubtotalUsd?.toFixed(2) || (sale.totalUsd + sale.discountAmountUsd).toFixed(2)}</td>
+                <td style="text-align:right; color:#555; font-weight:bold;">${fmtUsd(sale.cartSubtotalUsd || (sale.totalUsd + sale.discountAmountUsd))}</td>
             </tr>
             <tr>
                 <td style="text-align:left; color:#dc3545; font-weight:bold;">${sale.discountType === 'percentage' ? `DESCUENTO (${sale.discountValue}%):` : 'DESCUENTO:'}</td>
-                <td style="text-align:right; color:#dc3545; font-weight:bold;">-$${sale.discountAmountUsd.toFixed(2)}</td>
+                <td style="text-align:right; color:#dc3545; font-weight:bold;">-${fmtUsd(sale.discountAmountUsd)}</td>
             </tr>
         </table>
         ` : ''}
         <div class="center bold" style="font-size:${fSmall};color:#555;margin-bottom:4px;">TOTAL A PAGAR</div>
-        <div class="total-usd">$${parseFloat(sale.totalUsd || 0).toFixed(2)}</div>
-        <div class="total-bs" style="margin-bottom:${sale.copEnabled && sale.tasaCop > 0 ? '2px' : '4px'}">Bs ${formatBs(sale.totalBs || 0)}</div>
-        ${sale.copEnabled && sale.tasaCop > 0 ? `<div class="total-bs" style="font-size:${is80 ? '16px' : '13px'};">COP ${(sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>` : ''}
+        <div class="total-usd">${isCop ? formatCop(sale.totalCop || (sale.totalUsd * sale.tasaCop)) + ' COP' : '$' + parseFloat(sale.totalUsd || 0).toFixed(2)}</div>
+        <div class="total-bs" style="margin-bottom:${isCop ? '2px' : '4px'}">Bs ${formatBs(sale.totalBs || 0)}</div>
+        ${isCop ? `<div class="total-bs" style="font-size:${is80 ? '16px' : '13px'};">USD ${parseFloat(sale.totalUsd || 0).toFixed(2)}</div>` : ''}
     </div>
 
     <hr class="dash">
