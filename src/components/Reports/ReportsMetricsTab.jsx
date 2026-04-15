@@ -218,8 +218,8 @@ export default function ReportsMetricsTab({
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatCard icon={ShoppingBag} label="Ventas" value={salesForStats.length} color="emerald" />
-                <StatCard icon={DollarSign} label="Ingresos" value={copEnabled && tasaCop > 0 ? `${formatCop(totalUsd * tasaCop)} COP` : `$${totalUsd.toFixed(2)}`} sub={copEnabled && tasaCop > 0 ? `USD ${totalUsd.toFixed(2)} · ${formatBs(totalBs)} Bs` : `${formatBs(totalBs)} Bs`} color="blue" />
-                <StatCard icon={TrendingUp} label="Ganancia" value={copEnabled && tasaCop > 0 ? `${formatCop((bcvRate > 0 ? profit / bcvRate : 0) * tasaCop)} COP` : (bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00')} sub={copEnabled && tasaCop > 0 ? `USD ${bcvRate > 0 ? (profit / bcvRate).toFixed(2) : '0.00'} · ${formatBs(profit)} Bs` : `${formatBs(profit)} Bs`} color="indigo" />
+                <StatCard icon={DollarSign} label="Ingresos" value={`$${totalUsd.toFixed(2)}`} sub={copEnabled && tasaCop > 0 ? `${formatCop(totalUsd * tasaCop)} COP · ${formatBs(totalBs)} Bs` : `${formatBs(totalBs)} Bs`} color="blue" />
+                <StatCard icon={TrendingUp} label="Ganancia" value={bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00'} sub={copEnabled && tasaCop > 0 ? `${formatCop((bcvRate > 0 ? profit / bcvRate : 0) * tasaCop)} COP · ${formatBs(profit)} Bs` : `${formatBs(profit)} Bs`} color="indigo" />
                 <StatCard icon={Package} label="Artículos" value={totalItems} color="amber" />
             </div>
 
@@ -235,7 +235,7 @@ export default function ReportsMetricsTab({
                             const dayLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('es-VE', { day: 'numeric', month: 'short' });
                             return (
                                 <div key={day.date} className="flex-1 flex flex-col items-center gap-0.5">
-                                    <span className="text-[8px] font-bold text-slate-400">{copEnabled && tasaCop > 0 ? `${Math.round(day.total * tasaCop)}` : `$${day.total.toFixed(0)}`}</span>
+                                    <span className="text-[8px] font-bold text-slate-400">${day.total.toFixed(0)}</span>
                                     <div className="w-full flex justify-center">
                                         <div
                                             className="w-full max-w-[24px] rounded-t-md bg-gradient-to-t from-indigo-500 to-indigo-400 transition-all duration-500"

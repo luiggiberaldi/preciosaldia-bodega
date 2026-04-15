@@ -125,28 +125,26 @@ export default function DiscountModal({
                             <span className="text-slate-500 font-medium">Subtotal:</span>
                             <span className="text-slate-700 dark:text-slate-300 font-bold">
                                 {copEnabled && tasaCop > 0
-                                    ? `${formatCop(cartSubtotalUsd * tasaCop)} COP · USD ${cartSubtotalUsd.toFixed(2)}`
-                                    : `USD ${cartSubtotalUsd.toFixed(2)}`}
+                                    ? `$${cartSubtotalUsd.toFixed(2)} · ${formatCop(cartSubtotalUsd * tasaCop)} COP`
+                                    : `$${cartSubtotalUsd.toFixed(2)}`}
                             </span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-red-500 font-medium tracking-tight">Descuento aplicado:</span>
                             <span className="text-red-500 font-black">
                                 -{copEnabled && tasaCop > 0
-                                    ? `${formatCop(discountAmountUsd * tasaCop)} COP / USD ${discountAmountUsd.toFixed(2)}`
-                                    : `USD ${discountAmountUsd.toFixed(2)}`}
+                                    ? `$${discountAmountUsd.toFixed(2)} / ${formatCop(discountAmountUsd * tasaCop)} COP`
+                                    : `$${discountAmountUsd.toFixed(2)}`}
                             </span>
                         </div>
                         <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-end">
                             <span className="text-sm font-bold text-slate-600 dark:text-slate-400">Total Final:</span>
                             <div className="text-right">
                                 <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 leading-none block">
-                                    {copEnabled && tasaCop > 0
-                                        ? `${formatCop(newTotalUsd * tasaCop)} COP`
-                                        : `USD ${newTotalUsd.toFixed(2)}`}
+                                    ${newTotalUsd.toFixed(2)}
                                 </span>
                                 {copEnabled && tasaCop > 0 && (
-                                    <span className="text-[10px] font-bold text-slate-400 block">USD {newTotalUsd.toFixed(2)}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 block">{formatCop(newTotalUsd * tasaCop)} COP</span>
                                 )}
                                 <span className="text-xs font-bold text-slate-400">Bs {formatBs(newTotalBs)}</span>
                             </div>

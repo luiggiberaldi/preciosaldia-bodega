@@ -203,13 +203,10 @@ class PrinterSerial {
         }
 
         chunks.push(CMD.BOLD_ON);
+        chunks.push(encode(twoCol('TOTAL:', fmtUsd(sale.totalUsd || 0), w) + '\n'));
+        chunks.push(CMD.BOLD_OFF);
         if (isCop) {
-            chunks.push(encode(twoCol('TOTAL:', `${fmtCopLocal((sale.totalUsd || 0) * sale.tasaCop)} COP`, w) + '\n'));
-            chunks.push(CMD.BOLD_OFF);
-            chunks.push(encode(twoCol('USD:', fmtUsd(sale.totalUsd || 0), w) + '\n'));
-        } else {
-            chunks.push(encode(twoCol('TOTAL:', fmtUsd(sale.totalUsd || 0), w) + '\n'));
-            chunks.push(CMD.BOLD_OFF);
+            chunks.push(encode(twoCol('COP:', `${fmtCopLocal((sale.totalUsd || 0) * sale.tasaCop)} COP`, w) + '\n'));
         }
         const effectiveRate = sale.rate || rate;
         if (effectiveRate > 0) {

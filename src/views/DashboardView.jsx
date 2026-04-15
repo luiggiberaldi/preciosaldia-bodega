@@ -408,8 +408,9 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                 </div>
                                 <div className="text-right">
                                     <p className="text-xs font-bold text-slate-600 dark:text-slate-300">{p.qty} vendidos</p>
+                                    <p className="text-[10px] text-slate-400">${p.revenue.toFixed(2)}</p>
                                     {copEnabled && tasaCop > 0
-                                        ? <p className="text-[10px] text-slate-400">{formatCop(p.revenue * tasaCop)} COP</p>
+                                        ? <p className="text-[10px] text-slate-400">{formatCop(p.revenue * tasaCop)} COP · {formatBs(p.revenue * bcvRate)} Bs</p>
                                         : <p className="text-[10px] text-slate-400">{formatBs(p.revenue * bcvRate)} Bs</p>
                                     }
                                 </div>

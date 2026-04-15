@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Plus, Search, User, X, Trash2, Pencil, Phone, RefreshCw, Save, ArrowDownRight, ArrowUpRight, Clock, CheckCircle2, CreditCard, ShoppingBag, Truck } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { formatBs, formatUsd } from '../utils/calculatorUtils';
+import { formatBs, formatUsd, formatCop } from '../utils/calculatorUtils';
 import { procesarImpactoCliente } from '../utils/financialLogic';
 import TransactionModal from '../components/Customers/TransactionModal';
 import { processCustomerTransaction } from '../utils/customerTransactionProcessor';
@@ -530,13 +530,13 @@ function CustomerCard({ customer, bcvRate, tasaCop, copEnabled, onClick, onDelet
                         <>
                             <p className="text-sm font-black text-red-500 leading-tight">-${formatUsd(customer.deuda)}</p>
                             {bcvRate > 0 && <p className="text-[10px] font-bold text-red-400/70">-{formatBs(customer.deuda * bcvRate)} Bs</p>}
-                            {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-red-400/90">-{(customer.deuda * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
+                            {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-red-400/90">-{formatCop(customer.deuda * tasaCop)} COP</p>}
                         </>
                     ) : customer.favor > 0 ? (
                         <>
                             <p className="text-sm font-black text-emerald-500 leading-tight">+${formatUsd(customer.favor)}</p>
                             {bcvRate > 0 && <p className="text-[10px] font-bold text-emerald-400/70">+{formatBs(customer.favor * bcvRate)} Bs</p>}
-                            {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-emerald-400/90">+{(customer.favor * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
+                            {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-emerald-400/90">+{formatCop(customer.favor * tasaCop)} COP</p>}
                         </>
                     ) : (
                         <p className="text-xs font-bold text-slate-400 flex items-center gap-1">
@@ -618,14 +618,14 @@ function CustomerDetailSheet({ customer, isOpen, isAdmin, onClose, onAjustar, on
                                 <p className="text-[10px] font-bold text-red-400 uppercase">Debe</p>
                                 <p className="text-lg font-black text-red-500">-${formatUsd(customer.deuda)}</p>
                                 {bcvRate > 0 && <p className="text-[10px] font-bold text-red-400/70">-{formatBs(customer.deuda * bcvRate)} Bs</p>}
-                                {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-red-500/90">-{(customer.deuda * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
+                                {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-red-500/90">-{formatCop(customer.deuda * tasaCop)} COP</p>}
                             </div>
                         ) : customer.favor > 0 ? (
                             <div className="flex-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-xl px-3 py-2.5 text-center">
                                 <p className="text-[10px] font-bold text-emerald-400 uppercase">A favor</p>
                                 <p className="text-lg font-black text-emerald-500">+${formatUsd(customer.favor)}</p>
                                 {bcvRate > 0 && <p className="text-[10px] font-bold text-emerald-400/70">+{formatBs(customer.favor * bcvRate)} Bs</p>}
-                                {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-emerald-500/90">+{(customer.favor * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
+                                {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-emerald-500/90">+{formatCop(customer.favor * tasaCop)} COP</p>}
                             </div>
                         ) : (
                             <div className="flex-1 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-center">

@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, ArrowDownRight, ArrowUpRight, CheckCircle2, Save } from 'lucide-react';
 import { procesarImpactoCliente } from '../../utils/financialLogic';
-import { formatUsd, formatBs } from '../../utils/calculatorUtils';
+import { formatUsd, formatBs, formatCop } from '../../utils/calculatorUtils';
 
 export default function TransactionModal({
     transactionModal,
@@ -166,7 +166,7 @@ export default function TransactionModal({
                                 <span className="text-xs font-bold text-slate-500">Equivale a:</span>
                                 <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
                                     {formatBs(parseFloat(transactionAmount) * bcvRate)} Bs
-                                    {copEnabled && ` • ${(parseFloat(transactionAmount) * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP`}
+                                    {copEnabled && tasaCop > 0 && ` · ${formatCop(parseFloat(transactionAmount) * tasaCop)} COP`}
                                 </span>
                             </div>
                         )}
@@ -232,7 +232,7 @@ export default function TransactionModal({
                             {bcvRate > 0 && (
                                 <p className="text-[10px] font-bold text-slate-400 mt-1 text-right">
                                     {saldoPreviewUsd >= 0 ? '+' : '-'}{formatBs(Math.abs(saldoPreviewUsd) * bcvRate)} Bs
-                                    {copEnabled && ` • ${(Math.abs(saldoPreviewUsd) * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP`}
+                                    {copEnabled && tasaCop > 0 && ` · ${formatCop(Math.abs(saldoPreviewUsd) * tasaCop)} COP`}
                                 </p>
                             )}
                         </div>

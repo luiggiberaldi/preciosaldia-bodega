@@ -128,20 +128,16 @@ export async function generateTicketPDF(sale, bcvRate) {
             doc.text(`${qty}${unit}`, M, y);
             doc.text(name, M + 10, y);
             doc.setFont('helvetica', 'bold');
-            doc.text(isCop ? formatCop(sub * sale.tasaCop) + ' COP' : '$' + sub.toFixed(2), RIGHT, y, { align: 'right' });
+            doc.text(isCop ? 'USD ' + sub.toFixed(2) : '$' + sub.toFixed(2), RIGHT, y, { align: 'right' });
             y += 4;
 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(6);
             doc.setTextColor(...MUTED);
             let detailLine = isCop
-                ? 'USD ' + item.priceUsd.toFixed(2) + ' c/u  ·  Bs ' + formatBs(subBs)
+                ? 'USD ' + item.priceUsd.toFixed(2) + ' c/u  ·  ' + formatCop(sub * sale.tasaCop) + ' COP  ·  Bs ' + formatBs(subBs)
                 : '$' + item.priceUsd.toFixed(2) + ' c/u  ·  Bs ' + formatBs(subBs);
-            if (isCop) {
-                const copUnit = formatCop(item.priceUsd * sale.tasaCop);
-                const copSub = formatCop(sub * sale.tasaCop);
-                detailLine += '  ·  ' + copUnit + ' COP c/u';
-            } else if (sale.tasaCop > 0) {
+            if (!isCop && sale.tasaCop > 0) {
                 const copUnit = (item.priceUsd * sale.tasaCop).toLocaleString('es-CO', { maximumFractionDigits: 0 });
                 detailLine += '  ·  ' + copUnit + ' COP';
             }
@@ -189,33 +185,36 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.text('TOTAL A PAGAR', CX, y, { align: 'center' });
     y += 8;
 
-    // Monto USD — GRANDE
+    // Monto USD — GRANDE (siempre primario)
     doc.setFontSize(20);
     doc.setTextColor(...GREEN);
     const totalUsdStr = isCop
-        ? formatCop((sale.totalCop || (sale.totalUsd * sale.tasaCop))) + ' COP'
+        ? 'USD ' + parseFloat(sale.totalUsd || 0).toFixed(2)
         : '$' + parseFloat(sale.totalUsd || 0).toFixed(2);
     doc.text(totalUsdStr, CX, y, { align: 'center' });
     y += 8;
 
-    // Monto Bs — debajo
+    // COP secondary (when isCop)
+    if (isCop) {
+        doc.setFontSize(10);
+        doc.setTextColor(...BODY);
+        const totalCopStr = 'COP ' + formatCop(sale.totalCop || (sale.totalUsd * sale.tasaCop));
+        doc.text(totalCopStr, CX, y, { align: 'center' });
+        y += 6;
+    }
+
+    // Monto Bs — tertiary
     doc.setFontSize(10);
     doc.setTextColor(...BODY);
     const totalBsStr = 'Bs ' + formatBs(sale.totalBs || 0);
     doc.text(totalBsStr, CX, y, { align: 'center' });
     y += 6;
 
-    // Monto COP / USD secondary
-    if (isCop) {
+    if (!isCop && sale.copEnabled && sale.tasaCop > 0) {
         doc.setFontSize(10);
         doc.setTextColor(...BODY);
-        doc.text('USD ' + parseFloat(sale.totalUsd || 0).toFixed(2), CX, y, { align: 'center' });
-        y += 8;
-    } else if (sale.copEnabled && sale.tasaCop > 0) {
-        doc.setFontSize(10);
-        doc.setTextColor(...BODY);
-        const totalCopStr = 'COP ' + (sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        doc.text(totalCopStr, CX, y, { align: 'center' });
+        const totalCopStr2 = 'COP ' + (sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        doc.text(totalCopStr2, CX, y, { align: 'center' });
         y += 8;
     } else {
         y += 2;

@@ -125,13 +125,11 @@ export default function SalesHistory({
                                 </div>
                                 <div className="text-right shrink-0">
                                     <p className={`text-sm font-black ${isCanceled ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>
-                                        {copEnabled && tasaCop > 0
-                                            ? <>{formatCop((s.totalUsd || 0) * tasaCop)} <span className="text-[10px] font-medium text-slate-400">COP</span></>
-                                            : `$${(s.totalUsd || 0).toFixed(2)}`}
+                                        {`$${(s.totalUsd || 0).toFixed(2)}`}
                                     </p>
                                     {copEnabled && tasaCop > 0 && (
                                         <p className="text-[10px] font-medium">
-                                            <span className="text-emerald-600 dark:text-emerald-400">USD {(s.totalUsd || 0).toFixed(2)}</span>
+                                            <span className="text-amber-600 dark:text-amber-400">{formatCop((s.totalUsd || 0) * tasaCop)} COP</span>
                                             <span className="text-slate-300 mx-0.5">|</span>
                                             <span className="text-blue-500 dark:text-blue-400">{formatBs((s.totalBs || (s.totalUsd || 0) * (s.rate || bcvRate)))} Bs</span>
                                         </p>
@@ -152,9 +150,10 @@ export default function SalesHistory({
                                                 <div key={i} className={`flex justify-between items-center text-xs ${isCanceled ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'}`}>
                                                     <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
                                                     <span className="font-medium text-right">
+                                                        <span>${(item.priceUsd * item.qty).toFixed(2)}</span>
                                                         {copEnabled && tasaCop > 0
-                                                            ? <><span>{formatCop(item.priceUsd * item.qty * tasaCop)} COP</span><span className="font-normal ml-1"><span className="text-emerald-600 dark:text-emerald-400">USD {(item.priceUsd * item.qty).toFixed(2)}</span> · <span className="text-blue-500 dark:text-blue-400">{formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></span></>
-                                                            : <><span>${(item.priceUsd * item.qty).toFixed(2)}</span><span className="text-slate-400 font-normal ml-1">· {formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></>}
+                                                            ? <span className="text-slate-400 font-normal ml-1">{formatCop(item.priceUsd * item.qty * tasaCop)} COP · <span className="text-blue-500 dark:text-blue-400">{formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></span>
+                                                            : <span className="text-slate-400 font-normal ml-1">· {formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span>}
                                                     </span>
                                                 </div>
                                             ))}
@@ -172,7 +171,7 @@ export default function SalesHistory({
                                             <div className="flex items-center gap-1 self-start mt-0.5 bg-orange-50 dark:bg-orange-900/20 text-orange-500 dark:text-orange-400 font-bold px-1.5 py-0.5 rounded-md border border-orange-100 dark:border-orange-800/40">
                                                 <CornerDownLeft size={10} />
                                                 {copEnabled && tasaCop > 0
-                                                    ? <><span>−{formatCop(s.changeUsd * tasaCop)} COP</span><span className="font-normal opacity-75">/ −USD {s.changeUsd.toFixed(2)} / −{formatBs(s.changeBs || s.changeUsd * (s.rate || bcvRate))} Bs</span></>
+                                                    ? <><span>−${s.changeUsd.toFixed(2)}</span><span className="font-normal opacity-75">/ −{formatCop(s.changeUsd * tasaCop)} COP / −{formatBs(s.changeBs || s.changeUsd * (s.rate || bcvRate))} Bs</span></>
                                                     : <><span>−${s.changeUsd.toFixed(2)}</span><span className="font-normal opacity-75">/ −{formatBs(s.changeBs || s.changeUsd * (s.rate || bcvRate))} Bs</span></>}
                                             </div>
                                         )}

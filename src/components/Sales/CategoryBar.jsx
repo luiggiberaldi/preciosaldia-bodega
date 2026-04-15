@@ -91,14 +91,11 @@ export default function CategoryBar({
                                     </div>
                                     <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2 mb-1">{p.name}</p>
                                     <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400">
-                                        {copEnabled && tasaCop > 0
-                                            ? `${formatCop(p.priceUsdt * tasaCop)} COP`
-                                            : `$${p.priceUsdt?.toFixed(2)}`
-                                        }
+                                        ${p.priceUsdt?.toFixed(2)}
                                     </p>
                                     {copEnabled && tasaCop > 0 && (
                                         <p className="text-[8px] leading-tight mt-0.5">
-                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">USD {p.priceUsdt?.toFixed(2)}</span>
+                                            <span className="font-bold text-amber-600 dark:text-amber-400">{formatCop(p.priceUsdt * tasaCop)} COP</span>
                                             <span className="text-slate-300 mx-0.5">|</span>
                                             <span className="font-bold text-blue-500 dark:text-blue-400">{formatBs(p.priceUsdt * (effectiveRate || 0))} Bs</span>
                                         </p>

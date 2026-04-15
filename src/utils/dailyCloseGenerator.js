@@ -39,7 +39,7 @@ export async function generateDailyClosePDF({
     // COP mode detection
     const isCop = localStorage.getItem('cop_enabled') === 'true' && parseFloat(localStorage.getItem('tasa_cop') || '0') > 0;
     const tasaCop = parseFloat(localStorage.getItem('tasa_cop') || '0');
-    const fmtUsd = (v) => isCop ? `USD ${parseFloat(v).toFixed(2)}` : `$${parseFloat(v).toFixed(2)}`;
+    const fmtUsd = (v) => `$${parseFloat(v).toFixed(2)}`;
 
     // ── Paleta ──
     const INK = [33, 37, 41];
@@ -110,7 +110,7 @@ export async function generateDailyClosePDF({
     // ════════════════════════════════════
     y = sectionTitle('RESUMEN GENERAL', y);
 
-    const usdLabel = isCop ? 'USD' : '$';
+    const usdLabel = '$';
     const statsRows = [
         ['Ventas realizadas', `${sales.length}`],
         ['Artículos vendidos', `${todayItemsSold}`],
@@ -118,11 +118,11 @@ export async function generateDailyClosePDF({
         ['Ingresos brutos (Bs)', `Bs ${formatBs(todayTotalBs)}`],
         [`Ganancia estimada (${usdLabel})`, fmtUsd(bcvRate > 0 ? (todayProfit / bcvRate) : 0)],
         ['Ganancia estimada (Bs)', `Bs ${formatBs(todayProfit)}`],
-        ['Tasa BCV', `Bs ${formatBs(bcvRate)} / ${isCop ? 'USD 1' : '$1'}`],
+        ['Tasa BCV', `Bs ${formatBs(bcvRate)} / $1`],
     ];
 
     if (isCop && tasaCop > 0) {
-        statsRows.push(['Tasa COP', `${tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / USD 1`]);
+        statsRows.push(['Tasa COP', `${tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / $1`]);
         statsRows.splice(3, 0, ['Ingresos brutos (COP)', `${formatCop(todayTotalUsd * tasaCop)} COP`]);
     }
 

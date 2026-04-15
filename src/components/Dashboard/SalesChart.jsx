@@ -16,7 +16,6 @@ function SalesChart({ weekData, onDayClick, selectedDate, copEnabled, tasaCop, b
     const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
     const fmtBarLabel = (usd) => {
-        if (isCop) return `${formatCop(usd * tasaCop)}`;
         return `$${usd.toFixed(0)}`;
     };
 
@@ -83,19 +82,13 @@ function SalesChart({ weekData, onDayClick, selectedDate, copEnabled, tasaCop, b
                     <span className="text-[10px] text-slate-400 font-medium">
                         Total semana
                     </span>
-                    {isCop ? (
-                        <span className="text-xs font-black text-amber-600 dark:text-amber-400">
-                            {formatCop(weekTotal * tasaCop)} COP
-                        </span>
-                    ) : (
-                        <span className="text-xs font-black text-slate-700 dark:text-slate-200">
-                            ${weekTotal.toFixed(2)}
-                        </span>
-                    )}
+                    <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                        ${weekTotal.toFixed(2)}
+                    </span>
                 </div>
                 {isCop && (
                     <div className="flex justify-end gap-2 mt-0.5">
-                        <span className="text-[10px] text-slate-400 font-medium">USD {weekTotal.toFixed(2)}</span>
+                        <span className="text-[10px] text-slate-400 font-medium">{formatCop(weekTotal * tasaCop)} COP</span>
                         {bcvRate > 0 && <span className="text-[10px] text-slate-400 font-medium">{formatBs(weekTotal * bcvRate)} Bs</span>}
                     </div>
                 )}

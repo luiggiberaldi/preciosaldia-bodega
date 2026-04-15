@@ -26,9 +26,9 @@ export function buildTicketHtml(sale, bcvRate, paperConfig, settings) {
         const subBs = sub * rate;
         const maxLen = is80 ? 32 : 22;
         const name = item.name.length > maxLen ? item.name.substring(0, maxLen) + '...' : item.name;
-        const importeStr = isCop ? formatCop(sub * sale.tasaCop) + ' COP' : '$' + sub.toFixed(2);
+        const importeStr = isCop ? 'USD ' + sub.toFixed(2) : '$' + sub.toFixed(2);
         const detailStr = isCop
-            ? 'USD ' + item.priceUsd.toFixed(2) + ' c/u - Bs ' + formatBs(subBs)
+            ? 'USD ' + item.priceUsd.toFixed(2) + ' c/u - ' + formatCop(sub * sale.tasaCop) + ' COP - Bs ' + formatBs(subBs)
             : '$' + item.priceUsd.toFixed(2) + ' c/u - Bs ' + formatBs(subBs);
         return `
             <tr>
@@ -191,9 +191,9 @@ export function buildTicketHtml(sale, bcvRate, paperConfig, settings) {
         </table>
         ` : ''}
         <div class="center bold" style="font-size:${fSmall};color:#555;margin-bottom:4px;">TOTAL A PAGAR</div>
-        <div class="total-usd">${isCop ? formatCop(sale.totalCop || (sale.totalUsd * sale.tasaCop)) + ' COP' : '$' + parseFloat(sale.totalUsd || 0).toFixed(2)}</div>
-        <div class="total-bs" style="margin-bottom:${isCop ? '2px' : '4px'}">Bs ${formatBs(sale.totalBs || 0)}</div>
-        ${isCop ? `<div class="total-bs" style="font-size:${is80 ? '16px' : '13px'};">USD ${parseFloat(sale.totalUsd || 0).toFixed(2)}</div>` : ''}
+        <div class="total-usd">${isCop ? 'USD ' + parseFloat(sale.totalUsd || 0).toFixed(2) : '$' + parseFloat(sale.totalUsd || 0).toFixed(2)}</div>
+        ${isCop ? `<div class="total-bs" style="font-size:${is80 ? '16px' : '13px'};">COP ${formatCop(sale.totalCop || (sale.totalUsd * sale.tasaCop))}</div>` : ''}
+        <div class="total-bs" style="margin-bottom:4px">Bs ${formatBs(sale.totalBs || 0)}</div>
     </div>
 
     <hr class="dash">
