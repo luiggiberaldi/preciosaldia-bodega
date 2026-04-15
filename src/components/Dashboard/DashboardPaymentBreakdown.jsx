@@ -100,10 +100,6 @@ export default function DashboardPaymentBreakdown({
         );
     };
 
-    // Section header amounts
-    const bsHeaderUsd = bcvRate > 0 ? (totalVueltoBs > 0 ? Math.abs(netoBs) / bcvRate : subtotalBs / bcvRate) : 0;
-    const usdHeaderVal = totalVueltoUsd > 0 ? Math.abs(netoUsd) : subtotalUsd;
-
     return (
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative z-10" style={{ animation: 'fadeIn 0.3s ease' }}>
             <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
@@ -114,17 +110,9 @@ export default function DashboardPaymentBreakdown({
                 <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Por Cobrar</span>
-                        <div className="text-right">
-                            <span className="text-xs font-black text-amber-600 dark:text-amber-400">
+                        <span className="text-xs font-black text-amber-600 dark:text-amber-400">
                                 USD {fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}
                             </span>
-                            {isCop && (() => {
-                                const totalFiado = fiadoMethods.reduce((s, [,d]) => s + d.total, 0);
-                                return <div className="text-[10px] text-slate-400 font-medium">
-                                    {formatCop(totalFiado * tasaCop)} COP · {formatBs(totalFiado * bcvRate)} Bs
-                                </div>;
-                            })()}
-                        </div>
                     </div>
                     <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
                         <div className="pl-3 space-y-3">{fiadoMethods.map(e => renderMethod(e))}</div>
@@ -136,18 +124,11 @@ export default function DashboardPaymentBreakdown({
                 <div className="mb-3">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Bolívares</span>
-                        <div className="text-right">
-                            <span className={`text-xs font-black ${totalVueltoBs > 0 ? 'text-cyan-500 dark:text-cyan-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                        <span className={`text-xs font-black ${totalVueltoBs > 0 ? 'text-cyan-500 dark:text-cyan-400' : 'text-blue-600 dark:text-blue-400'}`}>
                                 {totalVueltoBs > 0
                                     ? `${netoBs < 0 ? '−' : ''}${formatBs(Math.abs(netoBs))} Bs neto`
                                     : `${formatBs(subtotalBs)} Bs`}
                             </span>
-                            {isCop && (
-                                <div className="text-[10px] text-slate-400 font-medium">
-                                    {formatCop(bsHeaderUsd * tasaCop)} COP · USD {bsHeaderUsd.toFixed(2)}
-                                </div>
-                            )}
-                        </div>
                     </div>
                     <div className="space-y-3 pl-1 border-l-2 border-blue-200 dark:border-blue-800/40">
                         <div className="pl-3 space-y-3">
@@ -162,18 +143,11 @@ export default function DashboardPaymentBreakdown({
                 <div className={copMethods.length > 0 ? 'mb-3' : ''}>
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Dólares</span>
-                        <div className="text-right">
-                            <span className={`text-xs font-black ${totalVueltoUsd > 0 ? 'text-cyan-500 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                        <span className={`text-xs font-black ${totalVueltoUsd > 0 ? 'text-cyan-500 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                 {totalVueltoUsd > 0
                                     ? `${netoUsd < 0 ? '−' : ''}USD ${Math.abs(netoUsd).toFixed(2)} neto`
                                     : `USD ${subtotalUsd.toFixed(2)}`}
                             </span>
-                            {isCop && (
-                                <div className="text-[10px] text-slate-400 font-medium">
-                                    {formatCop(usdHeaderVal * tasaCop)} COP · {formatBs(usdHeaderVal * bcvRate)} Bs
-                                </div>
-                            )}
-                        </div>
                     </div>
                     <div className="space-y-3 pl-1 border-l-2 border-emerald-200 dark:border-emerald-800/40">
                         <div className="pl-3 space-y-3">
@@ -190,12 +164,6 @@ export default function DashboardPaymentBreakdown({
                         <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pesos Colombianos</span>
                         <div className="text-right">
                             <span className="text-xs font-black text-amber-600 dark:text-amber-400">{formatCop(subtotalCop)} COP</span>
-                            {isCop && (() => {
-                                const copUsd = tasaCop > 0 ? subtotalCop / tasaCop : 0;
-                                return <div className="text-[10px] text-slate-400 font-medium">
-                                    USD {copUsd.toFixed(2)} · {formatBs(copUsd * bcvRate)} Bs
-                                </div>;
-                            })()}
                         </div>
                     </div>
                     <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">

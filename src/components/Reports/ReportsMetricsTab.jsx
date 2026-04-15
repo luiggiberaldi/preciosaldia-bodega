@@ -287,8 +287,8 @@ export default function ReportsMetricsTab({
                     const pct = grandTotalBsEquiv > 0 ? (bsEquiv / grandTotalBsEquiv * 100) : 0;
 
                     let displayAmount = `${formatBs(data.total)} Bs`;
-                    if (data.currency === 'FIADO') displayAmount = `$ ${data.total.toFixed(2)}`;
-                    else if (data.currency === 'USD') displayAmount = `$ ${data.total.toFixed(2)}`;
+                    if (data.currency === 'FIADO') displayAmount = `USD ${data.total.toFixed(2)}`;
+                    else if (data.currency === 'USD') displayAmount = `USD ${data.total.toFixed(2)}`;
                     else if (data.currency === 'COP') displayAmount = `${fmtCop(data.total)} COP`;
 
                     return (
@@ -319,7 +319,7 @@ export default function ReportsMetricsTab({
                     const bsEquiv = data.currency === 'USD' ? data.total * bcvRate : data.total;
                     const pct = grandTotalBsEquiv > 0 ? (bsEquiv / grandTotalBsEquiv * 100) : 0;
                     const isUsd = data.currency === 'USD';
-                    const displayAmount = isUsd ? `$ ${data.total.toFixed(2)}` : `${formatBs(data.total)} Bs`;
+                    const displayAmount = isUsd ? `USD ${data.total.toFixed(2)}` : `${formatBs(data.total)} Bs`;
 
                     return (
                         <div key={method}>
@@ -347,7 +347,7 @@ export default function ReportsMetricsTab({
                         <div className="mb-5">
                             <div className="flex items-center justify-between mb-3">
                                 <span className="text-[11px] font-bold text-amber-500 uppercase tracking-wider">Por Cobrar</span>
-                                <span className="text-xs font-black text-amber-600 dark:text-amber-400">${fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span>
+                                <span className="text-xs font-black text-amber-600 dark:text-amber-400">USD {fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span>
                             </div>
                             <div className="space-y-4">{fiadoMethods.map(e => renderMethod(e))}</div>
                         </div>
@@ -376,8 +376,8 @@ export default function ReportsMetricsTab({
                                 <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Dólares</span>
                                 <span className={`text-xs font-black ${totalVueltoUsd > 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                     {totalVueltoUsd > 0
-                                        ? (copEnabled && tasaCop > 0 ? `${formatCop(Math.abs(netoUsd) * tasaCop)} COP neto · USD ${Math.abs(netoUsd).toFixed(2)}` : `$${Math.abs(netoUsd).toFixed(2)} neto`)
-                                        : (copEnabled && tasaCop > 0 ? `${formatCop(subtotalUsd * tasaCop)} COP · USD ${subtotalUsd.toFixed(2)}` : `$${subtotalUsd.toFixed(2)}`)}
+                                        ? `${netoUsd < 0 ? '−' : ''}USD ${Math.abs(netoUsd).toFixed(2)} neto`
+                                        : `USD ${subtotalUsd.toFixed(2)}`}
                                 </span>
                             </div>
                             <div className="space-y-4">
