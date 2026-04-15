@@ -3,7 +3,7 @@ import { processVoidSale } from '../utils/voidSaleProcessor';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { BarChart3, TrendingUp, Package, AlertTriangle, ShoppingCart, Store, Users, Settings } from 'lucide-react';
-import { formatBs } from '../utils/calculatorUtils';
+import { formatBs, formatCop } from '../utils/calculatorUtils';
 import DashboardStats from '../components/Dashboard/DashboardStats';
 import DashboardPaymentBreakdown from '../components/Dashboard/DashboardPaymentBreakdown';
 import SalesHistory from '../components/Dashboard/SalesHistory';
@@ -405,7 +405,10 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                 </div>
                                 <div className="text-right">
                                     <p className="text-xs font-bold text-slate-600 dark:text-slate-300">{p.qty} vendidos</p>
-                                    <p className="text-[10px] text-slate-400">{formatBs(p.revenue)} Bs</p>
+                                    {copEnabled && tasaCop > 0
+                                        ? <p className="text-[10px] text-slate-400">{formatCop(p.revenue * tasaCop)} COP</p>
+                                        : <p className="text-[10px] text-slate-400">{formatBs(p.revenue * bcvRate)} Bs</p>
+                                    }
                                 </div>
                             </div>
                         ))}
