@@ -334,6 +334,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 setShowTopDeudas={setShowTopDeudas}
                 triggerHaptic={triggerHaptic}
                 onDailyClose={handleDailyClose}
+                copEnabled={copEnabled}
+                tasaCop={tasaCop}
             />
 
             {/* Pago por Metodo */}

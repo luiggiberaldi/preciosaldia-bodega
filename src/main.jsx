@@ -6,6 +6,13 @@ import { ToastProvider } from './components/Toast.jsx'
 import { supabaseCloud } from './config/supabaseCloud.js'
 import './index.css'
 
+// ── Forzar actualización del Service Worker al cargar ──
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.update());
+  });
+}
+
 // ── Evitar que la rueda del mouse cambie valores en inputs numéricos ──
 document.addEventListener('wheel', (e) => {
   if (e.target?.type === 'number') {
