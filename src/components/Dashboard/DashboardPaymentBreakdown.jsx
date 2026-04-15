@@ -37,17 +37,7 @@ export default function DashboardPaymentBreakdown({
         .filter(([, d]) => !d.isChange)
         .reduce((s, [, d]) => s + toBsEquiv(d), 0);
 
-    // Secondary line: shows the other 2 currencies
-    const SecondaryLine = ({ usd, bs, cop, omit }) => {
-        if (!isCop) return null;
-        const parts = [];
-        if (omit !== 'cop') parts.push(`${formatCop(cop)} COP`);
-        if (omit !== 'usd') parts.push(`USD ${usd.toFixed(2)}`);
-        if (omit !== 'bs' && bcvRate > 0) parts.push(`${formatBs(bs)} Bs`);
-        return <div className="text-[10px] text-slate-400 font-medium">{parts.join(' · ')}</div>;
-    };
-
-    const renderMethod = ([method, data], nativeCurrency) => {
+    const renderMethod = ([method, data]) => {
         const label = toTitleCase(getPaymentLabel(method, data.label));
         const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
         const bsEquiv = toBsEquiv(data);
@@ -63,25 +53,6 @@ export default function DashboardPaymentBreakdown({
             displayAmount = `${formatCop(data.total)} COP`;
         }
 
-        // Calculate equivalents for secondary line
-        let usdVal, bsVal, copVal;
-        if (data.currency === 'BS' || (!data.currency)) {
-            usdVal = bcvRate > 0 ? data.total / bcvRate : 0;
-            bsVal = data.total;
-            copVal = usdVal * (tasaCop || 0);
-        } else if (data.currency === 'USD' || data.currency === 'FIADO') {
-            usdVal = data.total;
-            bsVal = data.total * bcvRate;
-            copVal = data.total * (tasaCop || 0);
-        } else if (data.currency === 'COP') {
-            copVal = data.total;
-            usdVal = tasaCop > 0 ? data.total / tasaCop : 0;
-            bsVal = usdVal * bcvRate;
-        }
-
-        const omitCurrency = (data.currency === 'BS' || !data.currency) ? 'bs'
-            : (data.currency === 'COP') ? 'cop' : 'usd';
-
         return (
             <div key={method}>
                 <div className="flex justify-between text-sm mb-1">
@@ -94,7 +65,6 @@ export default function DashboardPaymentBreakdown({
                             <span className="font-bold text-slate-700 dark:text-white">{displayAmount}</span>
                             {data.currency !== 'FIADO' && <span className="text-[10px] text-slate-400 font-medium w-8 text-right">{pct.toFixed(0)}%</span>}
                         </div>
-                        {isCop && <SecondaryLine usd={usdVal} bs={bsVal} cop={copVal} omit={omitCurrency} />}
                     </div>
                 </div>
                 {data.currency !== 'FIADO' && (
@@ -112,13 +82,6 @@ export default function DashboardPaymentBreakdown({
         const isUsd = data.currency === 'USD';
         const displayAmount = isUsd ? `USD ${data.total.toFixed(2)}` : `${formatBs(data.total)} Bs`;
 
-        let usdVal, bsVal, copVal;
-        if (isUsd) {
-            usdVal = data.total; bsVal = data.total * bcvRate; copVal = data.total * (tasaCop || 0);
-        } else {
-            bsVal = data.total; usdVal = bcvRate > 0 ? data.total / bcvRate : 0; copVal = usdVal * (tasaCop || 0);
-        }
-
         return (
             <div key={method}>
                 <div className="flex justify-between text-sm mb-1">
@@ -128,7 +91,6 @@ export default function DashboardPaymentBreakdown({
                             <span className="font-bold text-orange-500 dark:text-orange-400">− {displayAmount}</span>
                             <span className="text-[10px] text-slate-400 font-medium w-8 text-right">{pct.toFixed(0)}%</span>
                         </div>
-                        {isCop && <SecondaryLine usd={usdVal} bs={bsVal} cop={copVal} omit={isUsd ? 'usd' : 'bs'} />}
                     </div>
                 </div>
                 <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -165,7 +127,7 @@ export default function DashboardPaymentBreakdown({
                         </div>
                     </div>
                     <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
-                        <div className="pl-3 space-y-3">{fiadoMethods.map(e => renderMethod(e, 'USD'))}</div>
+                        <div className="pl-3 space-y-3">{fiadoMethods.map(e => renderMethod(e))}</div>
                     </div>
                 </div>
             )}
@@ -189,7 +151,7 @@ export default function DashboardPaymentBreakdown({
                     </div>
                     <div className="space-y-3 pl-1 border-l-2 border-blue-200 dark:border-blue-800/40">
                         <div className="pl-3 space-y-3">
-                            {bsMethods.map(e => renderMethod(e, 'BS'))}
+                            {bsMethods.map(e => renderMethod(e))}
                             {vueltoBs.map(renderVuelto)}
                         </div>
                     </div>
@@ -215,7 +177,7 @@ export default function DashboardPaymentBreakdown({
                     </div>
                     <div className="space-y-3 pl-1 border-l-2 border-emerald-200 dark:border-emerald-800/40">
                         <div className="pl-3 space-y-3">
-                            {usdMethods.map(e => renderMethod(e, 'USD'))}
+                            {usdMethods.map(e => renderMethod(e))}
                             {vueltoUsd.map(renderVuelto)}
                         </div>
                     </div>
@@ -237,7 +199,7 @@ export default function DashboardPaymentBreakdown({
                         </div>
                     </div>
                     <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
-                        <div className="pl-3 space-y-3">{copMethods.map(e => renderMethod(e, 'COP'))}</div>
+                        <div className="pl-3 space-y-3">{copMethods.map(e => renderMethod(e))}</div>
                     </div>
                 </div>
             )}
