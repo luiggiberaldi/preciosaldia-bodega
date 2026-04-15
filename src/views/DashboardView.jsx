@@ -351,6 +351,9 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             <SalesChart
                 weekData={weekData}
                 selectedDate={selectedChartDate}
+                copEnabled={copEnabled}
+                tasaCop={tasaCop}
+                bcvRate={bcvRate}
                 onDayClick={(date) => {
                     triggerHaptic();
                     setSelectedChartDate(prev => prev === date ? null : date);
