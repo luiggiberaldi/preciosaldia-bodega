@@ -198,6 +198,7 @@ export default function ReportsMetricsTab({
     maxDayTotal,
     bcvRate,
     copEnabled,
+    copPrimary,
     tasaCop,
     triggerHaptic,
     expandedSaleId,
@@ -218,8 +219,8 @@ export default function ReportsMetricsTab({
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatCard icon={ShoppingBag} label="Ventas" value={salesForStats.length} color="emerald" />
-                <StatCard icon={DollarSign} label="Ingresos" value={`$${totalUsd.toFixed(2)}`} sub={copEnabled && tasaCop > 0 ? `${formatCop(totalUsd * tasaCop)} COP · ${formatBs(totalBs)} Bs` : `${formatBs(totalBs)} Bs`} color="blue" />
-                <StatCard icon={TrendingUp} label="Ganancia" value={bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00'} sub={copEnabled && tasaCop > 0 ? `${formatCop((bcvRate > 0 ? profit / bcvRate : 0) * tasaCop)} COP · ${formatBs(profit)} Bs` : `${formatBs(profit)} Bs`} color="indigo" />
+                <StatCard icon={DollarSign} label="Ingresos" value={copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(totalUsd * tasaCop)} COP` : `$${totalUsd.toFixed(2)}`} sub={copEnabled && tasaCop > 0 ? (copPrimary ? `$${totalUsd.toFixed(2)} · ${formatBs(totalBs)} Bs` : `${formatCop(totalUsd * tasaCop)} COP · ${formatBs(totalBs)} Bs`) : `${formatBs(totalBs)} Bs`} color="blue" />
+                <StatCard icon={TrendingUp} label="Ganancia" value={copEnabled && copPrimary && tasaCop > 0 ? `${formatCop((bcvRate > 0 ? profit / bcvRate : 0) * tasaCop)} COP` : (bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00')} sub={copEnabled && tasaCop > 0 ? (copPrimary ? `$${(bcvRate > 0 ? profit / bcvRate : 0).toFixed(2)} · ${formatBs(profit)} Bs` : `${formatCop((bcvRate > 0 ? profit / bcvRate : 0) * tasaCop)} COP · ${formatBs(profit)} Bs`) : `${formatBs(profit)} Bs`} color="indigo" />
                 <StatCard icon={Package} label="Artículos" value={totalItems} color="amber" />
             </div>
 
@@ -347,7 +348,7 @@ export default function ReportsMetricsTab({
                         <div className="mb-5">
                             <div className="flex items-center justify-between mb-3">
                                 <span className="text-[11px] font-bold text-amber-500 uppercase tracking-wider">Por Cobrar</span>
-                                <span className="text-xs font-black text-amber-600 dark:text-amber-400">USD {fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span>
+                                <span className="text-xs font-black text-amber-600 dark:text-amber-400">{copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(fiadoMethods.reduce((s, [,d]) => s + d.total, 0) * tasaCop)} COP` : `USD ${fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}`}</span>
                             </div>
                             <div className="space-y-4">{fiadoMethods.map(e => renderMethod(e))}</div>
                         </div>
@@ -374,10 +375,14 @@ export default function ReportsMetricsTab({
                         <div className={copMethods.length > 0 ? 'mb-5' : ''}>
                             <div className="flex items-center justify-between mb-3">
                                 <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Dólares</span>
-                                <span className={`text-xs font-black ${totalVueltoUsd > 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                <span className={`text-xs font-black ${totalVueltoUsd > 0 ? 'text-emerald-500 dark:text-emerald-400' : copEnabled && copPrimary ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                     {totalVueltoUsd > 0
-                                        ? `${netoUsd < 0 ? '−' : ''}USD ${Math.abs(netoUsd).toFixed(2)} neto`
-                                        : `USD ${subtotalUsd.toFixed(2)}`}
+                                        ? (copEnabled && copPrimary && tasaCop > 0
+                                            ? `${netoUsd < 0 ? '−' : ''}${formatCop(Math.abs(netoUsd) * tasaCop)} COP neto`
+                                            : `${netoUsd < 0 ? '−' : ''}USD ${Math.abs(netoUsd).toFixed(2)} neto`)
+                                        : (copEnabled && copPrimary && tasaCop > 0
+                                            ? `${formatCop(subtotalUsd * tasaCop)} COP`
+                                            : `USD ${subtotalUsd.toFixed(2)}`)}
                                 </span>
                             </div>
                             <div className="space-y-4">

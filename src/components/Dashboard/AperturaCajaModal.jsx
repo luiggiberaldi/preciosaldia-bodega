@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Lock, DollarSign, X, Check } from 'lucide-react';
 
-export default function AperturaCajaModal({ isOpen, onClose, onConfirm }) {
+export default function AperturaCajaModal({ isOpen, onClose, onConfirm, copEnabled }) {
     const [usd, setUsd] = useState('');
     const [bs, setBs] = useState('');
+    const [cop, setCop] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!isOpen) return null;
@@ -11,15 +12,18 @@ export default function AperturaCajaModal({ isOpen, onClose, onConfirm }) {
     const handleConfirm = async () => {
         const openingUsd = parseFloat(usd) || 0;
         const openingBs = parseFloat(bs) || 0;
+        const openingCop = parseFloat(cop) || 0;
 
         setIsSubmitting(true);
         try {
             await onConfirm({
                 openingUsd,
                 openingBs,
+                ...(copEnabled && openingCop > 0 ? { openingCop } : {}),
             });
             setUsd('');
             setBs('');
+            setCop('');
         } finally {
             setIsSubmitting(false);
         }
@@ -86,6 +90,24 @@ export default function AperturaCajaModal({ isOpen, onClose, onConfirm }) {
                             />
                         </div>
                     </div>
+
+                    {/* COP Opening */}
+                    {copEnabled && (
+                        <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Efectivo en Pesos (COP)</label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 font-bold text-[10px]">COP</span>
+                                <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    placeholder="0.00"
+                                    value={cop}
+                                    onChange={e => setCop(e.target.value)}
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-12 pr-4 py-3 text-sm font-bold text-amber-600 dark:text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all"
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Info note */}
                     <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 rounded-xl">

@@ -66,6 +66,7 @@ export function useCheckoutFlow({
                 tipo: 'APERTURA_CAJA',
                 openingUsd: data.openingUsd,
                 openingBs: data.openingBs,
+                ...(data.openingCop ? { openingCop: data.openingCop } : {}),
                 timestamp: today,
                 cajaCerrada: false
             };

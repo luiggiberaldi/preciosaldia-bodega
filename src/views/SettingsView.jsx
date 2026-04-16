@@ -36,6 +36,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
         copEnabled, setCopEnabled,
         autoCopEnabled, setAutoCopEnabled,
         tasaCopManual, setTasaCopManual,
+        copPrimary, setCopPrimary,
         tasaCop: calculatedTasaCop
     } = useProductContext();
 
@@ -200,6 +201,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                             copEnabled={copEnabled} setCopEnabled={setCopEnabled}
                             autoCopEnabled={autoCopEnabled} setAutoCopEnabled={setAutoCopEnabled}
                             tasaCopManual={tasaCopManual} setTasaCopManual={setTasaCopManual}
+                            copPrimary={copPrimary} setCopPrimary={setCopPrimary}
                             calculatedTasaCop={calculatedTasaCop}
                             handleSaveBusinessData={handleSaveBusinessData}
                             forceHeartbeat={forceHeartbeat}

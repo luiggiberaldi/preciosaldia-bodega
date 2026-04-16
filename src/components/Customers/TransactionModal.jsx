@@ -16,6 +16,7 @@ export default function TransactionModal({
     bcvRate,
     tasaCop,
     copEnabled,
+    copPrimary,
     handleTransaction
 }) {
     if (!transactionModal.isOpen || !transactionModal.customer) return null;
@@ -40,9 +41,10 @@ export default function TransactionModal({
     const saldoPreviewUsd = previewCustomer ? (previewCustomer.favor || 0) - (previewCustomer.deuda || 0) : saldoActualUsd;
 
     const formatSaldo = (val) => {
-        if (val > 0.001) return { text: `+$${formatUsd(val)}`, label: 'a favor', color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/30' };
-        if (val < -0.001) return { text: `-$${formatUsd(Math.abs(val))}`, label: 'debe', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/30' };
-        return { text: '$0.00', label: 'al dia', color: 'text-slate-500', bg: 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700' };
+        const isCopP = copEnabled && copPrimary && tasaCop > 0;
+        if (val > 0.001) return { text: isCopP ? `+${formatCop(val * tasaCop)} COP` : `+$${formatUsd(val)}`, label: 'a favor', color: isCopP ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/30' };
+        if (val < -0.001) return { text: isCopP ? `-${formatCop(Math.abs(val) * tasaCop)} COP` : `-$${formatUsd(Math.abs(val))}`, label: 'debe', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/30' };
+        return { text: isCopP ? '0 COP' : '$0.00', label: 'al dia', color: 'text-slate-500', bg: 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700' };
     };
 
     const saldoActual = formatSaldo(saldoActualUsd);
@@ -231,8 +233,10 @@ export default function TransactionModal({
                             </div>
                             {bcvRate > 0 && (
                                 <p className="text-[10px] font-bold text-slate-400 mt-1 text-right">
-                                    {saldoPreviewUsd >= 0 ? '+' : '-'}{formatBs(Math.abs(saldoPreviewUsd) * bcvRate)} Bs
-                                    {copEnabled && tasaCop > 0 && ` · ${formatCop(Math.abs(saldoPreviewUsd) * tasaCop)} COP`}
+                                    {copEnabled && copPrimary && tasaCop > 0
+                                        ? <>{saldoPreviewUsd >= 0 ? '+' : '-'}${formatUsd(Math.abs(saldoPreviewUsd))} · {formatBs(Math.abs(saldoPreviewUsd) * bcvRate)} Bs</>
+                                        : <>{saldoPreviewUsd >= 0 ? '+' : '-'}{formatBs(Math.abs(saldoPreviewUsd) * bcvRate)} Bs
+                                    {copEnabled && tasaCop > 0 && ` · ${formatCop(Math.abs(saldoPreviewUsd) * tasaCop)} COP`}</>}
                                 </p>
                             )}
                         </div>

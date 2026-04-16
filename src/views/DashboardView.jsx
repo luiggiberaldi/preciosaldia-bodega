@@ -33,7 +33,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const isAdmin = true;
     const isCajero = useAuthStore(s => s.requireLogin && s.usuarioActivo?.rol === 'CAJERO');
     const { log: auditLog } = useAudit();
-    const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
+    const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate, copEnabled, copPrimary, tasaCop } = useProductContext();
     const { loadCart } = useCart();
 
     // Data loading
@@ -335,6 +335,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 triggerHaptic={triggerHaptic}
                 onDailyClose={handleDailyClose}
                 copEnabled={copEnabled}
+                copPrimary={copPrimary}
                 tasaCop={tasaCop}
             />
 
@@ -344,6 +345,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 todayTotalBs={todayTotalBs}
                 bcvRate={bcvRate}
                 copEnabled={copEnabled}
+                copPrimary={copPrimary}
                 tasaCop={tasaCop}
             />
 
@@ -352,6 +354,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 weekData={weekData}
                 selectedDate={selectedChartDate}
                 copEnabled={copEnabled}
+                copPrimary={copPrimary}
                 tasaCop={tasaCop}
                 bcvRate={bcvRate}
                 onDayClick={(date) => {
@@ -408,9 +411,17 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                 </div>
                                 <div className="text-right">
                                     <p className="text-xs font-bold text-slate-600 dark:text-slate-300">{p.qty} vendidos</p>
-                                    <p className="text-[10px] text-slate-400">${p.revenue.toFixed(2)}</p>
+                                    <p className={`text-[10px] ${copEnabled && copPrimary ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'}`}>
+                                        {copEnabled && copPrimary && tasaCop > 0
+                                            ? `${formatCop(p.revenue * tasaCop)} COP`
+                                            : `$${p.revenue.toFixed(2)}`}
+                                    </p>
                                     {copEnabled && tasaCop > 0
-                                        ? <p className="text-[10px] text-slate-400">{formatCop(p.revenue * tasaCop)} COP · {formatBs(p.revenue * bcvRate)} Bs</p>
+                                        ? <p className="text-[10px] text-slate-400">
+                                            {copPrimary
+                                                ? `$${p.revenue.toFixed(2)} · ${formatBs(p.revenue * bcvRate)} Bs`
+                                                : `${formatCop(p.revenue * tasaCop)} COP · ${formatBs(p.revenue * bcvRate)} Bs`}
+                                          </p>
                                         : <p className="text-[10px] text-slate-400">{formatBs(p.revenue * bcvRate)} Bs</p>
                                     }
                                 </div>
@@ -445,6 +456,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 }}
                 onPrintTicket={handlePrintTicket}
                 copEnabled={copEnabled}
+                copPrimary={copPrimary}
                 tasaCop={tasaCop}
             />
 
@@ -519,6 +531,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 todayTopProducts={todayTopProducts}
                 bcvRate={bcvRate}
                 copEnabled={copEnabled}
+                copPrimary={copPrimary}
                 tasaCop={tasaCop}
             />
         </div>

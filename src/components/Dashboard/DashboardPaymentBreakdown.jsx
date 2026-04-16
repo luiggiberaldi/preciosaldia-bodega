@@ -4,7 +4,7 @@ import { formatBs, formatCop } from '../../utils/calculatorUtils';
 import { getPaymentLabel, toTitleCase, getPaymentIcon, PAYMENT_ICONS } from '../../config/paymentMethods';
 
 export default function DashboardPaymentBreakdown({
-    paymentBreakdown, todayTotalBs, bcvRate, copEnabled, tasaCop,
+    paymentBreakdown, todayTotalBs, bcvRate, copEnabled, copPrimary, tasaCop,
 }) {
     if (Object.keys(paymentBreakdown).length === 0) return null;
 

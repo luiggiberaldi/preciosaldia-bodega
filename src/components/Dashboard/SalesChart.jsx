@@ -6,7 +6,7 @@ import { formatBs, formatCop } from '../../utils/calculatorUtils';
  * Gráfica de barras: Ventas de los últimos 7 días.
  * Pure CSS — cero dependencias externas.
  */
-function SalesChart({ weekData, onDayClick, selectedDate, copEnabled, tasaCop, bcvRate }) {
+function SalesChart({ weekData, onDayClick, selectedDate, copEnabled, copPrimary, tasaCop, bcvRate }) {
     if (!weekData || weekData.length === 0) return null;
 
     const maxVal = Math.max(...weekData.map(d => d.total), 1);
@@ -16,6 +16,7 @@ function SalesChart({ weekData, onDayClick, selectedDate, copEnabled, tasaCop, b
     const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
     const fmtBarLabel = (usd) => {
+        if (copEnabled && copPrimary && tasaCop > 0) return `${formatCop(usd * tasaCop)}`;
         return `$${usd.toFixed(0)}`;
     };
 
@@ -82,13 +83,17 @@ function SalesChart({ weekData, onDayClick, selectedDate, copEnabled, tasaCop, b
                     <span className="text-[10px] text-slate-400 font-medium">
                         Total semana
                     </span>
-                    <span className="text-xs font-black text-slate-700 dark:text-slate-200">
-                        ${weekTotal.toFixed(2)}
+                    <span className={`text-xs font-black ${copEnabled && copPrimary ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                        {copEnabled && copPrimary
+                            ? `${formatCop(weekTotal * tasaCop)} COP`
+                            : `$${weekTotal.toFixed(2)}`}
                     </span>
                 </div>
                 {isCop && (
                     <div className="flex justify-end gap-2 mt-0.5">
-                        <span className="text-[10px] text-slate-400 font-medium">{formatCop(weekTotal * tasaCop)} COP</span>
+                        {copPrimary
+                            ? <span className="text-[10px] text-slate-400 font-medium">${weekTotal.toFixed(2)}</span>
+                            : <span className="text-[10px] text-slate-400 font-medium">{formatCop(weekTotal * tasaCop)} COP</span>}
                         {bcvRate > 0 && <span className="text-[10px] text-slate-400 font-medium">{formatBs(weekTotal * bcvRate)} Bs</span>}
                     </div>
                 )}

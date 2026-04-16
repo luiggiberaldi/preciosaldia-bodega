@@ -124,7 +124,7 @@ export function AddInvoiceModal({ supplier, bcvRate, tasaCop, copEnabled, onClos
     );
 }
 
-export function PayInvoiceModal({ supplier, bcvRate, tasaCop, copEnabled, activePaymentMethods = [], onClose, onSave }) {
+export function PayInvoiceModal({ supplier, bcvRate, tasaCop, copEnabled, copPrimary, activePaymentMethods = [], onClose, onSave }) {
     const [amount, setAmount] = useState('');
     const [currencyMode, setCurrencyMode] = useState('BS');
     const [paymentMethod, setPaymentMethod] = useState('efectivo_bs');
@@ -154,7 +154,7 @@ export function PayInvoiceModal({ supplier, bcvRate, tasaCop, copEnabled, active
                     <button onClick={onClose} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-full"><X size={18} /></button>
                 </div>
                 <form onSubmit={handleSave} className="p-5 space-y-4">
-                    <p className="text-xs text-slate-500 -mt-2 mb-2">Deuda total: <strong>{`USD ${formatUsd(supplier.deuda)}`}{copEnabled && tasaCop > 0 ? ` · ${formatCop(supplier.deuda * tasaCop)} COP` : ''}</strong></p>
+                    <p className="text-xs text-slate-500 -mt-2 mb-2">Deuda total: <strong>{copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(supplier.deuda * tasaCop)} COP · USD ${formatUsd(supplier.deuda)}` : `USD ${formatUsd(supplier.deuda)}`}{copEnabled && !copPrimary && tasaCop > 0 ? ` · ${formatCop(supplier.deuda * tasaCop)} COP` : ''}</strong></p>
                     
                     {/* Moneda */}
                     <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
@@ -214,7 +214,7 @@ export function PayInvoiceModal({ supplier, bcvRate, tasaCop, copEnabled, active
     );
 }
 
-export function SupplierDetailsSheet({ supplier, isOpen, isAdmin, onClose, onAddInvoice, onPayInvoice, onEdit, onDelete, bcvRate, tasaCop, copEnabled, historyData }) {
+export function SupplierDetailsSheet({ supplier, isOpen, isAdmin, onClose, onAddInvoice, onPayInvoice, onEdit, onDelete, bcvRate, tasaCop, copEnabled, copPrimary, historyData }) {
     if (!isOpen || !supplier) return null;
 
     return (
@@ -247,11 +247,14 @@ export function SupplierDetailsSheet({ supplier, isOpen, isAdmin, onClose, onAdd
                     {/* Deuda / Saldo */}
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 rounded-xl px-4 py-3 text-center">
                         <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Total por Pagar</p>
-                        <p className="text-3xl font-black text-red-600 dark:text-red-400">
-                            USD {formatUsd(supplier.deuda)}
+                        <p className={`text-3xl font-black ${copEnabled && copPrimary ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {copEnabled && copPrimary && tasaCop > 0
+                                ? `${formatCop(supplier.deuda * tasaCop)} COP`
+                                : `USD ${formatUsd(supplier.deuda)}`}
                         </p>
                         <div className="flex items-center justify-center gap-2 mt-1">
-                            {copEnabled && tasaCop > 0 && <p className="text-xs font-bold text-red-400/80">{formatCop(supplier.deuda * tasaCop)} COP</p>}
+                            {copEnabled && copPrimary && <p className="text-xs font-bold text-red-400/80">USD {formatUsd(supplier.deuda)}</p>}
+                            {copEnabled && !copPrimary && tasaCop > 0 && <p className="text-xs font-bold text-red-400/80">{formatCop(supplier.deuda * tasaCop)} COP</p>}
                             {bcvRate > 0 && <p className="text-xs font-bold text-red-400/80">{formatBs(supplier.deuda * bcvRate)} Bs</p>}
                         </div>
                     </div>
@@ -291,10 +294,16 @@ export function SupplierDetailsSheet({ supplier, isOpen, isAdmin, onClose, onAdd
                                             </div>
                                             <div className="text-right">
                                                 <p className={`text-sm font-black ${isInvoice ? 'text-red-500' : 'text-emerald-500'}`}>
-                                                    {isInvoice ? '+' : '-'}
-                                                    USD {formatUsd(isInvoice ? record.amountUsd : Math.abs(record.totalUsd || 0))}
+                                                    {copEnabled && copPrimary && tasaCop > 0
+                                                        ? <>{isInvoice ? '+' : '-'}{formatCop((isInvoice ? record.amountUsd : Math.abs(record.totalUsd || 0)) * tasaCop)} COP</>
+                                                        : <>{isInvoice ? '+' : '-'}USD {formatUsd(isInvoice ? record.amountUsd : Math.abs(record.totalUsd || 0))}</>}
                                                 </p>
-                                                {copEnabled && tasaCop > 0 && (
+                                                {copEnabled && copPrimary && (
+                                                    <p className={`text-[10px] font-bold ${isInvoice ? 'text-red-400/80' : 'text-emerald-400/80'}`}>
+                                                        {isInvoice ? '+' : '-'}USD {formatUsd(isInvoice ? record.amountUsd : Math.abs(record.totalUsd || 0))}
+                                                    </p>
+                                                )}
+                                                {copEnabled && !copPrimary && tasaCop > 0 && (
                                                     <p className={`text-[10px] font-bold ${isInvoice ? 'text-red-400/80' : 'text-emerald-400/80'}`}>
                                                         {isInvoice ? '+' : '-'}{formatCop((isInvoice ? record.amountUsd : Math.abs(record.totalUsd || 0)) * tasaCop)} COP
                                                     </p>

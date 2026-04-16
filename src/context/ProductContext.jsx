@@ -38,6 +38,9 @@ export function ProductProvider({ children, rates }) {
     const [tasaCopManual, setTasaCopManual] = useState(() => {
         return localStorage.getItem('tasa_cop') || '';
     });
+    const [copPrimary, setCopPrimary] = useState(() => {
+        return localStorage.getItem('cop_primary') === 'true';
+    });
 
     const effectiveRate = (useAutoRate ? rates.bcv?.price : (parseFloat(customRate) > 0 ? parseFloat(customRate) : rates.bcv?.price)) || 1;
     
@@ -118,6 +121,9 @@ export function ProductProvider({ children, rates }) {
             if (e.key === 'tasa_cop') {
                 setTasaCopManual(e.newValue);
             }
+            if (e.key === 'cop_primary') {
+                setCopPrimary(e.newValue === 'true');
+            }
             if (e.key === 'bodega_products_v1') {
                 // If modified in another tab, fetch it
                 storageService.getItem('bodega_products_v1', []).then(updatedProducts => setProducts(updatedProducts));
@@ -181,6 +187,8 @@ export function ProductProvider({ children, rates }) {
             setAutoCopEnabled,
             tasaCopManual,
             setTasaCopManual,
+            copPrimary,
+            setCopPrimary,
             tasaCop,
             adjustStock
         }}>

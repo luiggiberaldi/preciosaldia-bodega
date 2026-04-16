@@ -19,6 +19,7 @@ export default function CierreCajaWizard({
     todayTopProducts = [],
     bcvRate = 1,
     copEnabled = false,
+    copPrimary = false,
     tasaCop = 0
 }) {
     const [step, setStep] = useState(1);
@@ -133,9 +134,15 @@ export default function CierreCajaWizard({
                             <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl p-5 text-white relative overflow-hidden">
                                 <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
                                 <p className="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-1">Ingresos brutos del dia</p>
-                                <p className="text-3xl font-black">{fmtUsdAmt(todayTotalUsd)}</p>
+                                <p className="text-3xl font-black">
+                                    {copEnabled && copPrimary && tasaCop > 0
+                                        ? `${formatCop(todayTotalUsd * tasaCop)} COP`
+                                        : fmtUsdAmt(todayTotalUsd)}
+                                </p>
                                 {copActive && (
-                                    <p className="text-sm font-bold text-amber-300 mt-0.5">{formatCop(todayTotalUsd * tasaCop)} COP</p>
+                                    copPrimary
+                                        ? <p className="text-sm font-bold text-indigo-200 mt-0.5">{fmtUsdAmt(todayTotalUsd)}</p>
+                                        : <p className="text-sm font-bold text-amber-300 mt-0.5">{formatCop(todayTotalUsd * tasaCop)} COP</p>
                                 )}
                                 <p className="text-sm font-bold text-indigo-200 mt-0.5">{formatBs(todayTotalBs)} Bs</p>
                                 <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/20">
@@ -158,12 +165,18 @@ export default function CierreCajaWizard({
                                         <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">Ganancia</span>
                                     </div>
                                     <p className={`text-lg font-black ${todayProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-                                        {todayProfit >= 0 ? '+' : ''}{fmtUsdAmt(bcvRate > 0 ? todayProfit / bcvRate : 0)}
+                                        {copEnabled && copPrimary && tasaCop > 0
+                                            ? `${todayProfit >= 0 ? '+' : ''}${formatCop((bcvRate > 0 ? todayProfit / bcvRate : 0) * tasaCop)} COP`
+                                            : `${todayProfit >= 0 ? '+' : ''}${fmtUsdAmt(bcvRate > 0 ? todayProfit / bcvRate : 0)}`}
                                     </p>
                                     {copActive && (
-                                        <p className="text-[11px] font-bold text-emerald-500/70">
-                                            {todayProfit >= 0 ? '+' : ''}{formatCop((bcvRate > 0 ? todayProfit / bcvRate : 0) * tasaCop)} COP
-                                        </p>
+                                        copPrimary
+                                            ? <p className="text-[11px] font-bold text-emerald-500/70">
+                                                {todayProfit >= 0 ? '+' : ''}{fmtUsdAmt(bcvRate > 0 ? todayProfit / bcvRate : 0)}
+                                              </p>
+                                            : <p className="text-[11px] font-bold text-emerald-500/70">
+                                                {todayProfit >= 0 ? '+' : ''}{formatCop((bcvRate > 0 ? todayProfit / bcvRate : 0) * tasaCop)} COP
+                                              </p>
                                     )}
                                     <p className="text-[11px] font-bold text-emerald-500/70">{formatBs(todayProfit)} Bs</p>
                                 </div>
@@ -173,10 +186,14 @@ export default function CierreCajaWizard({
                                         <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase">Egresos</span>
                                     </div>
                                     <p className="text-lg font-black text-orange-600 dark:text-orange-400">
-                                        -{fmtUsdAmt(todayExpensesUsd)}
+                                        {copEnabled && copPrimary && tasaCop > 0
+                                            ? `-${formatCop(todayExpensesUsd * tasaCop)} COP`
+                                            : `-${fmtUsdAmt(todayExpensesUsd)}`}
                                     </p>
                                     {copActive && (
-                                        <p className="text-[11px] font-bold text-orange-500/70">-{formatCop(todayExpensesUsd * tasaCop)} COP</p>
+                                        copPrimary
+                                            ? <p className="text-[11px] font-bold text-orange-500/70">-{fmtUsdAmt(todayExpensesUsd)}</p>
+                                            : <p className="text-[11px] font-bold text-orange-500/70">-{formatCop(todayExpensesUsd * tasaCop)} COP</p>
                                     )}
                                     <p className="text-[11px] font-bold text-orange-500/70">-{formatBs(todayExpensesUsd * bcvRate)} Bs</p>
                                 </div>

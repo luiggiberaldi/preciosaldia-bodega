@@ -38,7 +38,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
     const { notifyLowStock } = useNotifications();
 
     // ── Global Context ──────────────────────────────────────
-    const { products, setProducts, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
+    const { products, setProducts, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, copPrimary, tasaCop } = useProductContext();
 
     // ── State ──────────────────────────────────────
     const [showConfetti, setShowConfetti] = useState(false);
@@ -576,6 +576,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                                     searchTerm={searchTerm}
                                     onOpenCustomAmount={() => setShowCustomAmountModal(true)}
                                     copEnabled={copEnabled}
+                                    copPrimary={copPrimary}
                                     tasaCop={tasaCop}
                                     effectiveRate={effectiveRate}
                             products={products}
@@ -689,6 +690,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                 onClose={() => { setShowReceipt(null); setSelectedCustomerId(''); }}
                 onShareWhatsApp={(r) => { window.open(buildReceiptWhatsAppUrl(r, effectiveRate), '_blank'); }}
                 currentRate={effectiveRate}
+                copPrimary={copPrimary}
             />
 
             {/* Custom Amount Modal */}
@@ -725,6 +727,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                     effectiveRate={effectiveRate}
                     tasaCop={tasaCop}
                     copEnabled={copEnabled}
+                    copPrimary={copPrimary}
                 />
             )}
 
@@ -742,6 +745,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                 isOpen={isAperturaOpen}
                 onClose={() => setIsAperturaOpen(false)}
                 onConfirm={handleSaveApertura}
+                copEnabled={copEnabled}
             />
         </div>
     );

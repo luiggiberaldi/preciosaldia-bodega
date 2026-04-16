@@ -4,16 +4,17 @@ import { formatUsd, formatBs, formatCop } from '../../utils/calculatorUtils';
 import EmptyState from '../EmptyState';
 import SwipeableItem from '../SwipeableItem';
 
-export default function SuppliersList({ 
-    suppliers, 
+export default function SuppliersList({
+    suppliers,
     bcvRate,
     tasaCop,
     copEnabled,
-    triggerHaptic, 
+    copPrimary,
+    triggerHaptic,
     isAdmin,
-    onAddSupplier, 
-    onSelectSupplier, 
-    onDeleteSupplier 
+    onAddSupplier,
+    onSelectSupplier,
+    onDeleteSupplier
 }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('all'); // 'all' | 'deuda'
@@ -41,10 +42,13 @@ export default function SuppliersList({
                                 Cuentas por Pagar
                             </p>
                             <h3 className="text-4xl font-black tracking-tight">
-                                USD {formatUsd(totalDebtUsd)}
+                                {copEnabled && copPrimary && tasaCop > 0
+                                    ? `${formatCop(totalDebtUsd * tasaCop)} COP`
+                                    : `USD ${formatUsd(totalDebtUsd)}`}
                             </h3>
                             <div className="flex flex-col mt-1">
-                                {copEnabled && tasaCop > 0 && <p className="text-sm font-bold text-purple-200">{formatCop(totalDebtUsd * tasaCop)} COP</p>}
+                                {copEnabled && copPrimary && tasaCop > 0 && <p className="text-sm font-bold text-purple-200">USD {formatUsd(totalDebtUsd)}</p>}
+                                {copEnabled && !copPrimary && tasaCop > 0 && <p className="text-sm font-bold text-purple-200">{formatCop(totalDebtUsd * tasaCop)} COP</p>}
                                 {bcvRate > 0 && <p className="text-sm font-bold text-purple-200">{formatBs(totalDebtUsd * bcvRate)} Bs</p>}
                             </div>
                         </div>
@@ -142,10 +146,13 @@ export default function SuppliersList({
                                 <div className="text-right shrink-0">
                                     {supplier.deuda > 0 ? (
                                         <>
-                                            <p className="text-sm font-black text-red-500 leading-tight">
-                                                -USD {formatUsd(supplier.deuda)}
+                                            <p className={`text-sm font-black ${copEnabled && copPrimary ? 'text-amber-600 dark:text-amber-400' : 'text-red-500'} leading-tight`}>
+                                                {copEnabled && copPrimary && tasaCop > 0
+                                                    ? `-${formatCop(supplier.deuda * tasaCop)} COP`
+                                                    : `-USD ${formatUsd(supplier.deuda)}`}
                                             </p>
-                                            {copEnabled && tasaCop > 0 && <p className="text-[10px] font-bold text-red-400/80">-{formatCop(supplier.deuda * tasaCop)} COP</p>}
+                                            {copEnabled && copPrimary && <p className="text-[10px] font-bold text-red-400/80">-USD {formatUsd(supplier.deuda)}</p>}
+                                            {copEnabled && !copPrimary && tasaCop > 0 && <p className="text-[10px] font-bold text-red-400/80">-{formatCop(supplier.deuda * tasaCop)} COP</p>}
                                             {bcvRate > 0 && <p className="text-[10px] font-bold text-red-400/80">-{formatBs(supplier.deuda * bcvRate)} Bs</p>}
                                             <p className="text-[9px] font-bold text-red-500 bg-red-50 dark:bg-red-900/30 px-1.5 py-0.5 rounded inline-block mt-0.5 uppercase tracking-wider">Deuda</p>
                                         </>

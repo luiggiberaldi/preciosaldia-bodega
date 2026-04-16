@@ -11,6 +11,7 @@ export default function SettingsTabNegocio({
     copEnabled, setCopEnabled,
     autoCopEnabled, setAutoCopEnabled,
     tasaCopManual, setTasaCopManual,
+    copPrimary, setCopPrimary,
     calculatedTasaCop,
     handleSaveBusinessData,
     forceHeartbeat,
@@ -180,6 +181,23 @@ export default function SettingsTabNegocio({
                 </div>
                 {copEnabled && (
                     <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-[13px] font-bold text-slate-700 dark:text-slate-200">COP como Moneda Principal</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Los precios se muestran primero en pesos</p>
+                            </div>
+                            <Toggle
+                                enabled={copPrimary}
+                                color="amber"
+                                onChange={() => {
+                                    const newVal = !copPrimary;
+                                    setCopPrimary(newVal);
+                                    localStorage.setItem('cop_primary', newVal.toString());
+                                    triggerHaptic?.();
+                                    showToast(newVal ? 'COP es moneda principal' : 'USD es moneda principal', 'success');
+                                }}
+                            />
+                        </div>
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-[13px] font-bold text-slate-700 dark:text-slate-200">Calcular Automaticamente</p>

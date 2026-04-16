@@ -23,7 +23,7 @@ const RANGE_OPTIONS = [
 ];
 
 export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive }) {
-    const { products, setProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
+    const { products, setProducts, effectiveRate: bcvRate, copEnabled, copPrimary, tasaCop } = useProductContext();
     const { loadCart } = useCart();
     const [allSales, setAllSales] = useState([]);
     const [activeTab, setActiveTab] = useState('metrics');
@@ -226,6 +226,7 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
                     maxDayTotal={maxDayTotal}
                     bcvRate={bcvRate}
                     copEnabled={copEnabled}
+                    copPrimary={copPrimary}
                     tasaCop={tasaCop}
                     triggerHaptic={triggerHaptic}
                     expandedSaleId={expandedSaleId}

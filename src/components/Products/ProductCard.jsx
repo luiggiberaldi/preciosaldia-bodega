@@ -10,6 +10,7 @@ export default function ProductCard({
     categories,
     onAdjustStock,
     copEnabled,
+    copPrimary,
     tasaCop,
     daysRemaining,
     isSelected,
@@ -71,15 +72,27 @@ export default function ProductCard({
                 <div className="flex justify-between items-end mb-3">
                     <div>
                         {copEnabled && tasaCop > 0 ? (
-                            <>
-                                <p className="text-lg lg:text-base font-black text-emerald-600 dark:text-emerald-400 leading-none">
-                                    {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
-                                </p>
-                                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded">{formatCop(valCop)} COP</span>
-                                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">{formatBs(valBs)} Bs</span>
-                                </div>
-                            </>
+                            copPrimary ? (
+                                <>
+                                    <p className="text-lg lg:text-base font-black text-amber-600 dark:text-amber-400 leading-none">
+                                        {formatCop(valCop)} <span className="text-[10px] font-bold text-amber-600/50 dark:text-amber-400/50">COP {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
+                                    </p>
+                                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded">{formatUsd(p.priceUsdt)} USD</span>
+                                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">{formatBs(valBs)} Bs</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-lg lg:text-base font-black text-emerald-600 dark:text-emerald-400 leading-none">
+                                        {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
+                                    </p>
+                                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                        <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded">{formatCop(valCop)} COP</span>
+                                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">{formatBs(valBs)} Bs</span>
+                                    </div>
+                                </>
+                            )
                         ) : (
                             <>
                                 <p className="text-lg lg:text-base font-black text-emerald-600 dark:text-emerald-400 leading-none">
@@ -92,7 +105,9 @@ export default function ProductCard({
                             <p className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mt-0.5 flex items-center gap-0.5">
                                 <Layers size={10} />
                                 {copEnabled && tasaCop > 0
-                                    ? `$${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud · ${formatCop((p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)) * tasaCop)} COP`
+                                    ? copPrimary
+                                        ? `${formatCop((p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)) * tasaCop)} COP / ud · $${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)}`
+                                        : `$${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud · ${formatCop((p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)) * tasaCop)} COP`
                                     : `$${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud`
                                 }
                             </p>
