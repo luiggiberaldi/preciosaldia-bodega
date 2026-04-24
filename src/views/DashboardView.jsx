@@ -70,8 +70,18 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
     // Notificar cierre de caja pendiente (>7pm con ventas o cobros sin cerrar)
     useEffect(() => {
-        if (todayCashFlow.length > 0) notifyCierrePendiente(todayCashFlow.length);
-    }, [todayCashFlow.length, notifyCierrePendiente]);
+        if (todayCashFlow.length > 0) {
+            const ventasHoy = todayCashFlow.filter(s => s.tipo === 'VENTA' || s.tipo === 'VENTA_FIADA');
+            const deudasHoy = todayCashFlow.filter(s => s.tipo === 'VENTA_FIADA');
+            notifyCierrePendiente({
+                salesCount: ventasHoy.length || todayCashFlow.length,
+                totalUsd: todayTotalUsd,
+                totalBs: todayTotalBs,
+                totalDeudas,
+                deudasCount: deudasHoy.length,
+            });
+        }
+    }, [todayCashFlow.length, notifyCierrePendiente, todayTotalUsd, todayTotalBs, totalDeudas]);
 
     // ── Funciones de Historial Avanzado ──
     const handleVoidSale = async (sale) => {

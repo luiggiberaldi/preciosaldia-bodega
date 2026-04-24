@@ -9,7 +9,7 @@ export function useCheckoutFlow({
     effectiveRate, tasaCop, copEnabled, discountData, useAutoRate,
     setSalesData, setShowReceipt, setShowCheckout, setSelectedCustomerId,
     setCart, setCartSelectedIndex, setShowConfetti, setTodayAperturaData, setIsAperturaOpen,
-    playCheckout, playError, notifyLowStock, triggerHaptic
+    playCheckout, playError, notifyLowStock, notifySaleComplete, triggerHaptic
 }) {
 
     const handleCheckout = async (payments, changeBreakdown) => {
@@ -43,6 +43,7 @@ export function useCheckoutFlow({
         playCheckout();
         setShowConfetti(true);
         notifyLowStock(result.updatedProducts);
+        notifySaleComplete && notifySaleComplete(result.sale);
 
         setCart([]);
         setShowCheckout(false);

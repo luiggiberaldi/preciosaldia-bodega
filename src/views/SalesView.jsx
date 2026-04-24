@@ -35,7 +35,7 @@ import { useCheckoutFlow } from '../hooks/useCheckoutFlow';
 
 export default function SalesView({ triggerHaptic, isActive }) {
     const { playAdd, playRemove, playCheckout, playError } = useSounds();
-    const { notifyLowStock } = useNotifications();
+    const { notifyLowStock, notifySaleComplete } = useNotifications();
 
     // ── Global Context ──────────────────────────────────────
     const { products, setProducts, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, copPrimary, tasaCop } = useProductContext();
@@ -274,7 +274,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
         effectiveRate, tasaCop, copEnabled, discountData, useAutoRate,
         setSalesData, setShowReceipt, setShowCheckout, setSelectedCustomerId,
         setCart, setCartSelectedIndex, setShowConfetti, setTodayAperturaData, setIsAperturaOpen,
-        playCheckout, playError, notifyLowStock, triggerHaptic
+        playCheckout, playError, notifyLowStock, notifySaleComplete, triggerHaptic
     });
 
     // ── Callbacks ─────────────────────────────────
