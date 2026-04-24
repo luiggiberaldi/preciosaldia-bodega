@@ -44,6 +44,7 @@ const SUITE_ICONS = {
     stock_modos:           '📦',
     // Bloque E — Display COP
     cop_display:           '🇨🇴',
+    cop_pagos:             '💛',
     // Bloque F — Datos reales
     auditoria_historica:   '🕵️',
     auditoria_patrimonial: '🏭',
@@ -191,8 +192,8 @@ export const TesterView = ({ onBack }) => {
                         <ShieldCheck size={18} />
                     </div>
                     <div>
-                        <h1 className="text-sm sm:text-lg font-black tracking-tight">Auditor Financiero <span className="text-rose-400">v6.0</span></h1>
-                        <p className="text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-widest font-bold">22 Suites • Determinista • Datos Reales • Groq AI</p>
+                        <h1 className="text-sm sm:text-lg font-black tracking-tight">Auditor Financiero <span className="text-rose-400">v6.1</span></h1>
+                        <p className="text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-widest font-bold">23 Suites • Determinista • Datos Reales • Groq AI</p>
                     </div>
                 </div>
 
@@ -443,7 +444,7 @@ export const TesterView = ({ onBack }) => {
 
             {/* ── Footer ── */}
             <p className="text-center text-[7px] sm:text-[9px] text-slate-700 font-mono uppercase pb-20 mt-4">
-                Precios al Día — Bodega • Auditor Financiero v6.0 • {new Date().getFullYear()} • 22 Suites Deterministas
+                Precios al Día — Bodega • Auditor Financiero v6.1 • {new Date().getFullYear()} • 23 Suites Deterministas
             </p>
         </div>
     );

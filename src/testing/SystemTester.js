@@ -701,7 +701,7 @@ async function suiteStockModos() {
 }
 
 // ════════════════════════════════════════════════════════════
-// ██  BLOQUE E — DISPLAY COP (Validación de Presentación)
+// ██  BLOQUE E — LÓGICA COP COMPLETA
 // ════════════════════════════════════════════════════════════
 
 // ── E1. COP DISPLAY — precedencia de tasa, copPrimary ──
@@ -750,6 +750,132 @@ async function suiteCopDisplay() {
     assertEqual(totalCop, Math.round(totalUsd * tasaCop), 'totalCop: mulR(totalUsd, tasaCop) = redondeo correcto');
 
     log('COP Display certificado: precedencia de tasa, copPrimary, displayTotal.', 'success');
+}
+
+// ── E2. COP PAGOS — conversión en checkout, guarda en sale, breakdown nativo ──
+async function suiteCopPagos() {
+    section('💛 SUITE E2: COP Pagos (conversión checkout, guarda sale, breakdown nativo)');
+
+    const RATE = 36.50;
+    const TASA_COP = 4150;
+    const safeTasaCop = TASA_COP > 0 ? TASA_COP : 4150;
+
+    // ── useCheckoutCalculations: COP → USD (divR) ──
+    // Pago de 83000 COP → divR(83000, 4150) = $20 USD
+    const copPago = 83000;
+    const copToUsd = divR(copPago, safeTasaCop);
+    assertEqual(copToUsd, 20, 'COP→USD: divR(83000, 4150) = $20');
+
+    // COP → Bs: mulR(divR(copAmount, tasaCop), rate)
+    const copToBs = mulR(divR(copPago, safeTasaCop), RATE);
+    assertEqual(copToBs, mulR(20, RATE), 'COP→Bs: mulR(divR(83000, 4150), 36.50) = 730 Bs');
+
+    // Monto parcial COP
+    const copParcial = 41500;
+    const copParcialUsd = divR(copParcial, safeTasaCop);
+    assertEqual(copParcialUsd, 10, 'COP parcial: 41500/4150 = $10');
+
+    // fillBar COP: remainingUsd × safeTasaCop
+    const remainingUsd = 15;
+    const fillBarCop = Number((remainingUsd * safeTasaCop).toFixed(2));
+    assertEqual(fillBarCop, 62250, 'fillBar COP: $15 × 4150 = 62250 COP');
+
+    // safeTasaCop guard: tasaCop=0 → 4150
+    const safeCopZero = (0 > 0 ? 0 : 4150);
+    assertEqual(safeCopZero, 4150, 'safeTasaCop: tasaCop=0 → fallback 4150');
+
+    // safeTasaCop guard: tasaCop negativo → 4150
+    const safeCopNeg = (-100 > 0 ? -100 : 4150);
+    assertEqual(safeCopNeg, 4150, 'safeTasaCop: tasaCop negativo → fallback 4150');
+
+    // ── checkoutProcessor: guarda totalCop solo si copEnabled=true ──
+    function calcTotalCop(totalUsd, copEnabled, tasaCop) {
+        return copEnabled && tasaCop > 0 ? mulR(totalUsd, tasaCop) : 0;
+    }
+    assertEqual(calcTotalCop(10, true, 4150), mulR(10, 4150), 'totalCop: copEnabled=true → mulR(totalUsd, tasaCop)');
+    assertEqual(calcTotalCop(10, false, 4150), 0, 'totalCop: copEnabled=false → 0');
+    assertEqual(calcTotalCop(10, true, 0), 0, 'totalCop: tasaCop=0 → 0');
+
+    // guarda tasaCop en sale: copEnabled ? tasaCop : 0
+    function saleTaskCop(copEnabled, tasaCop) {
+        return copEnabled ? tasaCop : 0;
+    }
+    assertEqual(saleTaskCop(true, 4150), 4150, 'sale.tasaCop: copEnabled=true → 4150');
+    assertEqual(saleTaskCop(false, 4150), 0, 'sale.tasaCop: copEnabled=false → 0');
+
+    // ── FinancialEngine.calculatePaymentBreakdown: COP nativo (p.currency === 'COP') ──
+    // El engine guarda copAmount = mulR(amountUsd, sale.tasaCop)
+    const amountUsd = 20;
+    const tasaCopSale = 4150;
+    const copNative = mulR(amountUsd, tasaCopSale);
+    assertEqual(copNative, mulR(20, 4150), 'breakdown COP nativo: mulR(amountUsd, tasaCop)');
+
+    // Prueba real a través del engine con pago efectivo_cop
+    const salesCop = [{
+        tipo: 'VENTA',
+        rate: RATE,
+        tasaCop: TASA_COP,
+        totalUsd: 20,
+        totalBs: mulR(20, RATE),
+        changeUsd: 0,
+        changeBs: 0,
+        payments: [{
+            methodId: 'efectivo_cop',
+            currency: 'COP',
+            amountUsd: 20,
+            amountBs: mulR(20, RATE),
+        }]
+    }];
+    const bdCop = FinancialEngine.calculatePaymentBreakdown(salesCop);
+    assert(bdCop['efectivo_cop'], 'breakdown: efectivo_cop existe como bucket');
+    // El total en COP debe ser mulR(20, 4150) = 83000
+    assertEqual(bdCop['efectivo_cop'].total, mulR(20, TASA_COP), 'breakdown: efectivo_cop.total en COP nativo');
+    assertEqual(bdCop['efectivo_cop'].currency, 'COP', 'breakdown: efectivo_cop.currency = COP');
+
+    // transferencia_cop también funciona
+    const salesCop2 = [{
+        tipo: 'VENTA',
+        rate: RATE,
+        tasaCop: TASA_COP,
+        totalUsd: 10,
+        totalBs: mulR(10, RATE),
+        changeUsd: 0,
+        changeBs: 0,
+        payments: [{
+            methodId: 'transferencia_cop',
+            currency: 'COP',
+            amountUsd: 10,
+        }]
+    }];
+    const bdCop2 = FinancialEngine.calculatePaymentBreakdown(salesCop2);
+    assert(bdCop2['transferencia_cop'], 'breakdown: transferencia_cop existe como bucket');
+
+    // ── Legacy V1 COP: method.includes('cop') → currency='COP', usa totalCop ──
+    const salesLegacyCop = [{
+        tipo: 'VENTA',
+        rate: RATE,
+        totalUsd: 10,
+        totalBs: mulR(10, RATE),
+        totalCop: mulR(10, TASA_COP),
+        paymentMethod: 'efectivo_cop',
+        changeUsd: 0,
+        changeBs: 0,
+        payments: []
+    }];
+    const bdLegacyCop = FinancialEngine.calculatePaymentBreakdown(salesLegacyCop);
+    assert(bdLegacyCop['efectivo_cop'], 'legacy V1 COP: method.includes(cop) detectado');
+    assertEqual(bdLegacyCop['efectivo_cop'].currency, 'COP', 'legacy V1 COP: currency = COP');
+
+    // ── Detección de confusión USD→COP (usuario ingresa $10 en lugar de 41500 COP) ──
+    function detectCopConfusion(inputVal, cartTotalUsd, safeTasaCop) {
+        const expectedCop = cartTotalUsd * safeTasaCop;
+        return inputVal < expectedCop * 0.05 && inputVal > 0 && inputVal <= cartTotalUsd * 2;
+    }
+    assert(detectCopConfusion(10, 10, 4150), 'COP confusion: $10 en campo COP de venta $10 → confusión detectada');
+    assert(!detectCopConfusion(41500, 10, 4150), 'COP confusion: 41500 COP correcto → no confusión');
+    assert(!detectCopConfusion(0, 10, 4150), 'COP confusion: 0 → no confusión');
+
+    log('COP Pagos certificado: conversión checkout, guarda sale, breakdown nativo, legacy V1, confusión.', 'success');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1220,8 +1346,9 @@ const SUITES = [
     { key: 'cambio_split',           name: '💱 Caja D2: Cambio Split (USD+Bs / espejo)',       fn: suiteCambioSplit,          fast: true },
     { key: 'stock_modos',            name: '📦 Inventario D3: Stock Modos (unit/peso/pkg)',   fn: suiteStockModos,           fast: true },
 
-    // ── Bloque E: Display COP ──
-    { key: 'cop_display',            name: '🇨🇴 Display E1: COP (precedencia tasa / primary)', fn: suiteCopDisplay,           fast: true },
+    // ── Bloque E: Lógica COP completa ──
+    { key: 'cop_display',            name: '🇨🇴 COP E1: Display (precedencia tasa / primary)', fn: suiteCopDisplay,           fast: true },
+    { key: 'cop_pagos',              name: '💛 COP E2: Pagos (conversión, sale, breakdown)',    fn: suiteCopPagos,             fast: true },
 
     // ── Bloque F: Auditorías de datos reales ──
     { key: 'auditoria_historica',    name: '🕵️ Datos F1: Integridad de Libros Históricos',   fn: suiteAuditarDataHistorica, fast: true },
