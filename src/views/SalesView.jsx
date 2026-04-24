@@ -597,6 +597,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                         triggerHaptic={triggerHaptic}
                         cartSelectedIndex={cartSelectedIndex}
                         copEnabled={copEnabled}
+                        copPrimary={copPrimary}
                         tasaCop={tasaCop}
                     />
                 </div>
@@ -621,7 +622,11 @@ export default function SalesView({ triggerHaptic, isActive }) {
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className="text-2xl font-black leading-none">${cartTotalUsd.toFixed(2)}</div>
+                            <div className="text-2xl font-black leading-none">
+                                {copEnabled && copPrimary && tasaCop > 0
+                                    ? `${new Intl.NumberFormat('es-CO').format(Math.round(cartTotalUsd * tasaCop))} COP`
+                                    : `$${cartTotalUsd.toFixed(2)}`}
+                            </div>
                             <div className="text-xs font-bold text-emerald-100 mt-1">Bs {formatBs(cartTotalBs)}</div>
                         </div>
                     </button>
@@ -656,6 +661,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                                     triggerHaptic={triggerHaptic}
                                     cartSelectedIndex={cartSelectedIndex}
                                     copEnabled={copEnabled}
+                                    copPrimary={copPrimary}
                                     tasaCop={tasaCop}
                                 />
                             </div>
@@ -678,6 +684,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                     onConfirmSale={handleCheckout} onCreateCustomer={handleCreateCustomer}
                     triggerHaptic={triggerHaptic}
                     copEnabled={copEnabled}
+                    copPrimary={copPrimary}
                     tasaCop={tasaCop}
                     currentFloatUsd={currentFloat.usd}
                     currentFloatBs={currentFloat.bs}
