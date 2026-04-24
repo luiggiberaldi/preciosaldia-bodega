@@ -28,15 +28,34 @@ function _fallbackCopy(text, setCopied) {
 }
 
 const SUITE_ICONS = {
+    // Bloque A — Motor dinero.js
     precision_financiera:  '🔬',
+    dinero_extended:       '🧮',
+    // Bloque B — FinancialEngine
+    cart_engine:           '🛒',
+    discount_logic:        '🏷️',
+    profit_engine:         '📈',
+    payment_breakdown:     '💳',
+    // Bloque C — Clientes
+    cliente_impacto:       '👤',
+    // Bloque D — Flujos de caja
+    fiado_calculo:         '📋',
+    cambio_split:          '💱',
+    stock_modos:           '📦',
+    // Bloque E — Display COP
+    cop_display:           '🇨🇴',
+    // Bloque F — Datos reales
     auditoria_historica:   '🕵️',
-    auditoria_patrimonial: '🛒',
+    auditoria_patrimonial: '🏭',
     auditoria_cartera:     '👥',
     auditoria_cierre:      '📦',
     auditoria_tasas:       '💱',
     margen_negativo:       '💸',
     pagos_inconsistentes:  '🧾',
     ids_duplicados:        '🪪',
+    cartera_coherencia:    '📒',
+    apertura_unica:        '🔓',
+    metodos_validos:       '💳',
 };
 
 export const TesterView = ({ onBack }) => {
@@ -105,8 +124,7 @@ export const TesterView = ({ onBack }) => {
             const elapsed = summary.startedAt && summary.finishedAt
                 ? ((summary.finishedAt - summary.startedAt) / 1000).toFixed(1) : 0;
 
-            text += `\n\n── RESUMEN ──\n`;
-            text += `Total: ${summary.suites.length} | OK: ${passed} | FALLO: ${failed} | Tiempo: ${elapsed}s\n`;
+        text += `\n── RESUMEN ──\nTotal: ${summary.suites.length} | OK: ${passed} | FALLO: ${failed} | Tiempo: ${elapsed}s\n`;
             text += '\n── DETALLE ──\n';
             summary.suites.forEach(r => {
                 text += `${r.status === 'passed' ? '✅' : '❌'} ${r.name}${r.error ? ` — ${r.error}` : ''}\n`;
@@ -173,8 +191,8 @@ export const TesterView = ({ onBack }) => {
                         <ShieldCheck size={18} />
                     </div>
                     <div>
-                        <h1 className="text-sm sm:text-lg font-black tracking-tight">Auditor Financiero <span className="text-rose-400">v5.0</span></h1>
-                        <p className="text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-widest font-bold">Determinista • Datos Reales • Groq AI</p>
+                        <h1 className="text-sm sm:text-lg font-black tracking-tight">Auditor Financiero <span className="text-rose-400">v6.0</span></h1>
+                        <p className="text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-widest font-bold">22 Suites • Determinista • Datos Reales • Groq AI</p>
                     </div>
                 </div>
 
@@ -425,7 +443,7 @@ export const TesterView = ({ onBack }) => {
 
             {/* ── Footer ── */}
             <p className="text-center text-[7px] sm:text-[9px] text-slate-700 font-mono uppercase pb-20 mt-4">
-                Precios al Día — Bodega • Auditor Financiero v5.0 • {new Date().getFullYear()} • Determinista
+                Precios al Día — Bodega • Auditor Financiero v6.0 • {new Date().getFullYear()} • 22 Suites Deterministas
             </p>
         </div>
     );
