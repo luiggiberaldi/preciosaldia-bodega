@@ -72,7 +72,7 @@ export function useSalesData({ setCart, cartRef, setProducts, isActive }) {
                 return saleLocalDay === todayStr;
             });
             setTodayAperturaData(apertura || null);
-        });
+        }).catch(err => console.error('[useSalesData] Error al recargar datos:', err));
     }, [isActive, setProducts]);
 
     useEffect(() => {

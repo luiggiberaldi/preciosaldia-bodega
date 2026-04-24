@@ -21,7 +21,15 @@ export function useCheckoutFlow({
             discountData, useAutoRate
         };
 
-        const result = await processSaleTransaction(opts);
+        let result;
+        try {
+            result = await processSaleTransaction(opts);
+        } catch (err) {
+            console.error('[checkout] Error inesperado en processSaleTransaction:', err);
+            showToast('Error al procesar la venta. Intenta de nuevo.', 'error');
+            playError();
+            return;
+        }
 
         if (!result.success) {
             console.error('Abortando venta:', result.error);
@@ -30,13 +38,8 @@ export function useCheckoutFlow({
             return;
         }
 
-        // Apply state updates using the returned optimized datasets
         setProducts(result.updatedProducts);
-
-        if (result.updatedCustomers) {
-            setCustomers(result.updatedCustomers);
-        }
-
+        if (result.updatedCustomers) setCustomers(result.updatedCustomers);
         setSalesData(prev => [result.sale, ...prev]);
 
         setShowReceipt(result.sale);
@@ -54,8 +57,14 @@ export function useCheckoutFlow({
     const handleCreateCustomer = async (name, documentId, phone) => {
         const newCustomer = { id: crypto.randomUUID(), name, documentId: documentId || '', phone: phone || '', deuda: 0, favor: 0, createdAt: new Date().toISOString() };
         const updated = [...customers, newCustomer];
-        setCustomers(updated);
-        await storageService.setItem('bodega_customers_v1', updated);
+        try {
+            await storageService.setItem('bodega_customers_v1', updated);
+            setCustomers(updated);
+        } catch (err) {
+            console.error('[checkout] Error al guardar cliente:', err);
+            showToast('Error al guardar el cliente', 'error');
+            return null;
+        }
         return newCustomer;
     };
 

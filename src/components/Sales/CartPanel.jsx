@@ -36,9 +36,7 @@ export default function CartPanel({
     const submitCustomQty = (item) => {
         setEditingQtyId(null);
         let parsed = parseFloat(tempQty.replace(',', '.'));
-        if (isNaN(parsed) || parsed <= 0) return; // Ignore invalid values
-        
-        // Calculate difference and call updateQty (+ delta)
+        if (isNaN(parsed) || parsed <= 0) return;
         const diff = parsed - item.qty;
         if (diff !== 0) {
             updateQty(item.id, diff);

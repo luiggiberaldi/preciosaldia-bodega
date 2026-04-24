@@ -32,6 +32,9 @@ export async function processSaleTransaction({
     if (cartTotalUsd <= 0.01) {
         return { success: false, error: 'No se pueden generar ventas de $0.00' };
     }
+    if (!Array.isArray(payments) || payments.some(p => isNaN(p.amountUsd) || p.amountUsd < 0)) {
+        return { success: false, error: 'Datos de pago inválidos' };
+    }
 
     // ── Aritmética precisa con dinero.js (elimina IEEE 754 drift) ──
     const totalPaidUsd = sumR(payments.map(p => p.amountUsd));

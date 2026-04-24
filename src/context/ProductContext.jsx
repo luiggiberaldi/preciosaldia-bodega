@@ -107,10 +107,10 @@ export function ProductProvider({ children, rates }) {
     useEffect(() => {
         const handleStorageChange = (e) => {
             if (e.key === 'bodega_custom_rate') {
-                setCustomRate(e.newValue);
+                if (e.newValue && parseFloat(e.newValue) > 0) setCustomRate(e.newValue);
             }
             if (e.key === 'bodega_use_auto_rate') {
-                setUseAutoRate(!!JSON.parse(e.newValue));
+                try { setUseAutoRate(!!JSON.parse(e.newValue)); } catch (_) {}
             }
             if (e.key === 'cop_enabled') {
                 setCopEnabled(e.newValue === 'true');
