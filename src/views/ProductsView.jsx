@@ -267,6 +267,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     // ─── HANDLERS BIMONEDA ──────────────────────────────────
     const [priceCop, setPriceCop] = useState('');
+    const [unitPriceCop, setUnitPriceCop] = useState('');
+    const [costCop, setCostCop] = useState('');
 
     const handlePriceUsdChange = (val) => {
         setPriceUsd(val);
@@ -294,14 +296,26 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     const handleCostUsdChange = (val) => {
         setCostUsd(val);
-        if (!val || parseFloat(val) <= 0) { setCostBs(''); return; }
+        if (!val || parseFloat(val) <= 0) { setCostBs(''); setCostCop(''); return; }
         setCostBs((parseFloat(val) * effectiveRate).toFixed(2));
+        if (copEnabled && tasaCop > 0) setCostCop(Math.round(parseFloat(val) * tasaCop).toString());
     };
 
     const handleCostBsChange = (val) => {
         setCostBs(val);
-        if (!val || parseFloat(val) <= 0) { setCostUsd(''); return; }
-        setCostUsd((parseFloat(val) / effectiveRate).toFixed(2));
+        if (!val || parseFloat(val) <= 0) { setCostUsd(''); setCostCop(''); return; }
+        const usd = parseFloat(val) / effectiveRate;
+        setCostUsd(usd.toFixed(2));
+        if (copEnabled && tasaCop > 0) setCostCop(Math.round(usd * tasaCop).toString());
+    };
+
+    const handleCostCopChange = (val) => {
+        setCostCop(val);
+        if (!val || parseFloat(val) <= 0) { setCostUsd(''); setCostBs(''); return; }
+        if (tasaCop <= 0) return;
+        const usd = parseFloat(val) / tasaCop;
+        setCostUsd(usd.toFixed(2));
+        setCostBs((usd * effectiveRate).toFixed(2));
     };
 
     // ─── CRUD ───────────────────────────────────────────────
@@ -358,6 +372,18 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         } else {
             setPriceCop('');
         }
+        // Set COP unit price for editing
+        if (copEnabled && tasaCop > 0 && product.unitPriceUsd > 0) {
+            setUnitPriceCop(Math.round(product.unitPriceUsd * tasaCop).toString());
+        } else {
+            setUnitPriceCop('');
+        }
+        // Set COP cost for editing
+        if (copEnabled && tasaCop > 0 && product.costUsd > 0) {
+            setCostCop(Math.round(product.costUsd * tasaCop).toString());
+        } else {
+            setCostCop('');
+        }
 
         setIsModalOpen(true);
 
@@ -396,6 +422,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const handleClose = () => {
         resetForm();
         setPriceCop('');
+        setUnitPriceCop('');
+        setCostCop('');
         setIsModalOpen(false);
         setProductMovements([]);
     };
@@ -761,16 +789,19 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 priceCop={priceCop}
                 costUsd={costUsd} handleCostUsdChange={handleCostUsdChange}
                 costBs={costBs} handleCostBsChange={handleCostBsChange}
+                costCop={costCop} handleCostCopChange={handleCostCopChange}
                 stock={stock} setStock={setStock}
                 lowStockAlert={lowStockAlert} setLowStockAlert={setLowStockAlert}
                 unitsPerPackage={unitsPerPackage} setUnitsPerPackage={setUnitsPerPackage}
                 sellByUnit={sellByUnit} setSellByUnit={setSellByUnit}
                 unitPriceUsd={unitPriceUsd} setUnitPriceUsd={setUnitPriceUsd}
+                unitPriceCop={unitPriceCop} setUnitPriceCop={setUnitPriceCop}
                 packagingType={packagingType} setPackagingType={setPackagingType}
                 stockInLotes={stockInLotes} setStockInLotes={setStockInLotes}
                 granelUnit={granelUnit} setGranelUnit={setGranelUnit}
                 effectiveRate={effectiveRate}
                 copEnabled={copEnabled}
+                copPrimary={copPrimary}
                 tasaCop={tasaCop}
                 isFormShaking={isFormShaking}
                 handleImageUpload={handleImageUpload}

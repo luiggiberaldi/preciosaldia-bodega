@@ -25,18 +25,21 @@ export default function ProductFormModal({
     priceCop,
     costUsd, handleCostUsdChange,
     costBs, handleCostBsChange,
+    costCop, handleCostCopChange,
     stock, setStock,
     lowStockAlert, setLowStockAlert,
 
     unitsPerPackage, setUnitsPerPackage,
     sellByUnit, setSellByUnit,
     unitPriceUsd, setUnitPriceUsd,
+    unitPriceCop, setUnitPriceCop,
 
     packagingType, setPackagingType,
     stockInLotes, setStockInLotes,
     granelUnit, setGranelUnit,
     effectiveRate,
     copEnabled,
+    copPrimary,
     tasaCop,
     isFormShaking,
 
@@ -81,7 +84,11 @@ export default function ProductFormModal({
     const mainMarginUsd = parsedPrice - parsedCost;
 
     // Unit margin for lote with sellByUnit
-    const effectiveUnitPrice = unitPriceUsd ? parseFloat(unitPriceUsd) : (parsedUnits > 0 ? parsedPrice / parsedUnits : 0);
+    const effectiveUnitPrice = copEnabled && tasaCop > 0 && unitPriceCop
+        ? parseFloat(unitPriceCop) / tasaCop
+        : unitPriceUsd
+            ? parseFloat(unitPriceUsd)
+            : (parsedUnits > 0 ? parsedPrice / parsedUnits : 0);
     const unitCost = parsedUnits > 0 && parsedCost > 0 ? parsedCost / parsedUnits : 0;
     const unitMarginPct = unitCost > 0 ? ((effectiveUnitPrice - unitCost) / unitCost * 100) : null;
     const unitMarginUsd = effectiveUnitPrice - unitCost;
@@ -256,10 +263,15 @@ export default function ProductFormModal({
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 mb-1 block uppercase tracking-wider">
-                                Costo ({copEnabled ? 'USD' : '$'}){priceSuffix}
+                                Costo ({copEnabled && copPrimary && tasaCop > 0 ? 'COP' : copEnabled ? 'USD' : '$'}){priceSuffix}
                             </label>
-                            <input type="number" inputMode="decimal" value={costUsd} onChange={e => handleCostUsdChange(e.target.value)} placeholder="1.00"
-                                className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
+                            {copEnabled && copPrimary && tasaCop > 0 ? (
+                                <input type="number" inputMode="decimal" value={costCop} onChange={e => handleCostCopChange(e.target.value)} placeholder="4100"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
+                            ) : (
+                                <input type="number" inputMode="decimal" value={costUsd} onChange={e => handleCostUsdChange(e.target.value)} placeholder="1.00"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
+                            )}
                         </div>
                         <div>
                             <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 mb-1 block uppercase tracking-wider">
@@ -275,7 +287,7 @@ export default function ProductFormModal({
                         <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-xl text-[11px]">
                             <span className="text-slate-500 font-medium">Costo por unidad:</span>
                             <span className="font-bold text-slate-700 dark:text-white flex items-center gap-1.5">
-                                ${(parsedCost / parsedUnits).toFixed(2)}
+                                {copEnabled && copPrimary && tasaCop > 0 ? `${Math.round((parsedCost / parsedUnits) * tasaCop).toLocaleString('es-CO')} COP` : `$${(parsedCost / parsedUnits).toFixed(2)}`}
                                 <span className="text-[8px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 px-1.5 py-0.5 rounded font-black">AUTO</span>
                             </span>
                         </div>
@@ -361,39 +373,69 @@ export default function ProductFormModal({
                                 <label className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Precio por Unidad Suelta</label>
                                 {parsedPrice > 0 && parsedUnits > 0 && (
                                     <span className="text-[9px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">
-                                        Auto: ${(parsedPrice / parsedUnits).toFixed(2)}
+                                        Auto: {copEnabled && tasaCop > 0
+                                            ? `${Math.round((parsedPrice / parsedUnits) * tasaCop).toLocaleString('es-CO')} COP`
+                                            : `$${(parsedPrice / parsedUnits).toFixed(2)}`}
                                     </span>
                                 )}
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-[9px] font-bold text-emerald-500 ml-0.5 mb-0.5 block">USD ($)</label>
-                                    <input type="number" inputMode="decimal" value={unitPriceUsd}
-                                        onChange={e => setUnitPriceUsd(e.target.value)}
-                                        placeholder={parsedPrice > 0 && parsedUnits > 0 ? (parsedPrice / parsedUnits).toFixed(2) : '0.00'}
-                                        className="w-full bg-indigo-50/50 dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/30 p-3 rounded-xl font-black text-indigo-700 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm" />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-bold text-blue-500 ml-0.5 mb-0.5 block">Bolívares (Bs)</label>
-                                    <div className="w-full bg-blue-50/50 dark:bg-slate-900 border border-blue-100 dark:border-blue-900/30 p-3 rounded-xl font-black text-blue-700 dark:text-blue-400 text-sm flex items-center justify-between">
-                                        {effectiveRate > 0
-                                            ? (effectiveUnitPrice * effectiveRate).toFixed(2)
-                                            : '—'
-                                        }
-                                        <span className="text-[8px] bg-blue-100 dark:bg-blue-900/30 text-blue-500 px-1.5 py-0.5 rounded font-black">Bs</span>
+                            {copEnabled ? (
+                                /* ── COP mode: COP input primary, USD + Bs derived ── */
+                                <div className="space-y-2">
+                                    <div>
+                                        <label className="text-[9px] font-bold text-amber-600 ml-0.5 mb-0.5 block">Pesos COP</label>
+                                        <input type="number" inputMode="decimal" value={unitPriceCop}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                setUnitPriceCop(val);
+                                                setUnitPriceUsd(val && parseFloat(val) > 0 && tasaCop > 0
+                                                    ? (parseFloat(val) / tasaCop).toFixed(4)
+                                                    : '');
+                                            }}
+                                            placeholder={parsedPrice > 0 && parsedUnits > 0 && tasaCop > 0
+                                                ? Math.round((parsedPrice / parsedUnits) * tasaCop).toString()
+                                                : '0'}
+                                            className="w-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 p-3 rounded-xl font-black text-amber-800 dark:text-amber-400 outline-none focus:ring-2 focus:ring-amber-500/50 text-sm" />
                                     </div>
-                                </div>
-                                {copEnabled && (
-                                    <div className="col-span-2 mt-0.5">
-                                        <div className="w-full bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 p-2.5 rounded-xl text-xs flex items-center justify-between">
-                                            <span className="text-amber-700/70 dark:text-amber-500/70 font-bold">Unidad Suelta COP:</span>
-                                            <span className="font-black text-amber-600 dark:text-amber-400">
-                                                 {Math.round(effectiveUnitPrice * tasaCop).toLocaleString('es-CO')} COP
-                                            </span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="text-[9px] font-bold text-emerald-500 ml-0.5 mb-0.5 block">USD ($)</label>
+                                            <div className="w-full bg-emerald-50/50 dark:bg-slate-900 border border-emerald-100 dark:border-emerald-900/30 p-3 rounded-xl font-black text-emerald-700 dark:text-emerald-400 text-sm">
+                                                {effectiveUnitPrice > 0 ? effectiveUnitPrice.toFixed(2) : '—'}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[9px] font-bold text-blue-500 ml-0.5 mb-0.5 block">Bolívares (Bs)</label>
+                                            <div className="w-full bg-blue-50/50 dark:bg-slate-900 border border-blue-100 dark:border-blue-900/30 p-3 rounded-xl font-black text-blue-700 dark:text-blue-400 text-sm flex items-center justify-between">
+                                                {effectiveRate > 0 && effectiveUnitPrice > 0
+                                                    ? (effectiveUnitPrice * effectiveRate).toFixed(2)
+                                                    : '—'}
+                                                <span className="text-[8px] bg-blue-100 dark:bg-blue-900/30 text-blue-500 px-1.5 py-0.5 rounded font-black">Bs</span>
+                                            </div>
                                         </div>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            ) : (
+                                /* ── No COP mode: USD input primary, Bs derived ── */
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[9px] font-bold text-emerald-500 ml-0.5 mb-0.5 block">USD ($)</label>
+                                        <input type="number" inputMode="decimal" value={unitPriceUsd}
+                                            onChange={e => setUnitPriceUsd(e.target.value)}
+                                            placeholder={parsedPrice > 0 && parsedUnits > 0 ? (parsedPrice / parsedUnits).toFixed(2) : '0.00'}
+                                            className="w-full bg-indigo-50/50 dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/30 p-3 rounded-xl font-black text-indigo-700 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-bold text-blue-500 ml-0.5 mb-0.5 block">Bolívares (Bs)</label>
+                                        <div className="w-full bg-blue-50/50 dark:bg-slate-900 border border-blue-100 dark:border-blue-900/30 p-3 rounded-xl font-black text-blue-700 dark:text-blue-400 text-sm flex items-center justify-between">
+                                            {effectiveRate > 0
+                                                ? (effectiveUnitPrice * effectiveRate).toFixed(2)
+                                                : '—'}
+                                            <span className="text-[8px] bg-blue-100 dark:bg-blue-900/30 text-blue-500 px-1.5 py-0.5 rounded font-black">Bs</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <p className="text-[9px] text-slate-400 italic">Déjalo vacío para usar el precio auto-calculado (lote ÷ unidades)</p>
                         </div>
                     )}
