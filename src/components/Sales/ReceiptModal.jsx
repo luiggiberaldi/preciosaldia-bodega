@@ -74,7 +74,7 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                         {receipt.copEnabled && receipt.tasaCop > 0 ? (
                                             copPrimary ? (
                                                 <>
-                                                    <span className="text-xs text-slate-400">{item.isWeight ? `${item.qty.toFixed(3)} Kg` : `${item.qty} u`} × {formatCop(item.priceUsd * receipt.tasaCop)} COP</span>
+                                                    <span className="text-xs text-slate-400">{item.isWeight ? `${item.qty.toFixed(3)} Kg` : `${item.qty} u`} × {formatCop(item.priceCop || Math.round(item.priceUsd * receipt.tasaCop))} COP</span>
                                                     <span className="text-xs text-slate-400 block">
                                                         <span className="text-emerald-600">${item.priceUsd.toFixed(2)} USD</span> · <span className="text-blue-500">{formatBs(item.priceUsd * (receipt.rate || 0))} Bs</span> c/u
                                                     </span>
@@ -83,7 +83,7 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                                 <>
                                                     <span className="text-xs text-slate-400">{item.isWeight ? `${item.qty.toFixed(3)} Kg` : `${item.qty} u`} × ${item.priceUsd.toFixed(2)}</span>
                                                     <span className="text-xs text-slate-400 block">
-                                                        <span className="text-amber-600">{formatCop(item.priceUsd * receipt.tasaCop)} COP</span> · <span className="text-blue-500">{formatBs(item.priceUsd * (receipt.rate || 0))} Bs</span> c/u
+                                                        <span className="text-amber-600">{formatCop(item.priceCop || Math.round(item.priceUsd * receipt.tasaCop))} COP</span> · <span className="text-blue-500">{formatBs(item.priceUsd * (receipt.rate || 0))} Bs</span> c/u
                                                     </span>
                                                 </>
                                             )
@@ -95,14 +95,14 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                         {receipt.copEnabled && receipt.tasaCop > 0 ? (
                                             copPrimary ? (
                                                 <>
-                                                    <span className="font-black text-amber-600 dark:text-amber-400 block">{formatCop(item.priceUsd * item.qty * receipt.tasaCop)} COP</span>
+                                                    <span className="font-black text-amber-600 dark:text-amber-400 block">{formatCop((item.priceCop || Math.round(item.priceUsd * receipt.tasaCop)) * item.qty)} COP</span>
                                                     <span className="text-xs text-emerald-600">${(item.priceUsd * item.qty).toFixed(2)}</span>
                                                     <span className="text-xs text-blue-500 block">{formatBs(item.priceUsd * item.qty * (receipt.rate || 0))} Bs</span>
                                                 </>
                                             ) : (
                                                 <>
                                                     <span className="font-black text-slate-900 block">${(item.priceUsd * item.qty).toFixed(2)}</span>
-                                                    <span className="text-xs text-amber-600">{formatCop(item.priceUsd * item.qty * receipt.tasaCop)} COP</span>
+                                                    <span className="text-xs text-amber-600">{formatCop((item.priceCop || Math.round(item.priceUsd * receipt.tasaCop)) * item.qty)} COP</span>
                                                     <span className="text-xs text-blue-500 block">{formatBs(item.priceUsd * item.qty * (receipt.rate || 0))} Bs</span>
                                                 </>
                                             )

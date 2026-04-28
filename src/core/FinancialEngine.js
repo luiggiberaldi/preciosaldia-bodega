@@ -276,7 +276,11 @@ export class FinancialEngine {
         const discountAmountBs = mulR(discountAmountUsd, bcvRate);
         const totalBs = round2(Math.max(0, subR(subtotalBs, discountAmountBs)));
         
-        const totalCop = copRate > 0 ? mulR(totalUsd, copRate) : 0;
+        const totalCop = copRate > 0
+            ? (cartItems.every(i => i.priceCop != null && i.priceCop > 0)
+                ? Math.round(sumR(cartItems.map(i => mulR(i.priceCop, i.qty))) * (1 - (discountAmountUsd / (subtotalUsd || 1))))
+                : mulR(totalUsd, copRate))
+            : 0;
 
         return {
             subtotalUsd,

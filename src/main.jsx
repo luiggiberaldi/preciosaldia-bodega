@@ -8,8 +8,18 @@ import './index.css'
 
 // ── Forzar actualización del Service Worker al cargar ──
 if ('serviceWorker' in navigator) {
+  // Forzar chequeo de nueva versión en cada carga
   navigator.serviceWorker.getRegistrations().then(regs => {
     regs.forEach(reg => reg.update());
+  });
+
+  // Cuando el nuevo SW toma control, recargar la página para servir el nuevo código.
+  // Sin esto, el usuario puede tener el SW actualizado pero seguir viendo el JS viejo.
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
   });
 }
 

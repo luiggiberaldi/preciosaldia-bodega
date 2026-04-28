@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tag, Banknote, AlertTriangle, Box, Minus, Plus, Pencil, Trash2, Package, Layers, Clock, Printer } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_ICONS, UNITS } from '../../config/categories';
-import { formatUsd, formatBs, formatCop, smartCashRounding } from '../../utils/calculatorUtils';
+import { formatUsd, formatBs, formatCop, smartCashRounding, getCop, getUsd } from '../../utils/calculatorUtils';
 
 export default function ProductCard({
     product: p,
@@ -21,8 +21,9 @@ export default function ProductCard({
     onEdit,
     onDelete
 }) {
-    const valBs = p.priceUsdt * effectiveRate;
-    const valCop = p.priceUsdt * tasaCop;
+    const effectiveUsd = getUsd(p, tasaCop);
+    const valBs = effectiveUsd * effectiveRate;
+    const valCop = getCop(p, tasaCop);
     const isLowStock = (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
     const margin = p.costBs > 0 ? ((valBs - p.costBs) / p.costBs * 100) : null;
     const catInfo = categories.find(c => c.id === p.category);
@@ -78,14 +79,14 @@ export default function ProductCard({
                                         {formatCop(valCop)} <span className="text-[10px] font-bold text-amber-600/50 dark:text-amber-400/50">COP {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                                     </p>
                                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded">{formatUsd(p.priceUsdt)} USD</span>
+                                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded">{formatUsd(effectiveUsd)} USD</span>
                                         <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">{formatBs(valBs)} Bs</span>
                                     </div>
                                 </>
                             ) : (
                                 <>
                                     <p className="text-lg lg:text-base font-black text-emerald-600 dark:text-emerald-400 leading-none">
-                                        {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
+                                        {formatUsd(effectiveUsd)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                                     </p>
                                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                                         <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded">{formatCop(valCop)} COP</span>
@@ -96,7 +97,7 @@ export default function ProductCard({
                         ) : (
                             <>
                                 <p className="text-lg lg:text-base font-black text-emerald-600 dark:text-emerald-400 leading-none">
-                                    {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
+                                    {formatUsd(effectiveUsd)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                                 </p>
                                 <p className="text-[11px] font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
                             </>
@@ -106,9 +107,9 @@ export default function ProductCard({
                                 <Layers size={10} />
                                 {copEnabled && tasaCop > 0
                                     ? copPrimary
-                                        ? `${formatCop((p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)) * tasaCop)} COP / ud · $${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)}`
-                                        : `$${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud · ${formatCop((p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)) * tasaCop)} COP`
-                                    : `$${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud`
+                                        ? `${formatCop(p.unitPriceCop || (p.priceCop ? Math.round(p.priceCop / (p.unitsPerPackage || 1)) : Math.round((p.unitPriceUsd ?? effectiveUsd / (p.unitsPerPackage || 1)) * tasaCop)))} COP / ud · $${(p.unitPriceUsd ?? effectiveUsd / (p.unitsPerPackage || 1)).toFixed(2)}`
+                                        : `$${(p.unitPriceUsd ?? effectiveUsd / (p.unitsPerPackage || 1)).toFixed(2)} / ud · ${formatCop(p.unitPriceCop || (p.priceCop ? Math.round(p.priceCop / (p.unitsPerPackage || 1)) : Math.round((p.unitPriceUsd ?? effectiveUsd / (p.unitsPerPackage || 1)) * tasaCop)))} COP`
+                                    : `$${(p.unitPriceUsd ?? effectiveUsd / (p.unitsPerPackage || 1)).toFixed(2)} / ud`
                                 }
                             </p>
                         )}

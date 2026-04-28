@@ -197,7 +197,8 @@ export default function SalesView({ triggerHaptic, isActive }) {
         discountAmountUsd,
         discountAmountBs,
         totalUsd: cartTotalUsd,
-        totalBs: cartTotalBs
+        totalBs: cartTotalBs,
+        totalCop: cartTotalCop
     } = useMemo(() =>
         FinancialEngine.buildCartTotals(cart, discount, effectiveRate, copEnabled ? tasaCop : 0)
     , [cart, discount, effectiveRate, copEnabled, tasaCop]);
@@ -302,13 +303,17 @@ export default function SalesView({ triggerHaptic, isActive }) {
         if (product.sellByUnit && product.unitPriceUsd && !forceMode && !qtyOverride) { setHierarchyPending(product); return; }
         if ((product.unit === 'kg' || product.unit === 'litro') && !qtyOverride) { setWeightPending(product); return; }
 
-        let priceToUse = parseFloat(product.priceUsdt) || 0;
+        // When priceCop is the source of truth, derive USD from COP at current rate
+        let priceToUse = (product.priceCop && tasaCop > 0)
+            ? product.priceCop / tasaCop
+            : (parseFloat(product.priceUsdt) || 0);
         let cartId = product.id;
         let cartName = product.name;
         let qtyToAdd = qtyOverride || 1;
 
         if (forceMode === 'unit') {
-            priceToUse = product.unitPriceUsd;
+            const unitCop = product.unitPriceCop || (product.priceCop ? Math.round(product.priceCop / (product.unitsPerPackage || 1)) : null);
+            priceToUse = (unitCop && tasaCop > 0) ? unitCop / tasaCop : product.unitPriceUsd;
             cartId = product.id + '_unit';
             cartName = product.name + ' (Ud.)';
         }
@@ -360,8 +365,12 @@ export default function SalesView({ triggerHaptic, isActive }) {
             if (existing && qtyOverride) return prev.map(i => i.id === cartId ? { ...i, qty: i.qty + qtyOverride } : i);
 
             const itemCostBs = product.costBs || (product.costUsd ? product.costUsd * effectiveRate : 0);
+            const itemPriceCop = forceMode === 'unit'
+                ? (product.unitPriceCop || (product.priceCop ? Math.round(product.priceCop / (product.unitsPerPackage || 1)) : null))
+                : (product.priceCop || null);
             return [{
                 ...product, id: cartId, name: cartName, priceUsd: priceToUse,
+                priceCop: itemPriceCop,
                 exactBs: product.exactBs || null,
                 costBs: forceMode === 'unit' ? itemCostBs / (product.unitsPerPackage || 1) : itemCostBs,
                 costUsd: forceMode === 'unit' ? (product.costUsd || 0) / (product.unitsPerPackage || 1) : (product.costUsd || 0),
@@ -593,7 +602,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                     <CartPanel
                         cart={cart} effectiveRate={effectiveRate}
                         cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
-                        cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
+                        cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartTotalCop={cartTotalCop} cartItemCount={cartItemCount}
                         discountData={discountData} onOpenDiscount={() => setShowDiscountModal(true)}
                         updateQty={updateQty} removeFromCart={removeFromCart}
                         onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); }}
@@ -628,7 +637,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                         <div className="text-right">
                             <div className="text-2xl font-black leading-none">
                                 {copEnabled && copPrimary && tasaCop > 0
-                                    ? `${new Intl.NumberFormat('es-CO').format(Math.round(cartTotalUsd * tasaCop))} COP`
+                                    ? `${new Intl.NumberFormat('es-CO').format(Math.round(cartTotalCop))} COP`
                                     : `$${cartTotalUsd.toFixed(2)}`}
                             </div>
                             <div className="text-xs font-bold text-emerald-100 mt-1">Bs {formatBs(cartTotalBs)}</div>
@@ -657,7 +666,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                                 <CartPanel
                                     cart={cart} effectiveRate={effectiveRate}
                                     cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
-                                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
+                                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartTotalCop={cartTotalCop} cartItemCount={cartItemCount}
                                     discountData={discountData} onOpenDiscount={() => setShowDiscountModal(true)}
                                     updateQty={updateQty} removeFromCart={removeFromCart}
                                     onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); setIsCartSheetOpen(false); }}
@@ -681,7 +690,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                 <CheckoutModal
                     onClose={() => { setShowCheckout(false); setSelectedCustomerId(''); }}
                     cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
-                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs}
+                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartTotalCop={cartTotalCop}
                     discountData={discountData} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}

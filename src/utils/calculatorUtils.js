@@ -7,6 +7,25 @@ export const formatUsd = (val) => new Intl.NumberFormat('en-US', { minimumFracti
 export const formatCop = (val) => Math.round(val).toLocaleString('es-CO');
 
 /**
+ * Get COP price for a product/item: use stored priceCop if available, otherwise derive from USD.
+ */
+export const getCop = (item, tasaCop) => {
+    if (item.priceCop != null && item.priceCop > 0) return item.priceCop;
+    return Math.round((item.priceUsdt ?? item.priceUsd ?? 0) * (tasaCop || 0));
+};
+
+/**
+ * Get effective USD price: when priceCop exists and tasaCop is valid, derive USD from COP in real-time.
+ * This ensures USD/Bs update dynamically when the COP rate changes.
+ */
+export const getUsd = (item, tasaCop) => {
+    if (item.priceCop != null && item.priceCop > 0 && tasaCop > 0) {
+        return item.priceCop / tasaCop;
+    }
+    return item.priceUsdt ?? item.priceUsd ?? 0;
+};
+
+/**
  * Format price with correct currency label when COP is enabled.
  * @param {number} usdVal - price in USD
  * @param {object} opts - { copEnabled, tasaCop, showUsd, showBs, effectiveRate }

@@ -28,7 +28,7 @@ export function buildTicketHtml(sale, bcvRate, paperConfig, settings) {
         const name = item.name.length > maxLen ? item.name.substring(0, maxLen) + '...' : item.name;
         const importeStr = isCop ? 'USD ' + sub.toFixed(2) : '$' + sub.toFixed(2);
         const detailStr = isCop
-            ? 'USD ' + item.priceUsd.toFixed(2) + ' c/u - ' + formatCop(sub * sale.tasaCop) + ' COP - Bs ' + formatBs(subBs)
+            ? 'USD ' + item.priceUsd.toFixed(2) + ' c/u - ' + formatCop(item.priceCop ? item.priceCop * item.qty : sub * sale.tasaCop) + ' COP - Bs ' + formatBs(subBs)
             : '$' + item.priceUsd.toFixed(2) + ' c/u - Bs ' + formatBs(subBs);
         return `
             <tr>

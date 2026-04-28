@@ -7,7 +7,7 @@ import { ProductShareModal } from '../components/ProductShareModal';
 import { useAuthStore } from '../hooks/store/useAuthStore';
 
 import ShareInventoryModal from '../components/ShareInventoryModal';
-import { formatBs, formatUsd, smartCashRounding } from '../utils/calculatorUtils';
+import { formatBs, formatUsd, smartCashRounding, getCop, getUsd } from '../utils/calculatorUtils';
 import { generarEtiquetas } from '../utils/ticketGenerator';
 import { useWallet } from '../hooks/useWallet';
 import { BODEGA_CATEGORIES, UNITS, CATEGORY_COLORS } from '../config/categories';
@@ -290,7 +290,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         if (!val || parseFloat(val) <= 0) { setPriceUsd(''); setPriceBs(''); return; }
         if (tasaCop <= 0) return;
         const usd = parseFloat(val) / tasaCop;
-        setPriceUsd(usd.toFixed(2));
+        // Usar 4 decimales para que al reconvertir a COP dé el valor original
+        setPriceUsd(usd.toFixed(4));
         setPriceBs((usd * effectiveRate).toFixed(2));
     };
 
@@ -329,8 +330,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         }
 
         const productData = buildProductPayload({
-            name, barcode, priceUsd, priceBs, costUsd, costBs, stock, stockInLotes,
-            packagingType, unitsPerPackage, granelUnit, sellByUnit, unitPriceUsd,
+            name, barcode, priceUsd, priceBs, priceCop, costUsd, costBs, stock, stockInLotes,
+            packagingType, unitsPerPackage, granelUnit, sellByUnit, unitPriceUsd, unitPriceCop,
             category, lowStockAlert
         }, effectiveRate);
 
@@ -366,15 +367,31 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const handleEdit = async (product) => {
         triggerHaptic && triggerHaptic();
         populateForm(product, effectiveRate);
-        // Set COP price for editing
-        if (copEnabled && tasaCop > 0 && product.priceUsdt > 0) {
-            setPriceCop(Math.round(product.priceUsdt * tasaCop).toString());
+        // Set COP price for editing: use stored priceCop if available, otherwise derive
+        if (copEnabled && tasaCop > 0) {
+            if (product.priceCop != null && product.priceCop > 0) {
+                setPriceCop(product.priceCop.toString());
+                // Recalculate USD and Bs from COP at current rate
+                const usd = product.priceCop / tasaCop;
+                setPriceUsd(usd.toFixed(4));
+                setPriceBs((usd * effectiveRate).toFixed(2));
+            } else if (product.priceUsdt > 0) {
+                setPriceCop(Math.round(product.priceUsdt * tasaCop).toString());
+            } else {
+                setPriceCop('');
+            }
         } else {
             setPriceCop('');
         }
         // Set COP unit price for editing
-        if (copEnabled && tasaCop > 0 && product.unitPriceUsd > 0) {
-            setUnitPriceCop(Math.round(product.unitPriceUsd * tasaCop).toString());
+        if (copEnabled && tasaCop > 0) {
+            if (product.unitPriceCop != null && product.unitPriceCop > 0) {
+                setUnitPriceCop(product.unitPriceCop.toString());
+            } else if (product.unitPriceUsd > 0) {
+                setUnitPriceCop(Math.round(product.unitPriceUsd * tasaCop).toString());
+            } else {
+                setUnitPriceCop('');
+            }
         } else {
             setUnitPriceCop('');
         }
@@ -690,7 +707,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                                         )}
                                                         {isLowStock && <span className="text-[9px] font-bold text-amber-500 flex items-center gap-0.5"><AlertTriangle size={9} /> Bajo</span>}
                                                         {/* Mobile: show price inline */}
-                                                        <span className="sm:hidden text-[11px] font-black text-emerald-600 dark:text-emerald-400">{copEnabled && copPrimary && tasaCop > 0 ? `${Math.round(p.priceUsdt * tasaCop).toLocaleString('es-CO')} COP` : `$${(p.priceUsdt || 0).toFixed(2)}`}</span>
+                                                        <span className="sm:hidden text-[11px] font-black text-emerald-600 dark:text-emerald-400">{copEnabled && copPrimary && tasaCop > 0 ? `${getCop(p, tasaCop).toLocaleString('es-CO')} COP` : `$${(getUsd(p, tasaCop) || 0).toFixed(2)}`}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -714,13 +731,13 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                                 {copEnabled && tasaCop > 0 ? (
                                                     copPrimary ? (
                                                         <>
-                                                            <p className="text-sm font-black text-amber-600 dark:text-amber-400">{Math.round(p.priceUsdt * tasaCop).toLocaleString('es-CO')} COP</p>
-                                                            <p className="text-[10px] text-slate-400 font-medium">USD {(p.priceUsdt || 0).toFixed(2)}</p>
+                                                            <p className="text-sm font-black text-amber-600 dark:text-amber-400">{getCop(p, tasaCop).toLocaleString('es-CO')} COP</p>
+                                                            <p className="text-[10px] text-slate-400 font-medium">USD {getUsd(p, tasaCop).toFixed(2)}</p>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${(p.priceUsdt || 0).toFixed(2)}</p>
-                                                            <p className="text-[10px] text-slate-400 font-medium">{Math.round(p.priceUsdt * tasaCop).toLocaleString('es-CO')} COP</p>
+                                                            <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${getUsd(p, tasaCop).toFixed(2)}</p>
+                                                            <p className="text-[10px] text-slate-400 font-medium">{getCop(p, tasaCop).toLocaleString('es-CO')} COP</p>
                                                         </>
                                                     )
                                                 ) : (

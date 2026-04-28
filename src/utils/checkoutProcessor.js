@@ -65,6 +65,7 @@ export async function processSaleTransaction({
             name: i.name,
             qty: i.qty,
             priceUsd: i.priceUsd,
+            priceCop: i.priceCop || null,
             costBs: i.costBs || 0,
             costUsd: i.costUsd || 0,
             isWeight: i.isWeight
@@ -75,7 +76,11 @@ export async function processSaleTransaction({
         discountAmountUsd:  discountData?.amountUsd || 0,
         totalUsd:  cartTotalUsd,
         totalBs:   cartTotalBs,
-        totalCop:  copEnabled && tasaCop > 0 ? mulR(cartTotalUsd, tasaCop) : 0,
+        totalCop:  copEnabled && tasaCop > 0
+            ? (cart.every(i => i.priceCop > 0)
+                ? Math.round(cart.reduce((s, i) => s + i.priceCop * i.qty, 0) * (1 - ((discountData?.amountUsd || 0) / (cartSubtotalUsd || 1))))
+                : mulR(cartTotalUsd, tasaCop))
+            : 0,
         payments:  normalizedPayments,          // ← Con currency + methodLabel
         rate:      effectiveRate,
         tasaCop:   copEnabled ? tasaCop : 0,

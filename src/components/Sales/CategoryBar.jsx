@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Package, Calculator, ChevronDown } from 'lucide-react';
 import { BODEGA_CATEGORIES, CATEGORY_ICONS } from '../../config/categories';
-import { formatCop, formatBs } from '../../utils/calculatorUtils';
+import { formatCop, formatBs, getCop, getUsd } from '../../utils/calculatorUtils';
 
 const PAGE_SIZE = 30;
 
@@ -92,19 +92,19 @@ export default function CategoryBar({
                                     </div>
                                     <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2 mb-1">{p.name}</p>
                                     <p className={`text-[11px] font-black ${copPrimary ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                        {copPrimary ? `${Math.round(p.priceUsdt * tasaCop).toLocaleString('es-CO')} COP` : `$${p.priceUsdt?.toFixed(2)}`}
+                                        {copPrimary ? `${getCop(p, tasaCop).toLocaleString('es-CO')} COP` : `$${p.priceUsdt?.toFixed(2)}`}
                                     </p>
                                     {copEnabled && tasaCop > 0 && (
                                         <p className="text-[8px] leading-tight mt-0.5">
                                             {copPrimary ? (
                                                 <>
-                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">${p.priceUsdt?.toFixed(2)} USD</span>
+                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">${getUsd(p, tasaCop).toFixed(2)} USD</span>
                                                     <span className="text-slate-300 mx-0.5">|</span>
-                                                    <span className="font-bold text-blue-500 dark:text-blue-400">{formatBs(p.priceUsdt * (effectiveRate || 0))} Bs</span>
+                                                    <span className="font-bold text-blue-500 dark:text-blue-400">{formatBs(getUsd(p, tasaCop) * (effectiveRate || 0))} Bs</span>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <span className="font-bold text-amber-600 dark:text-amber-400">{formatCop(p.priceUsdt * tasaCop)} COP</span>
+                                                    <span className="font-bold text-amber-600 dark:text-amber-400">{formatCop(getCop(p, tasaCop))} COP</span>
                                                     <span className="text-slate-300 mx-0.5">|</span>
                                                     <span className="font-bold text-blue-500 dark:text-blue-400">{formatBs(p.priceUsdt * (effectiveRate || 0))} Bs</span>
                                                 </>

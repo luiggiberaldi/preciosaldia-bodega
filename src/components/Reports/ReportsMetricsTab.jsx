@@ -71,7 +71,7 @@ function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, on
             s.items.forEach(item => {
                 const qty = item.isWeight ? `${item.qty.toFixed(3)}Kg` : `${item.qty} Und`;
                 if (useCop) {
-                    text += `- ${item.name} ${qty} x ${formatCop(item.priceUsd * tasaCop)} COP = *${formatCop(item.priceUsd * item.qty * tasaCop)} COP*\n`;
+                    text += `- ${item.name} ${qty} x ${formatCop(item.priceCop || Math.round(item.priceUsd * tasaCop))} COP = *${formatCop((item.priceCop || Math.round(item.priceUsd * tasaCop)) * item.qty)} COP*\n`;
                 } else {
                     text += `- ${item.name} ${qty} x $${item.priceUsd.toFixed(2)} = *$${(item.priceUsd * item.qty).toFixed(2)}*\n`;
                 }
@@ -142,7 +142,7 @@ function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, on
                             {s.items.map((item, i) => (
                                 <div key={i} className={`flex justify-between items-center text-xs ${isCanceled ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'}`}>
                                     <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
-                                    <span className="font-medium">{copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(item.priceUsd * item.qty * tasaCop)} COP` : `$${(item.priceUsd * item.qty).toFixed(2)}`}</span>
+                                    <span className="font-medium">{copEnabled && copPrimary && tasaCop > 0 ? `${formatCop((item.priceCop || Math.round(item.priceUsd * tasaCop)) * item.qty)} COP` : `$${(item.priceUsd * item.qty).toFixed(2)}`}</span>
                                 </div>
                             ))}
                         </div>

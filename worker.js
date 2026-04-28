@@ -263,6 +263,21 @@ export default {
       return handleShare(request, env);
     }
 
+    // Archivos que NUNCA deben cachearse en el CDN:
+    // - index.html: si se cachea, los usuarios no reciben la nueva versión de la app
+    // - sw.js / registerSW.js / workbox-*: si se cachean, el SW no detecta actualizaciones
+    // - manifest.webmanifest: puede cambiar entre deploys
+    const noCacheFiles = ['/', '/index.html', '/sw.js', '/registerSW.js', '/manifest.webmanifest'];
+    const isWorkbox = url.pathname.startsWith('/workbox-');
+    if (noCacheFiles.includes(url.pathname) || isWorkbox) {
+      const response = await env.ASSETS.fetch(request);
+      const newResponse = new Response(response.body, response);
+      newResponse.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      newResponse.headers.set('Pragma', 'no-cache');
+      newResponse.headers.set('Expires', '0');
+      return newResponse;
+    }
+
     return env.ASSETS.fetch(request);
   }
 };

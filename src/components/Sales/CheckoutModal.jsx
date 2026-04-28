@@ -16,6 +16,7 @@ export default function CheckoutModal({
     cartSubtotalBs,
     cartTotalUsd,
     cartTotalBs,
+    cartTotalCop,
     discountData,
     effectiveRate,
     customers,
@@ -108,7 +109,7 @@ export default function CheckoutModal({
                             copPrimary ? (
                                 <>
                                     <span className={`text-4xl sm:text-5xl font-black ${discountData?.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                                        {formatCop(cartTotalUsd * tasaCop)} COP
+                                        {formatCop(cartTotalCop || Math.round(cartTotalUsd * tasaCop))} COP
                                     </span>
                                     <span className="block text-sm sm:text-base font-bold text-slate-500 mt-1">
                                         ${cartTotalUsd.toFixed(2)} · Bs {formatBs(cartTotalBs)}
@@ -120,7 +121,7 @@ export default function CheckoutModal({
                                         ${cartTotalUsd.toFixed(2)}
                                     </span>
                                     <span className="block text-sm sm:text-base font-bold text-slate-500 mt-1">
-                                        {formatCop(cartTotalUsd * tasaCop)} COP · Bs {formatBs(cartTotalBs)}
+                                        {formatCop(cartTotalCop || Math.round(cartTotalUsd * tasaCop))} COP · Bs {formatBs(cartTotalBs)}
                                     </span>
                                 </>
                             )

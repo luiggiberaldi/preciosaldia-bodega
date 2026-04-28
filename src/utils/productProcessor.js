@@ -4,6 +4,7 @@ export function buildProductPayload(formData, effectiveRate) {
         barcode,
         priceUsd,
         priceBs,
+        priceCop,
         costUsd,
         costBs,
         stock,
@@ -13,6 +14,7 @@ export function buildProductPayload(formData, effectiveRate) {
         granelUnit,
         sellByUnit,
         unitPriceUsd,
+        unitPriceCop,
         category,
         lowStockAlert
     } = formData;
@@ -22,6 +24,9 @@ export function buildProductPayload(formData, effectiveRate) {
     const finalPriceUsd = priceUsd ? parseFloat(priceUsd) : (priceBs ? Math.round(parseFloat(priceBs) / safeRate * 100) / 100 : 0);
     const finalCostUsd = costUsd ? parseFloat(costUsd) : (costBs ? Math.round(parseFloat(costBs) / safeRate * 100) / 100 : 0);
     const finalCostBs = costBs ? parseFloat(costBs) : (costUsd ? Math.round(parseFloat(costUsd) * safeRate * 100) / 100 : 0);
+
+    // COP: guardar el valor exacto que escribió el usuario (sin redondeo de ida/vuelta)
+    const finalPriceCop = priceCop && parseFloat(priceCop) > 0 ? Math.round(parseFloat(priceCop)) : null;
 
     // Map packagingType → unit legacy
     let legacyUnit = 'unidad';
@@ -33,6 +38,13 @@ export function buildProductPayload(formData, effectiveRate) {
     const autoUnitPrice = parsedUnitsPerPkg > 1 ? finalPriceUsd / parsedUnitsPerPkg : finalPriceUsd;
     const finalUnitPrice = sellByUnit && unitPriceUsd ? parseFloat(unitPriceUsd) : autoUnitPrice;
 
+    // Unit price in COP for lote products
+    const finalUnitPriceCop = isLote && sellByUnit && unitPriceCop && parseFloat(unitPriceCop) > 0
+        ? Math.round(parseFloat(unitPriceCop))
+        : (isLote && sellByUnit && finalPriceCop && parsedUnitsPerPkg > 1
+            ? Math.round(finalPriceCop / parsedUnitsPerPkg)
+            : null);
+
     // Stock: for lote, convert lotes → units
     let finalStock = stock ? parseInt(stock) : 0;
     if (isLote && stockInLotes && parsedUnitsPerPkg > 0) {
@@ -43,6 +55,7 @@ export function buildProductPayload(formData, effectiveRate) {
         name: formattedName,
         barcode: barcode ? barcode.trim() : null,
         priceUsdt: finalPriceUsd,
+        priceCop: finalPriceCop,
         costUsd: finalCostUsd,
         costBs: finalCostBs,
         stock: finalStock,
@@ -51,6 +64,7 @@ export function buildProductPayload(formData, effectiveRate) {
         unitsPerPackage: parsedUnitsPerPkg,
         sellByUnit: isLote ? sellByUnit : false,
         unitPriceUsd: isLote && sellByUnit ? finalUnitPrice : null,
+        unitPriceCop: isLote && sellByUnit ? finalUnitPriceCop : null,
         stockInLotes: isLote && stockInLotes ? parseInt(stockInLotes) : null,
         category: category,
         lowStockAlert: lowStockAlert ? parseInt(lowStockAlert) : 5,

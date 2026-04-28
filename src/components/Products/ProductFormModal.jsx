@@ -361,7 +361,9 @@ export default function ProductFormModal({
                                 <Banknote size={16} /> COP
                             </span>
                             <span className="font-black text-amber-600 dark:text-amber-400 text-lg">
-                                {Math.round(parsedPrice * tasaCop).toLocaleString('es-CO')}
+                                {priceCop && parseFloat(priceCop) > 0
+                                    ? Math.round(parseFloat(priceCop)).toLocaleString('es-CO')
+                                    : Math.round(parsedPrice * tasaCop).toLocaleString('es-CO')}
                             </span>
                         </div>
                     )}
@@ -540,7 +542,7 @@ export default function ProductFormModal({
                                     <div className="flex justify-between"><span className="text-slate-400">Categoría:</span><span className="font-bold text-slate-700 dark:text-white">{categories.find(c => c.id === category)?.label || category}</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">Tipo:</span><span className="font-bold text-slate-700 dark:text-white">{PACKAGING_TYPES.find(p => p.id === packagingType)?.label}</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">Precio USD/BS:</span><span className="font-bold text-emerald-600">${parsedPrice.toFixed(2)}{priceSuffix} / {(parsedPrice * effectiveRate).toFixed(2)} Bs</span></div>
-                                    {copEnabled && tasaCop > 0 && <div className="flex justify-between"><span className="text-amber-500/80">Precio COP:</span><span className="font-bold text-amber-600">{Math.round(parsedPrice * tasaCop).toLocaleString('es-CO')} COP{priceSuffix}</span></div>}
+                                    {copEnabled && tasaCop > 0 && <div className="flex justify-between"><span className="text-amber-500/80">Precio COP:</span><span className="font-bold text-amber-600">{(priceCop && parseFloat(priceCop) > 0 ? Math.round(parseFloat(priceCop)) : Math.round(parsedPrice * tasaCop)).toLocaleString('es-CO')} COP{priceSuffix}</span></div>}
                                     {parsedCost > 0 && <div className="flex justify-between"><span className="text-slate-400">Costo:</span><span className="font-bold text-slate-600">${parsedCost.toFixed(2)}{priceSuffix}</span></div>}
                                     {mainMarginPct !== null && <div className="flex justify-between"><span className="text-slate-400">Margen:</span><span className={`font-black ${mainMarginPct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{mainMarginPct.toFixed(1)}%</span></div>}
                                     {isLote && <div className="flex justify-between"><span className="text-slate-400">Uds/Lote:</span><span className="font-bold text-indigo-500">{parsedUnits}</span></div>}

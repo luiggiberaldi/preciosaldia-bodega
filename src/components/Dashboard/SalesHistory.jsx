@@ -155,13 +155,13 @@ export default function SalesHistory({
                                                     <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
                                                     <span className="font-medium text-right">
                                                         {copEnabled && copPrimary
-                                                            ? <span className="text-amber-600 dark:text-amber-400">{formatCop(item.priceUsd * item.qty * tasaCop)} COP</span>
+                                                            ? <span className="text-amber-600 dark:text-amber-400">{formatCop((item.priceCop || Math.round(item.priceUsd * tasaCop)) * item.qty)} COP</span>
                                                             : <span>${(item.priceUsd * item.qty).toFixed(2)}</span>}
                                                         {copEnabled && tasaCop > 0
                                                             ? <span className="text-slate-400 font-normal ml-1">
                                                                 {copPrimary
                                                                     ? <>${(item.priceUsd * item.qty).toFixed(2)} · <span className="text-blue-500 dark:text-blue-400">{formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></>
-                                                                    : <>{formatCop(item.priceUsd * item.qty * tasaCop)} COP · <span className="text-blue-500 dark:text-blue-400">{formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></>}
+                                                                    : <>{formatCop((item.priceCop || Math.round(item.priceUsd * tasaCop)) * item.qty)} COP · <span className="text-blue-500 dark:text-blue-400">{formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span></>}
                                                               </span>
                                                             : <span className="text-slate-400 font-normal ml-1">· {formatBs(item.priceUsd * item.qty * (s.rate || bcvRate))} Bs</span>}
                                                     </span>

@@ -135,10 +135,10 @@ export async function generateTicketPDF(sale, bcvRate) {
             doc.setFontSize(6);
             doc.setTextColor(...MUTED);
             let detailLine = isCop
-                ? 'USD ' + item.priceUsd.toFixed(2) + ' c/u  ·  ' + formatCop(sub * sale.tasaCop) + ' COP  ·  Bs ' + formatBs(subBs)
+                ? 'USD ' + item.priceUsd.toFixed(2) + ' c/u  ·  ' + formatCop(item.priceCop ? item.priceCop * item.qty : sub * sale.tasaCop) + ' COP  ·  Bs ' + formatBs(subBs)
                 : '$' + item.priceUsd.toFixed(2) + ' c/u  ·  Bs ' + formatBs(subBs);
             if (!isCop && sale.tasaCop > 0) {
-                const copUnit = (item.priceUsd * sale.tasaCop).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                const copUnit = (item.priceCop || Math.round(item.priceUsd * sale.tasaCop)).toLocaleString('es-CO', { maximumFractionDigits: 0 });
                 detailLine += '  ·  ' + copUnit + ' COP';
             }
             doc.text(detailLine, M + 10, y);

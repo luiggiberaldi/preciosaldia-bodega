@@ -47,7 +47,7 @@ export const generarEtiquetas = async (productos, effectiveRate, copEnabled, tas
 
         const priceUsdRaw = p.priceUsdt || 0;
         const textUsd = copEnabled && tasaCop > 0
-            ? `${(priceUsdRaw * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
+            ? `${(p.priceCop || Math.round(priceUsdRaw * tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} COP`
             : `$${priceUsdRaw.toFixed(2)}`;
 
         doc.text(textUsd, centerX, safeY, { align: "center", baseline: "top" });
