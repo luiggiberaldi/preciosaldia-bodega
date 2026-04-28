@@ -5,7 +5,7 @@ import AnimatedCounter from '../AnimatedCounter';
 
 export default function DashboardStats({
     isDemo, demoTimeLeft, deviceId,
-    todayTotalUsd, todayTotalBs, todaySales, todayItemsSold,
+    todayTotalUsd, todayTotalBs, todayTotalCop, todaySales, todayItemsSold,
     todayExpenses, todayExpensesUsd,
     todayProfit, bcvRate,
     todayCashFlow,
@@ -50,7 +50,7 @@ export default function DashboardStats({
                         <>
                             <div className="flex items-baseline gap-1">
                                 <span className="text-2xl font-black text-amber-600 dark:text-amber-400 tracking-tight">
-                                    {formatCop(todayTotalUsd * tasaCop)} <span className="text-base">COP</span>
+                                    {formatCop(todayTotalCop || Math.round(todayTotalUsd * tasaCop))} <span className="text-base">COP</span>
                                 </span>
                             </div>
                             <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">${todayTotalUsd.toFixed(2)} · {formatBs(todayTotalBs)} Bs</p>
@@ -63,7 +63,7 @@ export default function DashboardStats({
                                 </span>
                             </div>
                             {copEnabled && tasaCop > 0 && (
-                                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">{formatCop(todayTotalUsd * tasaCop)} COP · {formatBs(todayTotalBs)} Bs</p>
+                                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">{formatCop(todayTotalCop || Math.round(todayTotalUsd * tasaCop))} COP · {formatBs(todayTotalBs)} Bs</p>
                             )}
                             {!(copEnabled && tasaCop > 0) && (
                                 <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-0.5">{formatBs(todayTotalBs)} Bs</p>
@@ -195,7 +195,7 @@ export default function DashboardStats({
                             </div>
                             <div className="text-left">
                                 <p className="text-sm font-black">Cerrar Caja</p>
-                                <p className="text-[11px] font-medium text-white/70">{copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(todayTotalUsd * tasaCop)} COP · $${todayTotalUsd.toFixed(2)}` : `$${todayTotalUsd.toFixed(2)}${copEnabled && tasaCop > 0 ? ` · ${formatCop(todayTotalUsd * tasaCop)} COP` : ''}`} | {todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'}</p>
+                                <p className="text-[11px] font-medium text-white/70">{copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(todayTotalCop || Math.round(todayTotalUsd * tasaCop))} COP · $${todayTotalUsd.toFixed(2)}` : `$${todayTotalUsd.toFixed(2)}${copEnabled && tasaCop > 0 ? ` · ${formatCop(todayTotalCop || Math.round(todayTotalUsd * tasaCop))} COP` : ''}`} | {todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'}</p>
                             </div>
                         </div>
                         <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center group-hover:translate-x-1 transition-transform">

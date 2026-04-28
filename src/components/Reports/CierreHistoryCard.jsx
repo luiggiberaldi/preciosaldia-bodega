@@ -21,7 +21,9 @@ export default function CierreHistoryCard({ cierre, bcvRate, products, copEnable
                 s.items.forEach(item => {
                     if (!todayProductMap[item.name]) todayProductMap[item.name] = { name: item.name, qty: 0, revenue: 0 };
                     todayProductMap[item.name].qty += item.qty;
-                    todayProductMap[item.name].revenue += item.priceUsd * item.qty;
+                    todayProductMap[item.name].revenue += (item.priceCop && item.priceCop > 0)
+                        ? item.priceCop * item.qty
+                        : item.priceUsd * item.qty;
                 });
             }
         });
@@ -66,13 +68,13 @@ export default function CierreHistoryCard({ cierre, bcvRate, products, copEnable
                     <div>
                         {copEnabled && copPrimary && tasaCop > 0 ? (
                             <>
-                                <p className="text-sm font-black text-amber-600 dark:text-amber-400">{formatCop(cierre.totalUsd * tasaCop)} COP</p>
+                                <p className="text-sm font-black text-amber-600 dark:text-amber-400">{formatCop(cierre.totalCop || Math.round(cierre.totalUsd * tasaCop))} COP</p>
                                 <p className="text-[10px] text-slate-400 font-medium">${cierre.totalUsd.toFixed(2)}</p>
                             </>
                         ) : (
                             <>
                                 <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${cierre.totalUsd.toFixed(2)}</p>
-                                <p className="text-[10px] text-slate-400 font-medium">{copEnabled && tasaCop > 0 ? `${formatCop(cierre.totalUsd * tasaCop)} COP` : `${formatBs(cierre.totalBs)} Bs`}</p>
+                                <p className="text-[10px] text-slate-400 font-medium">{copEnabled && tasaCop > 0 ? `${formatCop(cierre.totalCop || Math.round(cierre.totalUsd * tasaCop))} COP` : `${formatBs(cierre.totalBs)} Bs`}</p>
                             </>
                         )}
                     </div>
@@ -87,7 +89,7 @@ export default function CierreHistoryCard({ cierre, bcvRate, products, copEnable
                         <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800/50">
                             <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><DollarSign size={14}/> Fondo de Apertura</span>
                             {copEnabled && copPrimary && tasaCop > 0 ? (
-                                <span className="text-sm font-black text-slate-700 dark:text-slate-300">{formatCop(fondoInicial * tasaCop)} COP <span className="text-[10px] text-slate-400 ml-1">(${fondoInicial.toFixed(2)})</span></span>
+                                <span className="text-sm font-black text-slate-700 dark:text-slate-300">{formatCop(cierre.apertura?.openingCop || Math.round(fondoInicial * tasaCop))} COP <span className="text-[10px] text-slate-400 ml-1">(${fondoInicial.toFixed(2)})</span></span>
                             ) : (
                                 <span className="text-sm font-black text-slate-700 dark:text-slate-300">${fondoInicial.toFixed(2)} <span className="text-[10px] text-slate-400 ml-1">({formatBs(fondoInicialBs)} Bs)</span></span>
                             )}

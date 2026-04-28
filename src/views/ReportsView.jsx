@@ -86,6 +86,7 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
         historySales,
         totalUsd,
         totalBs,
+        totalCop,
         totalItems,
         profit,
         paymentBreakdown,
@@ -218,6 +219,7 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
                     historySales={historySales}
                     totalUsd={totalUsd}
                     totalBs={totalBs}
+                    totalCop={totalCop}
                     totalItems={totalItems}
                     profit={profit}
                     paymentBreakdown={paymentBreakdown}

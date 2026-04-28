@@ -26,6 +26,7 @@ export function calculateReportsData(allSales, from, to, bcvRate, products) {
 
     const totalUsd = sumR(salesForStats.map(sale => sale.totalUsd || 0));
     const totalBs = sumR(salesForStats.map(sale => sale.totalBs || 0));
+    const totalCop = sumR(salesForStats.map(sale => sale.totalCop || 0));
     const totalItems = salesForStats.reduce((s, sale) => s + (sale.items ? sale.items.reduce((is, i) => is + i.qty, 0) : 0), 0);
     const profit = FinancialEngine.calculateAggregateProfit(salesForStats, bcvRate, products);
     const paymentBreakdown = FinancialEngine.calculatePaymentBreakdown(salesForCashFlow);
@@ -57,6 +58,7 @@ export function calculateReportsData(allSales, from, to, bcvRate, products) {
         historySales,
         totalUsd,
         totalBs,
+        totalCop,
         totalItems,
         profit,
         paymentBreakdown,
@@ -103,6 +105,7 @@ export function groupSalesByCierreId(allSales, from, to) {
 
             const totalUsd = sumR(salesForStats.map(s => s.totalUsd || 0));
             const totalBs = sumR(salesForStats.map(s => s.totalBs || 0));
+            const totalCop = sumR(salesForStats.map(s => s.totalCop || 0));
             const totalItems = salesForStats.reduce((acc, s) => acc + (s.items ? s.items.reduce((is, it) => is + it.qty, 0) : 0), 0);
             
             // Reconstruir desglose de pago de esta caja
@@ -115,6 +118,7 @@ export function groupSalesByCierreId(allSales, from, to) {
                 salesForCashFlow,
                 totalUsd,
                 totalBs,
+                totalCop,
                 totalItems,
                 paymentBreakdown,
             };

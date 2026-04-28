@@ -40,6 +40,7 @@ export function useDashboardMetrics(sales, customers, products, bcvRate) {
 
     const todayTotalBs = useMemo(() => sumR(todaySales.map(s => s.totalBs || 0)), [todaySales]);
     const todayTotalUsd = useMemo(() => sumR(todaySales.map(s => s.totalUsd || 0)), [todaySales]);
+    const todayTotalCop = useMemo(() => sumR(todaySales.map(s => s.totalCop || 0)), [todaySales]);
     const todayItemsSold = useMemo(() => todaySales.reduce((sum, s) => sum + (s.items ? s.items.reduce((is, i) => is + i.qty, 0) : 0), 0), [todaySales]);
 
     // Egresos del día (pagos a proveedores)
@@ -138,6 +139,7 @@ export function useDashboardMetrics(sales, customers, products, bcvRate) {
         todayApertura,
         todayTotalBs,
         todayTotalUsd,
+        todayTotalCop,
         todayItemsSold,
         todayExpenses,
         todayExpensesUsd,

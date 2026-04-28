@@ -214,6 +214,7 @@ export default function ReportsMetricsTab({
     historySales,
     totalUsd,
     totalBs,
+    totalCop,
     totalItems,
     profit,
     paymentBreakdown,
@@ -243,7 +244,7 @@ export default function ReportsMetricsTab({
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatCard icon={ShoppingBag} label="Ventas" value={salesForStats.length} color="emerald" />
-                <StatCard icon={DollarSign} label="Ingresos" value={copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(totalUsd * tasaCop)} COP` : `$${totalUsd.toFixed(2)}`} sub={copEnabled && tasaCop > 0 ? (copPrimary ? `$${totalUsd.toFixed(2)} · ${formatBs(totalBs)} Bs` : `${formatCop(totalUsd * tasaCop)} COP · ${formatBs(totalBs)} Bs`) : `${formatBs(totalBs)} Bs`} color="blue" />
+                <StatCard icon={DollarSign} label="Ingresos" value={copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(totalCop || Math.round(totalUsd * tasaCop))} COP` : `$${totalUsd.toFixed(2)}`} sub={copEnabled && tasaCop > 0 ? (copPrimary ? `$${totalUsd.toFixed(2)} · ${formatBs(totalBs)} Bs` : `${formatCop(totalCop || Math.round(totalUsd * tasaCop))} COP · ${formatBs(totalBs)} Bs`) : `${formatBs(totalBs)} Bs`} color="blue" />
                 <StatCard icon={TrendingUp} label="Ganancia" value={copEnabled && copPrimary && tasaCop > 0 ? `${formatCop((bcvRate > 0 ? profit / bcvRate : 0) * tasaCop)} COP` : (bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00')} sub={copEnabled && tasaCop > 0 ? (copPrimary ? `$${(bcvRate > 0 ? profit / bcvRate : 0).toFixed(2)} · ${formatBs(profit)} Bs` : `${formatCop((bcvRate > 0 ? profit / bcvRate : 0) * tasaCop)} COP · ${formatBs(profit)} Bs`) : `${formatBs(profit)} Bs`} color="indigo" />
                 <StatCard icon={Package} label="Artículos" value={totalItems} color="amber" />
             </div>

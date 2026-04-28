@@ -60,7 +60,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     // Metrics
     const {
         today, todaySales, todayCashFlow, todayApertura,
-        todayTotalBs, todayTotalUsd, todayItemsSold,
+        todayTotalBs, todayTotalUsd, todayTotalCop, todayItemsSold,
         todayExpenses, todayExpensesUsd, todayProfit,
         getRecentSales, weekData, lowStockProducts,
         totalDeudas, topProducts, paymentBreakdown, todayTopProducts,
@@ -332,6 +332,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 deviceId={deviceId}
                 todayTotalUsd={todayTotalUsd}
                 todayTotalBs={todayTotalBs}
+                todayTotalCop={todayTotalCop}
                 todaySales={todaySales}
                 todayItemsSold={todayItemsSold}
                 todayExpenses={todayExpenses}
@@ -534,6 +535,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 todaySales={todaySales}
                 todayTotalUsd={todayTotalUsd}
                 todayTotalBs={todayTotalBs}
+                todayTotalCop={todayTotalCop}
                 todayProfit={todayProfit}
                 todayItemsSold={todayItemsSold}
                 todayExpensesUsd={todayExpensesUsd}

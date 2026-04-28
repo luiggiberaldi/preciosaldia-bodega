@@ -12,6 +12,7 @@ export default function CierreCajaWizard({
     todaySales = [],
     todayTotalUsd = 0,
     todayTotalBs = 0,
+    todayTotalCop: todayTotalCopProp = 0,
     todayProfit = 0,
     todayItemsSold = 0,
     todayExpensesUsd = 0,
@@ -46,8 +47,8 @@ export default function CierreCajaWizard({
         Object.keys(paymentBreakdown).some(k => paymentBreakdown[k].currency === 'COP')
     );
 
-    // Total COP del dia (sum of all COP-currency payments)
-    const todayTotalCop = copEnabled && tasaCop > 0 ? mulR(todayTotalUsd, tasaCop) : 0;
+    // Total COP del dia (use stored totalCop from sales, fallback to derived)
+    const todayTotalCop = todayTotalCopProp > 0 ? todayTotalCopProp : (copEnabled && tasaCop > 0 ? mulR(todayTotalUsd, tasaCop) : 0);
 
     // Semaforo
     const absDiffUsd = Math.abs(diffUsd);
@@ -136,13 +137,13 @@ export default function CierreCajaWizard({
                                 <p className="text-xs font-bold text-indigo-200 uppercase tracking-widest mb-1">Ingresos brutos del dia</p>
                                 <p className="text-3xl font-black">
                                     {copEnabled && copPrimary && tasaCop > 0
-                                        ? `${formatCop(todayTotalUsd * tasaCop)} COP`
+                                        ? `${formatCop(todayTotalCop)} COP`
                                         : fmtUsdAmt(todayTotalUsd)}
                                 </p>
                                 {copActive && (
                                     copPrimary
                                         ? <p className="text-sm font-bold text-indigo-200 mt-0.5">{fmtUsdAmt(todayTotalUsd)}</p>
-                                        : <p className="text-sm font-bold text-amber-300 mt-0.5">{formatCop(todayTotalUsd * tasaCop)} COP</p>
+                                        : <p className="text-sm font-bold text-amber-300 mt-0.5">{formatCop(todayTotalCop)} COP</p>
                                 )}
                                 <p className="text-sm font-bold text-indigo-200 mt-0.5">{formatBs(todayTotalBs)} Bs</p>
                                 <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/20">
