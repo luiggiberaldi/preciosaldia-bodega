@@ -6,12 +6,12 @@ import CierreHistoryCard from './CierreHistoryCard';
  * History tab — displays grouped "cierre de caja" cards for the selected
  * date range, or an empty state when there are none.
  */
-export default function ReportsHistoryTab({ groupedClosings, bcvRate, products }) {
+export default function ReportsHistoryTab({ groupedClosings, bcvRate, products, copEnabled, copPrimary, tasaCop }) {
     return (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             {groupedClosings.length > 0 ? (
                 groupedClosings.map(cierre => (
-                    <CierreHistoryCard key={cierre.cierreId} cierre={cierre} bcvRate={bcvRate} products={products} />
+                    <CierreHistoryCard key={cierre.cierreId} cierre={cierre} bcvRate={bcvRate} products={products} copEnabled={copEnabled} copPrimary={copPrimary} tasaCop={tasaCop} />
                 ))
             ) : (
                 <div className="mt-8">

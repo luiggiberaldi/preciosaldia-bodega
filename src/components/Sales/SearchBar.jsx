@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import { Search, Mic, Package, X, Box } from 'lucide-react';
 import { BODEGA_CATEGORIES, CATEGORY_ICONS, CATEGORY_COLORS } from '../../config/categories';
+import { formatCop } from '../../utils/calculatorUtils';
 
 const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
@@ -23,6 +24,10 @@ const SearchBar = forwardRef(function SearchBar({
     setHierarchyPending,
     weightPending,
     setWeightPending,
+    // COP
+    copEnabled,
+    copPrimary,
+    tasaCop,
 }, ref) {
     return (
         <div className="relative">
@@ -118,12 +123,25 @@ const SearchBar = forwardRef(function SearchBar({
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
-                                        ${p.priceUsdt?.toFixed(2)}
-                                    </p>
-                                    <p className="text-[10px] font-medium text-slate-400">
-                                        {formatBs(p.priceUsdt * effectiveRate)} Bs
-                                    </p>
+                                    {copEnabled && copPrimary && tasaCop > 0 ? (
+                                        <>
+                                            <p className="text-sm font-black text-amber-600 dark:text-amber-400">
+                                                {formatCop(p.priceUsdt * tasaCop)} COP
+                                            </p>
+                                            <p className="text-[10px] font-medium text-slate-400">
+                                                ${p.priceUsdt?.toFixed(2)}
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                                                ${p.priceUsdt?.toFixed(2)}
+                                            </p>
+                                            <p className="text-[10px] font-medium text-slate-400">
+                                                {copEnabled && tasaCop > 0 ? `${formatCop(p.priceUsdt * tasaCop)} COP` : `${formatBs(p.priceUsdt * effectiveRate)} Bs`}
+                                            </p>
+                                        </>
+                                    )}
                                 </div>
                             </button>
                         );
@@ -153,14 +171,14 @@ const SearchBar = forwardRef(function SearchBar({
                             className="flex flex-col items-center gap-2 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all active:scale-95">
                             <Package size={24} className="text-indigo-600 dark:text-indigo-400" />
                             <span className="text-xs font-black text-indigo-700 dark:text-indigo-300 uppercase">Caja/Bulto</span>
-                            <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">${hierarchyPending.priceUsdt?.toFixed(2)}</span>
+                            <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">{copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(hierarchyPending.priceUsdt * tasaCop)} COP` : `$${hierarchyPending.priceUsdt?.toFixed(2)}`}</span>
                             <span className="text-[9px] text-slate-400 font-bold">{hierarchyPending.unitsPerPackage} uds</span>
                         </button>
                         <button onClick={() => addToCart(hierarchyPending, null, 'unit')}
                             className="flex flex-col items-center gap-2 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all active:scale-95">
                             <Box size={24} className="text-emerald-600 dark:text-emerald-400" />
                             <span className="text-xs font-black text-emerald-700 dark:text-emerald-300 uppercase">Unidad</span>
-                            <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">${hierarchyPending.unitPriceUsd?.toFixed(2)}</span>
+                            <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(hierarchyPending.unitPriceUsd * tasaCop)} COP` : `$${hierarchyPending.unitPriceUsd?.toFixed(2)}`}</span>
                             <span className="text-[9px] text-slate-400 font-bold">1 ud</span>
                         </button>
                     </div>

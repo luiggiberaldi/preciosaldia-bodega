@@ -34,7 +34,7 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
     );
 }
 
-function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, onRecycleSale }) {
+function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, onRecycleSale, copEnabled, copPrimary, tasaCop }) {
     const d = new Date(s.timestamp);
     let methodLabel = 'Efectivo';
     let payMethodIconId = 'efectivo_bs';
@@ -62,6 +62,7 @@ function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, on
 
     const handleShare = (e) => {
         e.stopPropagation();
+        const useCop = copEnabled && copPrimary && tasaCop > 0;
         let text = `*COMPROBANTE | PRECIOS AL DIA*\n`;
         text += `Orden: #${s.id.substring(0, 6).toUpperCase()}\n`;
         text += `Fecha: ${d.toLocaleString('es-VE')}\n`;
@@ -69,11 +70,20 @@ function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, on
         if (s.items && s.items.length > 0) {
             s.items.forEach(item => {
                 const qty = item.isWeight ? `${item.qty.toFixed(3)}Kg` : `${item.qty} Und`;
-                text += `- ${item.name} ${qty} x $${item.priceUsd.toFixed(2)} = *$${(item.priceUsd * item.qty).toFixed(2)}*\n`;
+                if (useCop) {
+                    text += `- ${item.name} ${qty} x ${formatCop(item.priceUsd * tasaCop)} COP = *${formatCop(item.priceUsd * item.qty * tasaCop)} COP*\n`;
+                } else {
+                    text += `- ${item.name} ${qty} x $${item.priceUsd.toFixed(2)} = *$${(item.priceUsd * item.qty).toFixed(2)}*\n`;
+                }
             });
         }
-        text += `\n*TOTAL: $${(s.totalUsd || 0).toFixed(2)}*\n`;
-        text += `Ref: ${formatBs(s.totalBs || 0)} Bs\n`;
+        if (useCop) {
+            text += `\n*TOTAL: ${formatCop((s.totalUsd || 0) * tasaCop)} COP*\n`;
+            text += `Ref: $${(s.totalUsd || 0).toFixed(2)}\n`;
+        } else {
+            text += `\n*TOTAL: $${(s.totalUsd || 0).toFixed(2)}*\n`;
+            text += `Ref: ${formatBs(s.totalBs || 0)} Bs\n`;
+        }
         const encoded = encodeURIComponent(text);
         window.open(`https://wa.me/?text=${encoded}`, '_blank');
     };
@@ -103,10 +113,24 @@ function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, on
                     </p>
                 </div>
                 <div className="text-right shrink-0">
-                    <p className={`text-sm font-black ${isCanceled ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>${(s.totalUsd || 0).toFixed(2)}</p>
-                    <div className="flex justify-end mt-0.5">
-                        {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
-                    </div>
+                    {copEnabled && copPrimary && tasaCop > 0 ? (
+                        <>
+                            <p className={`text-sm font-black ${isCanceled ? 'text-slate-400' : 'text-amber-600 dark:text-amber-400'}`}>{formatCop((s.totalUsd || 0) * tasaCop)} COP</p>
+                            <p className="text-[10px] font-medium text-slate-400">${(s.totalUsd || 0).toFixed(2)}</p>
+                        </>
+                    ) : (
+                        <>
+                            <p className={`text-sm font-black ${isCanceled ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>${(s.totalUsd || 0).toFixed(2)}</p>
+                            <div className="flex justify-end mt-0.5">
+                                {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                            </div>
+                        </>
+                    )}
+                    {copEnabled && copPrimary && tasaCop > 0 && (
+                        <div className="flex justify-end mt-0.5">
+                            {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -118,7 +142,7 @@ function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, on
                             {s.items.map((item, i) => (
                                 <div key={i} className={`flex justify-between items-center text-xs ${isCanceled ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'}`}>
                                     <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
-                                    <span className="font-medium">${(item.priceUsd * item.qty).toFixed(2)}</span>
+                                    <span className="font-medium">{copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(item.priceUsd * item.qty * tasaCop)} COP` : `$${(item.priceUsd * item.qty).toFixed(2)}`}</span>
                                 </div>
                             ))}
                         </div>
@@ -236,7 +260,7 @@ export default function ReportsMetricsTab({
                             const dayLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('es-VE', { day: 'numeric', month: 'short' });
                             return (
                                 <div key={day.date} className="flex-1 flex flex-col items-center gap-0.5">
-                                    <span className="text-[8px] font-bold text-slate-400">${day.total.toFixed(0)}</span>
+                                    <span className="text-[8px] font-bold text-slate-400">{copEnabled && copPrimary && tasaCop > 0 ? `${Math.round(day.total * tasaCop / 1000)}k` : `$${day.total.toFixed(0)}`}</span>
                                     <div className="w-full flex justify-center">
                                         <div
                                             className="w-full max-w-[24px] rounded-t-md bg-gradient-to-t from-indigo-500 to-indigo-400 transition-all duration-500"
@@ -420,7 +444,7 @@ export default function ReportsMetricsTab({
                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{p.name}</p>
                                     <p className="text-[10px] text-slate-400">{p.qty} vendidos</p>
                                 </div>
-                                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">${p.revenue.toFixed(2)}</span>
+                                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">{copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(p.revenue * tasaCop)} COP` : `$${p.revenue.toFixed(2)}`}</span>
                             </div>
                         ))}
                     </div>
@@ -500,7 +524,7 @@ export default function ReportsMetricsTab({
                                 {/* Mini Summary Strip */}
                                 {searchedSales.length > 0 && (
                                     <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl px-3 py-2 text-[10px] font-bold text-slate-500">
-                                        <span className="flex items-center gap-1"><DollarSign size={12} className="text-emerald-500" /> ${sumUsd.toFixed(2)}</span>
+                                        <span className="flex items-center gap-1"><DollarSign size={12} className="text-emerald-500" /> {copEnabled && copPrimary && tasaCop > 0 ? `${formatCop(sumUsd * tasaCop)} COP` : `$${sumUsd.toFixed(2)}`}</span>
                                         <span className="w-px h-3 bg-slate-300 dark:bg-slate-700" />
                                         <span>{completedInList.length} venta{completedInList.length !== 1 ? 's' : ''}</span>
                                         {voidedInList.length > 0 && (
@@ -519,6 +543,9 @@ export default function ReportsMetricsTab({
                                         onToggle={() => setExpandedSaleId(prev => prev === s.id ? null : s.id)}
                                         onVoidSale={setVoidSaleTarget}
                                         onRecycleSale={setRecycleOffer}
+                                        copEnabled={copEnabled}
+                                        copPrimary={copPrimary}
+                                        tasaCop={tasaCop}
                                     />
                                 ))}
 

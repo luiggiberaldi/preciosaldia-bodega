@@ -247,6 +247,9 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
                     groupedClosings={groupedClosings}
                     bcvRate={bcvRate}
                     products={products}
+                    copEnabled={copEnabled}
+                    copPrimary={copPrimary}
+                    tasaCop={tasaCop}
                 />
             )}
 

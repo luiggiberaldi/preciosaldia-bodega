@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, LockIcon, Printer, DollarSign, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { formatBs } from '../../utils/calculatorUtils';
+import { formatBs, formatCop } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentIcon, toTitleCase, PAYMENT_ICONS } from '../../config/paymentMethods';
 import { generateDailyClosePDF } from '../../utils/dailyCloseGenerator';
 
-export default function CierreHistoryCard({ cierre, bcvRate, products }) {
+export default function CierreHistoryCard({ cierre, bcvRate, products, copEnabled, copPrimary, tasaCop }) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const dateLabel = new Date(cierre.cierreId).toLocaleString('es-VE', { 
@@ -64,8 +64,17 @@ export default function CierreHistoryCard({ cierre, bcvRate, products }) {
                 </div>
                 <div className="text-right flex items-center gap-3">
                     <div>
-                        <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${cierre.totalUsd.toFixed(2)}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">{formatBs(cierre.totalBs)} Bs</p>
+                        {copEnabled && copPrimary && tasaCop > 0 ? (
+                            <>
+                                <p className="text-sm font-black text-amber-600 dark:text-amber-400">{formatCop(cierre.totalUsd * tasaCop)} COP</p>
+                                <p className="text-[10px] text-slate-400 font-medium">${cierre.totalUsd.toFixed(2)}</p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${cierre.totalUsd.toFixed(2)}</p>
+                                <p className="text-[10px] text-slate-400 font-medium">{copEnabled && tasaCop > 0 ? `${formatCop(cierre.totalUsd * tasaCop)} COP` : `${formatBs(cierre.totalBs)} Bs`}</p>
+                            </>
+                        )}
                     </div>
                     {isExpanded ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
                 </div>
@@ -77,7 +86,11 @@ export default function CierreHistoryCard({ cierre, bcvRate, products }) {
                     {hasApertura && (
                         <div className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800/50">
                             <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5"><DollarSign size={14}/> Fondo de Apertura</span>
-                            <span className="text-sm font-black text-slate-700 dark:text-slate-300">${fondoInicial.toFixed(2)} <span className="text-[10px] text-slate-400 ml-1">({formatBs(fondoInicialBs)} Bs)</span></span>
+                            {copEnabled && copPrimary && tasaCop > 0 ? (
+                                <span className="text-sm font-black text-slate-700 dark:text-slate-300">{formatCop(fondoInicial * tasaCop)} COP <span className="text-[10px] text-slate-400 ml-1">(${fondoInicial.toFixed(2)})</span></span>
+                            ) : (
+                                <span className="text-sm font-black text-slate-700 dark:text-slate-300">${fondoInicial.toFixed(2)} <span className="text-[10px] text-slate-400 ml-1">({formatBs(fondoInicialBs)} Bs)</span></span>
+                            )}
                         </div>
                     )}
 

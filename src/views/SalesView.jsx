@@ -563,6 +563,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                                     isRecording={isRecording} isProcessingAudio={isProcessingAudio} startRecording={startRecording} stopRecording={stopRecording}
                                     hierarchyPending={hierarchyPending} setHierarchyPending={setHierarchyPending}
                                     weightPending={weightPending} setWeightPending={setWeightPending}
+                                    copEnabled={copEnabled} copPrimary={copPrimary} tasaCop={tasaCop}
                                 />
                             </div>
 
