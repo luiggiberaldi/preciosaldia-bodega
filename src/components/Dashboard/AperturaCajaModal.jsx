@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, DollarSign, X, Check } from 'lucide-react';
 
-export default function AperturaCajaModal({ isOpen, onClose, onConfirm, copEnabled }) {
+export default function AperturaCajaModal({ isOpen, onClose, onConfirm, copEnabled, copPrimary }) {
     const [usd, setUsd] = useState('');
     const [bs, setBs] = useState('');
     const [cop, setCop] = useState('');
@@ -58,6 +58,25 @@ export default function AperturaCajaModal({ isOpen, onClose, onConfirm, copEnabl
                 </div>
 
                 <div className="space-y-4">
+                    {/* COP Opening - FIRST when copPrimary */}
+                    {copEnabled && copPrimary && (
+                        <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Efectivo en Pesos (COP)</label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 font-bold text-[10px]">COP</span>
+                                <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    placeholder="0.00"
+                                    value={cop}
+                                    onChange={e => setCop(e.target.value)}
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-12 pr-4 py-3 text-sm font-bold text-amber-600 dark:text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     {/* USD Opening */}
                     <div>
                         <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Efectivo en Dólares ($)</label>
@@ -70,7 +89,7 @@ export default function AperturaCajaModal({ isOpen, onClose, onConfirm, copEnabl
                                 value={usd}
                                 onChange={e => setUsd(e.target.value)}
                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all"
-                                autoFocus
+                                autoFocus={!copPrimary}
                             />
                         </div>
                     </div>
@@ -91,8 +110,8 @@ export default function AperturaCajaModal({ isOpen, onClose, onConfirm, copEnabl
                         </div>
                     </div>
 
-                    {/* COP Opening */}
-                    {copEnabled && (
+                    {/* COP Opening - at the end when NOT copPrimary */}
+                    {copEnabled && !copPrimary && (
                         <div>
                             <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Efectivo en Pesos (COP)</label>
                             <div className="relative">

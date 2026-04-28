@@ -766,6 +766,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
                 onClose={() => setIsAperturaOpen(false)}
                 onConfirm={handleSaveApertura}
                 copEnabled={copEnabled}
+                copPrimary={copPrimary}
             />
         </div>
     );
