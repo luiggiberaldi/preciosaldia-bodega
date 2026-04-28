@@ -65,6 +65,33 @@ export function ProductProvider({ children, rates }) {
         return () => { isMounted = false; };
     }, []);
 
+    // One-time migration: assign priceCop to existing products that don't have it
+    useEffect(() => {
+        if (isLoadingProducts || products.length === 0) return;
+        if (!copEnabled || !tasaCop || tasaCop <= 0) return;
+        if (localStorage.getItem('priceCop_migration_v1') === 'done') return;
+
+        const needsMigration = products.some(p => p.priceUsdt > 0 && (p.priceCop == null || p.priceCop <= 0));
+        if (!needsMigration) {
+            localStorage.setItem('priceCop_migration_v1', 'done');
+            return;
+        }
+
+        const migrated = products.map(p => {
+            if (p.priceUsdt > 0 && (p.priceCop == null || p.priceCop <= 0)) {
+                const priceCop = Math.round(p.priceUsdt * tasaCop);
+                const unitPriceCop = p.unitPriceUsd > 0
+                    ? Math.round(p.unitPriceUsd * tasaCop)
+                    : null;
+                return { ...p, priceCop, ...(unitPriceCop ? { unitPriceCop } : {}) };
+            }
+            return p;
+        });
+
+        setProducts(migrated);
+        localStorage.setItem('priceCop_migration_v1', 'done');
+    }, [isLoadingProducts, products.length, copEnabled, tasaCop]);
+
     // Set Initial Street Rate (from BCV)
     useEffect(() => {
         if (!streetRate && rates.bcv?.price > 0 && !localStorage.getItem('street_rate_bs')) {
