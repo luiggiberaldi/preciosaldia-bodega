@@ -386,7 +386,22 @@ export default function SalesView({ triggerHaptic, isActive }) {
             searchInputRef.current?.blur();
             setCartSelectedIndex(0); // Ensure cart item is selected and ready for + / -
         }, 50);
-    }, [triggerHaptic, effectiveRate]);
+    }, [triggerHaptic, effectiveRate, tasaCop]);
+
+    // Recalculate priceUsd for cart items with priceCop when tasaCop changes
+    useEffect(() => {
+        if (!tasaCop || tasaCop <= 0) return;
+        setCart(prev => {
+            const needsUpdate = prev.some(i => i.priceCop && i.priceCop > 0);
+            if (!needsUpdate) return prev;
+            return prev.map(i => {
+                if (i.priceCop && i.priceCop > 0) {
+                    return { ...i, priceUsd: i.priceCop / tasaCop };
+                }
+                return i;
+            });
+        });
+    }, [tasaCop]);
 
     const updateQty = (id, delta) => {
         triggerHaptic && triggerHaptic();
