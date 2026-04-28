@@ -38,7 +38,7 @@ export default function SalesView({ triggerHaptic, isActive }) {
     const { notifyLowStock, notifySaleComplete } = useNotifications();
 
     // ── Global Context ──────────────────────────────────────
-    const { products, setProducts, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, copPrimary, tasaCop } = useProductContext();
+    const { products, setProducts, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, copPrimary, tasaCop, autoCopEnabled, setAutoCopEnabled, tasaCopManual, setTasaCopManual } = useProductContext();
 
     // ── State ──────────────────────────────────────
     const [showConfetti, setShowConfetti] = useState(false);
@@ -519,6 +519,9 @@ export default function SalesView({ triggerHaptic, isActive }) {
                 showRateConfig={showRateConfig} setShowRateConfig={setShowRateConfig}
                 setShowKeyboardHelp={setShowKeyboardHelp}
                 triggerHaptic={triggerHaptic}
+                copEnabled={copEnabled} copPrimary={copPrimary} tasaCop={tasaCop}
+                autoCopEnabled={autoCopEnabled} setAutoCopEnabled={setAutoCopEnabled}
+                tasaCopManual={tasaCopManual} setTasaCopManual={setTasaCopManual}
             />
 
             {!todayAperturaData ? (

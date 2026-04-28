@@ -12,11 +12,42 @@ export default function SalesHeader({
     showRateConfig,
     setShowRateConfig,
     setShowKeyboardHelp,
-    triggerHaptic
+    triggerHaptic,
+    copEnabled,
+    copPrimary,
+    tasaCop,
+    autoCopEnabled,
+    setAutoCopEnabled,
+    tasaCopManual,
+    setTasaCopManual,
 }) {
+    const isCopMode = copEnabled && copPrimary && tasaCop > 0;
 
     const handleRateToggle = () => {
         setShowRateConfig(!showRateConfig);
+    };
+
+    // When copPrimary: toggle controls autoCopEnabled; otherwise useAutoRate
+    const isAuto = isCopMode ? autoCopEnabled : useAutoRate;
+    const handleAutoToggle = () => {
+        triggerHaptic && triggerHaptic();
+        if (isCopMode) {
+            const newVal = !autoCopEnabled;
+            setAutoCopEnabled(newVal);
+            localStorage.setItem('auto_cop_enabled', newVal.toString());
+        } else {
+            setUseAutoRate(!useAutoRate);
+        }
+    };
+
+    const manualValue = isCopMode ? tasaCopManual : customRate;
+    const handleManualChange = (e) => {
+        if (isCopMode) {
+            setTasaCopManual(e.target.value);
+            localStorage.setItem('tasa_cop', e.target.value);
+        } else {
+            setCustomRate(e.target.value);
+        }
     };
 
     return (
@@ -35,15 +66,19 @@ export default function SalesHeader({
                             onClick={handleRateToggle}
                             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all bg-slate-50 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 active:scale-95 dark:bg-slate-800 dark:border-slate-700"
                         >
-                            <RefreshCw size={12} className={showRateConfig ? "text-emerald-500" : "text-slate-400"} />
-                            <strong className="text-xs text-emerald-600 dark:text-emerald-400">{formatBs(effectiveRate)}</strong>
+                            <RefreshCw size={12} className={showRateConfig ? (isCopMode ? "text-amber-500" : "text-emerald-500") : "text-slate-400"} />
+                            {isCopMode
+                                ? <strong className="text-xs text-amber-600 dark:text-amber-400">{Math.round(tasaCop).toLocaleString('es-CO')}</strong>
+                                : <strong className="text-xs text-emerald-600 dark:text-emerald-400">{formatBs(effectiveRate)}</strong>
+                            }
+                            {!isAuto && <span className="text-[8px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1 rounded font-bold">MAN</span>}
                         </button>
                     </div>
                 </div>
 
                 {/* Tasa Desktop y Botones (oculto en sm) */}
                 <div className="hidden sm:flex items-center gap-2">
-                    <button 
+                    <button
                         onClick={() => setShowKeyboardHelp(true)}
                         className="hidden md:flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl transition-colors hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
                     >
@@ -51,17 +86,29 @@ export default function SalesHeader({
                         <span className="text-xs font-bold">Atajos (PC)</span>
                     </button>
 
-                    <Tooltip text={useAutoRate ? "Tasa oficial sincronizada (BCV)" : "Usando tasa manual fijada por ti"} position="bottom">
+                    <Tooltip text={isCopMode ? `Tasa COP/USD: ${Math.round(tasaCop).toLocaleString('es-CO')}` : (useAutoRate ? "Tasa oficial sincronizada (BCV)" : "Usando tasa manual fijada por ti")} position="bottom">
                         <button
                             onClick={handleRateToggle}
                             className="flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all group bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:shadow-sm"
                         >
-                            <span className="text-xs text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1.5">
-                                <RefreshCw size={12} className={showRateConfig ? "text-emerald-500" : "group-hover:text-emerald-500"} />
-                                BCV:
-                            </span>
-                            <strong className="text-sm text-emerald-600 dark:text-emerald-400">{formatBs(effectiveRate)} Bs</strong>
-                            {!useAutoRate && <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1 rounded-md font-bold">MAN</span>}
+                            {isCopMode ? (
+                                <>
+                                    <span className="text-xs text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1.5">
+                                        <RefreshCw size={12} className={showRateConfig ? "text-amber-500" : "group-hover:text-amber-500"} />
+                                        COP:
+                                    </span>
+                                    <strong className="text-sm text-amber-600 dark:text-amber-400">{Math.round(tasaCop).toLocaleString('es-CO')} $/USD</strong>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-xs text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1.5">
+                                        <RefreshCw size={12} className={showRateConfig ? "text-emerald-500" : "group-hover:text-emerald-500"} />
+                                        BCV:
+                                    </span>
+                                    <strong className="text-sm text-emerald-600 dark:text-emerald-400">{formatBs(effectiveRate)} Bs</strong>
+                                </>
+                            )}
+                            {!isAuto && <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1 rounded-md font-bold">MAN</span>}
                         </button>
                     </Tooltip>
                 </div>
@@ -71,25 +118,30 @@ export default function SalesHeader({
             {showRateConfig && (
                 <div className="bg-slate-50 dark:bg-slate-950 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 p-3 mb-3 animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-slate-500">Tasa de Cambio</span>
+                        <span className="text-xs font-bold text-slate-500">
+                            {isCopMode ? 'Tasa COP/USD' : 'Tasa de Cambio'}
+                        </span>
                         <div className="flex items-center gap-2">
                             <span className="text-[11px] font-bold text-slate-400">
-                                {useAutoRate ? <span className="text-emerald-500">Auto Dólar BCV</span> : <span>Manual</span>}
+                                {isAuto
+                                    ? <span className={isCopMode ? "text-amber-500" : "text-emerald-500"}>{isCopMode ? 'Auto TRM' : 'Auto Dólar BCV'}</span>
+                                    : <span>Manual</span>
+                                }
                             </span>
-                            <button onClick={() => { triggerHaptic && triggerHaptic(); setUseAutoRate(!useAutoRate); }}
-                                className={`relative w-10 h-6 rounded-full transition-colors ${useAutoRate ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
-                                <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${useAutoRate ? 'translate-x-4' : 'translate-x-0'}`} />
+                            <button onClick={handleAutoToggle}
+                                className={`relative w-10 h-6 rounded-full transition-colors ${isAuto ? (isCopMode ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-300 dark:bg-slate-600'}`}>
+                                <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${isAuto ? 'translate-x-4' : 'translate-x-0'}`} />
                             </button>
                         </div>
                     </div>
-                    {!useAutoRate && (
-                        <input type="number" value={customRate} onChange={e => setCustomRate(e.target.value)}
-                            className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-bold text-indigo-600 dark:text-indigo-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                            placeholder="Ingresa Tasa Manual (Bs por $)" autoFocus />
+                    {!isAuto && (
+                        <input type="number" value={manualValue} onChange={handleManualChange}
+                            className={`w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-bold outline-none focus:ring-2 ${isCopMode ? 'text-amber-600 dark:text-amber-400 focus:border-amber-500 focus:ring-amber-500/20' : 'text-indigo-600 dark:text-indigo-400 focus:border-indigo-500 focus:ring-indigo-500/20'}`}
+                            placeholder={isCopMode ? 'Tasa COP por 1 USD (ej: 4150)' : 'Ingresa Tasa Manual (Bs por $)'} autoFocus />
                     )}
                     <button
                         onClick={() => { triggerHaptic && triggerHaptic(); setShowRateConfig(false); }}
-                        className="w-full mt-2 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm rounded-xl shadow-sm shadow-emerald-500/20 active:scale-95 transition-all"
+                        className={`w-full mt-2 py-2.5 text-white font-bold text-sm rounded-xl shadow-sm active:scale-95 transition-all ${isCopMode ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20'}`}
                     >
                         Aceptar
                     </button>

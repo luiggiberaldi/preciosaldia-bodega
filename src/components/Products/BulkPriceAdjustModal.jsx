@@ -13,6 +13,9 @@ export default function BulkPriceAdjustModal({
     effectiveRate,
     triggerHaptic,
     showToast,
+    copEnabled,
+    copPrimary,
+    tasaCop,
 }) {
     const [direction, setDirection] = useState('up'); // 'up' | 'down'
     const [percent, setPercent] = useState(10);
@@ -253,10 +256,10 @@ export default function BulkPriceAdjustModal({
                                     <div key={i} className="flex items-center justify-between bg-white/80 dark:bg-slate-800/80 rounded-xl px-3 py-2">
                                         <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate mr-3 max-w-[45%]">{s.name}</span>
                                         <div className="flex items-center gap-2 shrink-0">
-                                            <span className="text-xs text-slate-400 line-through">${s.oldPrice.toFixed(2)}</span>
+                                            <span className="text-xs text-slate-400 line-through">{copEnabled && copPrimary && tasaCop > 0 ? `${Math.round(s.oldPrice * tasaCop).toLocaleString('es-CO')} COP` : `$${s.oldPrice.toFixed(2)}`}</span>
                                             <span className="text-xs font-bold">&rarr;</span>
                                             <span className={`text-sm font-black ${isUp ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-                                                ${s.newPrice.toFixed(2)}
+                                                {copEnabled && copPrimary && tasaCop > 0 ? `${Math.round(s.newPrice * tasaCop).toLocaleString('es-CO')} COP` : `$${s.newPrice.toFixed(2)}`}
                                             </span>
                                         </div>
                                     </div>

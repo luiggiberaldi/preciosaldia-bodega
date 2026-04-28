@@ -690,7 +690,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                                         )}
                                                         {isLowStock && <span className="text-[9px] font-bold text-amber-500 flex items-center gap-0.5"><AlertTriangle size={9} /> Bajo</span>}
                                                         {/* Mobile: show price inline */}
-                                                        <span className="sm:hidden text-[11px] font-black text-emerald-600 dark:text-emerald-400">${(p.priceUsdt || 0).toFixed(2)}</span>
+                                                        <span className="sm:hidden text-[11px] font-black text-emerald-600 dark:text-emerald-400">{copEnabled && copPrimary && tasaCop > 0 ? `${Math.round(p.priceUsdt * tasaCop).toLocaleString('es-CO')} COP` : `$${(p.priceUsdt || 0).toFixed(2)}`}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -731,7 +731,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                                 )}
                                             </div>
                                             <div className="hidden sm:block">
-                                                {!isCajero ? <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{p.costUsd ? `$${p.costUsd.toFixed(2)}` : '-'}</p> : <span className="text-[10px] text-slate-300">-</span>}
+                                                {!isCajero ? <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{p.costUsd ? (copEnabled && copPrimary && tasaCop > 0 ? `${Math.round(p.costUsd * tasaCop).toLocaleString('es-CO')} COP` : `$${p.costUsd.toFixed(2)}`) : '-'}</p> : <span className="text-[10px] text-slate-300">-</span>}
                                             </div>
                                             <div className="hidden sm:block">
                                                 {!isCajero ? (margin !== null ? (
@@ -931,6 +931,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 effectiveRate={effectiveRate}
                 triggerHaptic={triggerHaptic}
                 showToast={showToast}
+                copEnabled={copEnabled}
+                copPrimary={copPrimary}
+                tasaCop={tasaCop}
             />
 
             <CategoryManagerModal
